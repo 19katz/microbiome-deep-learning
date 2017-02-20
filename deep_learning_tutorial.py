@@ -5,6 +5,7 @@ import matplotlib
 matplotlib.use('Agg') # this suppresses the console for plotting 
 import bz2
 import numpy
+from numpy import random
 import pandas
 import os
 import pylab
@@ -108,9 +109,20 @@ pylab.xlabel('epoch')
 pylab.legend(['train', 'test'], loc='upper left')
 pylab.savefig(os.path.expanduser('~/deep_learning/deep_learning_analysis/epoch_vs_loss.pdf'), bbox_inches='tight')
 
-# how does the loss change as I change the test vs training data sets?
+# how does the loss change as the fraction of data in the test vs training change?
 
 # how do the points before and after encoding compare (can we make a y=x line?)
+#matplotlib.rcParams['agg.path.chunksize'] = 10000 # might need this as there are too many points. 
+pylab.figure()
+num_data_pts=len(x_test.flatten())
+indexes=numpy.random.choice(num_data_pts,100,replace=False)
+input_data=x_test.flatten()[indexes]
+decoded_data=decoded_imgs.flatten()[indexes]
+pylab.plot(input_data, decoded_data)
+pylab.title("input vs decoded data")
+pylab.ylabel("decoded data")
+pylab.xlabel("input data")
+pylab.savefig(os.path.expanduser('~/deep_learning/deep_learning_analysis/data_decoded.pdf'), bbox_inches='tight')
 
 # Plot alpha diversity before and after encoding
 
