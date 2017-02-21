@@ -16,8 +16,10 @@ from keras.callbacks import History
 #################################
 # read in the data using pandas
 #################################
-filename=os.path.expanduser("~/deep_learning/deep_learning_data/relative_abundance.txt.bz2")
-rel_abundance_matrix = pandas.read_csv(filename, sep = '\t', index_col = 0)
+filename="~/deep_learning/deep_learning_data/relative_abundance.txt.bz2"
+rel_abundance_matrix = pandas.read_csv(filename, sep = '\t', index_col = 0).T # note that .T transposes permanently
+
+#other operations to take note of:
 #rel_abundance_matrix.head()
 #rel_abundance_matrix.values # gives numpy representation
 #rel_abundance_matrix.values.transpose()
@@ -27,7 +29,7 @@ rel_abundance_matrix = pandas.read_csv(filename, sep = '\t', index_col = 0)
 ################################
 
 # this is the size of our encoded representations -- NEED TO PLAY AROUND WITH THIS VARIABLE
-encoding_dim = 32  # 32 floats -> compression of factor 24.5, assuming the input is 784 floats
+encoding_dim = 3  # 32 floats -> compression of factor 24.5, assuming the input is 784 floats
 
 # this is our input placeholder
 # 1573 comes from the number of columns in our input data
@@ -77,11 +79,11 @@ autoencoder.compile(optimizer='adadelta', loss='mean_squared_error')
 # Fit the model #
 #################
 
-x_train=rel_abundance_matrix.values.transpose()[0:1300]
-x_test=rel_abundance_matrix.values.transpose()[1300:(len(rel_abundance_matrix.values.transpose()))]   
+x_train=rel_abundance_matrix.values[:1300]
+x_test=rel_abundance_matrix.values[1300:]   
 history = History() 
 autoencoder.fit(x_train, x_train,
-                nb_epoch=100,
+                nb_epoch=50,
                 batch_size=256,
                 shuffle=True,
                 validation_data=(x_test, x_test),
@@ -115,7 +117,7 @@ pylab.savefig(os.path.expanduser('~/deep_learning/deep_learning_analysis/epoch_v
 #matplotlib.rcParams['agg.path.chunksize'] = 10000 # might need this as there are too many points. 
 pylab.figure()
 num_data_pts=len(x_test.flatten())
-indexes=numpy.random.choice(num_data_pts,100,replace=False)
+indexes=numpy.random.choice(num_data_pts,1000,replace=False)
 input_data=x_test.flatten()[indexes]
 decoded_data=decoded_imgs.flatten()[indexes]
 pylab.plot(input_data, decoded_data)
