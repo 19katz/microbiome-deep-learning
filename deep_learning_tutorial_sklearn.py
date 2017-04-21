@@ -27,7 +27,7 @@ def create_autoencoder():
     decoded = Dense(5952, activation='sigmoid')(encoded)
     # this model maps an input to its reconstruction
     autoencoder = Model(input=input_img, output=decoded)
-    autoencoder.compile(optimizer='adadelta', loss='mean_squared_error', metrics=['accuracy']) # NOT SURE IF THIS IS THE RIGHT METRIC (SHOULD IT BE neg_mean_squared_error? MSE?)
+    autoencoder.compile(optimizer='adadelta', loss='mean_squared_error', metrics=['MSE']) # NOT SURE IF THIS IS THE RIGHT METRIC (SHOULD IT BE neg_mean_squared_error? MSE?)
     return autoencoder
 
 autoencoder = KerasClassifier(build_fn=create_autoencoder, verbose=0)
