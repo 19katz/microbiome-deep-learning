@@ -8,32 +8,47 @@ import os
 import pylab
 from sklearn.feature_extraction.text import CountVectorizer
 from Bio import SeqIO
+import gzip
 
 
 # using biopython, load the fastq file
-#fasta_dict = SeqIO.index("/home/ngarud/deep_learning/deep_learning_data/SRR038746_1_test.fasta", "fasta")
+#fastq_dict = SeqIO.index("/home/ngarud/deep_learning/deep_learning_data/SRR038746_1_test.fastq", "fastq")
 
-#for sequence in fasta_dict:
-#    print(sequence)
-#fasta_dict["SRR038746.22"].seq
+#for sequence in fastq_dict:
+#    print(fastq_dict[sequence].seq)
 
-data=['NCATAGACATCAAGATTTTCTATAGTCTTTCCGTTACGCACCAACTTTATGCCACAT']
+
+# try iterating through a fastq.gz file
+#fasta_dict={}
+#file=gzip.open('/home/ngarud/deep_learning/deep_learning_data/SRR038746_1.fastq.gz','rb')
+#read_sequence=False
+#for line in file:
+#    if read_sequence==True:
+#        fasta_dict[header]=line.strip()
+#        read_sequence=False
+#    elif line[0]=='@':
+#        header=line.strip()
+#        read_sequence=True
+
+# try iterating through a fastq file
+fasta_dict={}
+file=open('/home/ngarud/deep_learning/deep_learning_data/SRR038746_1_test.fastq','r')
+read_sequence=False
+for line in file:
+    if read_sequence==True:
+        fasta_dict[header]=line.strip()
+        read_sequence=False
+    elif line[0]=='@':
+        header=line.strip()
+        read_sequence=True
+
+
+sequences_df=pd.DataFrame(pd.Series(fasta_dict))
 v = CountVectorizer(analyzer = 'char', ngram_range = (7, 7), lowercase = True)
-v.fit_transform(data)
-v.get_feature_names()
 
 kmers_df = pd.DataFrame(
-    v.fit_transform(data).todense(),
-    index = data.index,
+    v.fit_transform(sequences_df[0]).todense(),
+    index = sequences_df[0].index,
     columns = v.get_feature_names()
 )
-
-# Sean's code
-#v = CountVectorizer(analyzer = 'char', ngram_range = (1, 4), lowercase = True)
-#kmers_df = pd.DataFrame(
-#    v.fit_transform(sequences_df['sequence']).todense(),
-#    index = sequences_df.index,
-#    columns = v.get_feature_names()
-#)
-
 
