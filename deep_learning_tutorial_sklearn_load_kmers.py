@@ -18,7 +18,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 #fasta_dict["SRR038746.22"].seq
 
 #data=['NCATAGACATCAAGATTTTCTATAGTCTTTCCGTTACGCACCAACTTTATGCCACAT']
-sequences_df=pandas.read_table("~/Documents/project_data/deepLearning/sample.fasta",index_col=0,header=None)
+sequences_df=pandas.read_table("sample.fasta",index_col=0,header=None)
 sequences_df.columns=["sequence"]
 v = CountVectorizer(analyzer = 'char', ngram_range = (2, 5), lowercase = True)
 kmers_df = pd.DataFrame(
