@@ -16,7 +16,7 @@ from keras.callbacks import History
 #################################
 # read in the data using pandas
 #################################
-filename="~/deep_learning/deep_learning_data/relative_abundance.txt.bz2"
+filename="~/deep_learning_microbiome/data/relative_abundance.txt.bz2"
 rel_abundance_matrix = pandas.read_csv(filename, sep = '\t', index_col = 0).T # note that .T transposes permanently
 
 #other operations to take note of:
@@ -109,7 +109,7 @@ pylab.title('model loss')
 pylab.ylabel('loss')
 pylab.xlabel('epoch')
 pylab.legend(['train', 'test'], loc='upper left')
-pylab.savefig(os.path.expanduser('~/deep_learning/deep_learning_analysis/epoch_vs_loss.pdf'), bbox_inches='tight')
+pylab.savefig(os.path.expanduser('~/deep_learning_microbiome/analysis/epoch_vs_loss.pdf'), bbox_inches='tight')
 
 # how does the loss change as the fraction of data in the test vs training change?
 
@@ -124,7 +124,7 @@ pylab.plot(input_data, decoded_data)
 pylab.title("input vs decoded data")
 pylab.ylabel("decoded data")
 pylab.xlabel("input data")
-pylab.savefig(os.path.expanduser('~/deep_learning/deep_learning_analysis/data_decoded.pdf'), bbox_inches='tight')
+pylab.savefig(os.path.expanduser('~/deep_learning_microbiome/analysis/data_decoded.pdf'), bbox_inches='tight')
 
 # Plot alpha diversity before and after encoding
 
