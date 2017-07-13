@@ -19,7 +19,6 @@ def get_kmers(fn):
     # return vectorizer.fit_transform(sequences) # returns a numpy array (columns = kmers, rows = sequencies)
     return vectorizer.fit_transform(sequences).sum(axis=0) # returns a numpy array (with exactly 1 row taking the sum across all rows (above))
 
-# TFidf -- frequency of word vs document frequency (i.e. 'the' and 'and'). May not want to do this. 
 
 kmer_size = 5
 all_kmers = [''.join(_) for _ in product(['a', 'c', 'g', 't'], repeat = kmer_size)]
@@ -29,8 +28,9 @@ vectorizer = TfidfVectorizer(
     analyzer = 'char', # count at level of character instead of word. 
     ngram_range = (kmer_size, kmer_size), # can set a range (min, max). The longer kmer is, the less accurate the predicition is. 
     vocabulary = all_kmers,
-    use_idf = False, # false makes idf similar to countVectorizer
-    norm = None # scale vector (L1 or L2 norm)
+    use_idf = False, # false makes idf similar to countVectorizer. # TFidf -- frequency of word vs document frequency (i.e. 'the' and 'and'). May not want to do this. 
+    #norm = None # scale vector (L1 or L2 norm)
+    norm='l1' # change this to None or l2 later?
 )
 
 # -1 means that you use all the CPUs (be very careful, because if one CPU takes a lot of ram, then you can really swamp system. instead start with 1 core, guesstimate how much RAM it will take, then scale up. May make sense to use 2-4 cores)
