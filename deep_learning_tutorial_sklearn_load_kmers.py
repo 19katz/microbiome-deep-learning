@@ -14,8 +14,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 def get_kmers(fn):
     # fn = abbrev for file name
     # parse will return all the sequences in the fast. .seq returns all the DNA (ignores the fasta header). Will return a vector with the number of rows = number of unique seq. 
-    # change fasta -> fastq
-    sequences = [str(_.seq) for _ in SeqIO.parse(gzip.open(fn, 'rt'), 'fasta')]
+    sequences = [str(_.seq) for _ in SeqIO.parse(gzip.open(fn, 'rt'), 'fastq')]
 
     # return vectorizer.fit_transform(sequences) # returns a numpy array (columns = kmers, rows = sequencies)
     return vectorizer.fit_transform(sequences).sum(axis=0) # returns a numpy array (with exactly 1 row taking the sum across all rows (above))
