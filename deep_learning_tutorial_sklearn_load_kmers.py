@@ -40,19 +40,15 @@ vectorizer = TfidfVectorizer(
 
 kmers = Parallel(n_jobs = 1)(delayed(get_kmers)(fn) for fn in glob('*fastq.gz'))
 
+
 # create pandas dframe
-sparse_kmers_df = pd.SparseDataFrame(
+sparse_kmers_df = pd.DataFrame(
     # stack the arrays vertically into a sparse (sp) array
-    sp.vstack(kmers),
+    np.vstack(kmers),
     # naming all the columns with the kmers from the vectorizer
     columns = all_kmers,
-    # if values are not present, then fill with 0
-    default_fill_value = 0
 )
-print(sparse_kmers_df.head())
 
 # will tell you how much memory etc. 
-sparse_kmers_df.info()
-print()
-# to_dense will un-sparse it. Sometime sparse doesn't work with some functions. 
-sparse_kmers_df.to_dense().info()
+#sparse_kmers_df.info()
+#print()
