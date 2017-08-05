@@ -12,7 +12,7 @@ from itertools import product
 from functools import partial
 from multiprocessing import Pool
 
-kmer_size = 5
+kmer_size = 7
 # All the kmer names
 all_kmers_caps = [''.join(_) for _ in product(['A', 'C', 'G', 'T'], repeat = kmer_size)]
 
