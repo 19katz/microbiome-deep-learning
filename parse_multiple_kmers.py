@@ -41,7 +41,7 @@ def get_kmers(output_dir, fn):
                 f.write(k + '\t' + str(v) + "\n")
 
 def process_fastq_files(file_name_list, output_dir = '../data_generated',
-                       input_dir = '../data', n_threads=6):
+                    n_threads=6):
     pool = Pool(n_threads)
     part_f = partial(get_kmers, output_dir)
     pool.map(part_f, file_name_list)
@@ -53,5 +53,4 @@ def process_fastq_data(file_pattern='*.fastq.gz', output_dir = '../data_generate
 
 
 if __name__ == '__main__':
-    # will tell you how much memory etc.
     process_fastq_data()
