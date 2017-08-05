@@ -48,7 +48,7 @@ def process_fastq_files(file_name_list, output_dir = '../data_generated',
 
 def process_fastq_data(file_pattern='*.fastq.gz', output_dir = '../data_generated',
                        input_dir = '../data', n_threads=6):
-    process_fastq_files(glob(input_dir + '/' + file_pattern), output_dir, input_dir, n_threads)
+    process_fastq_files(glob(input_dir + '/' + file_pattern), output_dir, n_threads)
 
 
 
