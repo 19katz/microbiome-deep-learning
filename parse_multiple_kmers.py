@@ -13,7 +13,7 @@ from functools import partial
 from multiprocessing import Pool
 
 
-kmer_sizes = [5, 7, 9]
+kmer_sizes = [7, 9]
 
 def get_kmers(output_dir, fn):
     print("Processing: " + fn)
