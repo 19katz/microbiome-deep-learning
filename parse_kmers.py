@@ -48,7 +48,7 @@ def get_kmers(output_dir, fn):
 # spawn the specified number of threads to parse out kmer counts in
 # the input files. These counts are written to output files, one per input file.
 def process_fastq_files(file_name_list, output_dir='../data_generated',
-                       input_dir = '../data', n_threads=6):
+                       n_threads=6):
     pool = Pool(n_threads)
     part_f = partial(get_kmers, output_dir)
     kmer_cnts_list = pool.map(part_f, file_name_list)
