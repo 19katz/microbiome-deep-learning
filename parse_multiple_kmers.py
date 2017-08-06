@@ -13,7 +13,7 @@ from functools import partial
 from multiprocessing import Pool
 
 
-kmer_sizes = [7, 9]
+kmer_sizes = [ 11,  15 ]
 
 def get_kmers(output_dir, fn):
     print("Processing: " + fn)
@@ -21,17 +21,25 @@ def get_kmers(output_dir, fn):
 
     # running through the sequences
     for sq in SeqIO.parse(gzip.open(fn, 'rt'), 'fastq'):
-        sequence = str(sq.seq)
-        leng = len(sequence)
-        # parsing out every kmer
-        for size in kmer_sizes:
-            d = dicts[size]
-            for i in range(leng - size + 1):
-                kmer = sequence[i:i+size]
-                try:
-                    d[kmer] += 1
-                except KeyError:
-                    d[kmer] = 1
+        sequences = str(sq.seq).split('N')
+        for sequence in sequences:
+            leng = len(sequence)
+            if leng == 0:
+                continue
+
+            # parsing out every kmer
+            for size in kmer_sizes:
+                d = dicts[size]
+                # Use while instead of for i in range() to avoid creating
+                # lists too many times.
+                i = 0
+                while i < leng - size + 1:
+                    kmer = sequence[i:i+size]
+                    try:
+                        d[kmer] += 1
+                    except KeyError:
+                        d[kmer] = 1
+                    i += 1
 
     for size in kmer_sizes:
         d = dicts[size]
@@ -53,4 +61,5 @@ def process_fastq_data(file_pattern='*.fastq.gz', output_dir = '../data_generate
 
 
 if __name__ == '__main__':
-    process_fastq_data()
+    #process_fastq_data(output_dir = 'tmp', input_dir = 'tmp')
+    process_fastq_data(n_threads=6)
