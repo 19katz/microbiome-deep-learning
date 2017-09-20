@@ -493,16 +493,41 @@ def load_ra_t2d_with_labels(kmer_cnts_dir = '../data_generated', data_dir='../da
         rn.shuffle(labels)
     return kmers_df, labels
 
+dataset_loader_dict = {'HMP': load_kmer_cnts_for_hmp_with_labels, 'MetaHIT': load_kmer_cnts_for_metahit_with_labels,
+                       'T2D': load_kmer_cnts_for_t2d_with_labels, 'RA': load_kmer_cnts_for_ra_with_labels }
+# load a dataset with healthy samples from other datasets - for checking the Pasolli paper's result that
+# adding healthy samples helps with disease classification.
+def load_single_disease_plus_healthy_others(disease_dataset, healthy_others=['HMP'], kmer_cnts_dir = '../data_generated', data_dir='../data', filter=True, load_1_only=False, metahit_obesity=False, shuffle_labels=False):
+    kmers_df, labels = dataset_loader_dict[disease_dataset](kmer_cnts_dir, data_dir, filter, load_1_only, shuffle_labels)
+    for h in healthy_others:
+        df, lbls = dataset_loader_dict[h](kmer_cnts_dir, data_dir, filter, load_1_only, shuffle_labels)
+        for i in range(len(lbls)):
+            if lbls[i][0] == '0':
+                # healthy - matrix append
+                kmers_df = kmers_df.append(df.iloc[[i]])
+                # list append
+                labels.append(lbls[i])
+
+    if shuffle_labels:
+        # shuffle the labels - note that we don't change the distribution of the class labels
+        rn.shuffle(labels)
+    return kmers_df, labels
+
 if __name__ == '__main__':
     # will tell you how much memory etc.
 
-    for ((df, lbls), name) in [ (load_kmer_cnts_for_hmp_with_labels(), 'HMP'),
-                                (load_kmer_cnts_for_metahit_with_labels(), 'MetaHIT'),
-                                (load_kmer_cnts_for_t2d_with_labels(), 'T2D'),
-                                (load_kmer_cnts_for_ra_with_labels(), 'RA') ]:
-        
+    # df, labels = load_single_disease_plus_healthy_others('RA', healthy_others=['T2D'])
+    # print('RA plus T2D healthy: total -- ' + str(len(df)) + ' with # of labels -- ' + str(len(labels)))
 
-        print(name + ": total count - " + str( len(df.values)) + ", num of diseased - " + str([ lbls[i][0] for i in range(len(lbls)) ].count('1')))
+    for ((df, lbls), name, id_ind) in [ #(load_kmer_cnts_for_hmp_with_labels(), 'HMP', 1),
+                                        (load_kmer_cnts_for_metahit_with_labels(), 'MetaHIT', 2),
+                                        (load_kmer_cnts_for_t2d_with_labels(), 'T2D', 2),
+                                        (load_kmer_cnts_for_ra_with_labels(), 'RA', 2) ]:
+        
+        print(name + ": total count - " + str( len(df.values)) + ", num of diseased - " + str([ lbls[i][0] for i in range(len(lbls)) ].count('1'))
+              + ', number of 5-mers: ' + str(df.values.sum()))
+        for r in lbls:
+            print(r[2][id_ind])
 
     # kmers_df, labels = load_all_kmer_cnts_with_labels()
     # print("All data dims: " + str(kmers_df.values.shape))
