@@ -269,6 +269,23 @@ def load_kmer_cnts_for_hmp_with_labels(kmer_cnts_dir = '../data_generated', data
     # For HMP, shuffling labels or not doesn't matter because everyone's labels are the same -- healthy, US, and NA
     return kmers_df, [ ['0', 'North America', None, 'United States', 'HMP', 'HMP', 'Healthy'] for i in range(len(kmers_df.values)) ]
 
+# For testing the autoencoder - because the K-fold cross validation code is shared with supervised learning
+# , it needs some positive labels to work, so we randomly generate some here, but they do not affect the
+# autoencoder experiment results.
+def load_kmer_cnts_for_hmp_with_random_labels(kmer_cnts_dir = '../data_generated', data_dir='../data', filter=True, load_1_only=False, shuffle_labels=False):
+    files = []
+    for id in hmp_no_timedup_ids:
+        if (not filter) or not (id in hmp_ids_to_be_filtered):
+            # Only use the _1 file names because the _2 ones (if exist) will be automatically loaded and merged with _1 file counts
+            files.append(kmer_cnts_dir + '/' + id + "_1.fastq.gz.5mer.rawcnt")
+    kmers_df = load_kmer_cnts_from_files(files, load_1_only=load_1_only)
+    # For HMP, shuffling labels or not doesn't matter because everyone's labels are the same -- healthy, US, and NA
+    labels = []
+    for i in range(len(kmers_df.values)):
+        sick = np.random.randint(0, 2)
+        labels.append([str(sick), 'North America', None, 'United States', 'HMP', 'HMP', 'IBD' if sick else 'Healthy'])
+    return kmers_df, labels
+
 # MetaHIT outlier                    
 metahit_filter = ['ERR011293']
 def load_kmer_cnts_for_metahit(shuffle=False, kmer_cnts_dir = '../data_generated', filter=True, load_1_only=False):
