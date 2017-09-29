@@ -266,7 +266,7 @@ exp_configs = {
                 # boolean for whether no randomness should be used
                 no_random_key:    [ [0], "Eliminate randomness in training: {}" ],
                 # number of iterations
-                num_iters_key:    [ [5], "Number of iterations: {}" ],
+                num_iters_key:    [ [20], "Number of iterations: {}" ],
                 # the current iteration index
                 iter_key:    [ [0], "Iteration: {}" ],
                 # boolean
@@ -1327,67 +1327,135 @@ def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, co
     pylab.close(fig)
 
 if __name__ == '__main__':
+    # the experiment mode can be one of SUPER_MODELS, AUTO_MODELS, SEARCH_SUPER_MODELS, SEARCH_AUTO_MODELS, OTHER
+    # - see below
+    exp_mode = "AUTO_MODELS"
 
-    # Models chosen after supervised grid search
+    if exp_mode == "SUPER_MODELS":
+        plot_ae_fold = False
+        plot_ae_overall = False
 
-    # set_config(dataset_key, ['AllContinent', 'AllCountry', 'AllHealth', 'SingleDiseaseIBD', 'SingleDiseaseT2D', 'SingleDiseaseRA'])
- 
-    # # This produced 0.998 AUC and 0.987 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-    # # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-    # dataset_config['AllContinent'] = ['LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1',
-    #                                   'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1'
-    # ]
+        plot_fold = False
+        plot_iter = False
 
-    # # This produced 0.989 AUC and 0.939 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-    # # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-    # dataset_config['AllCountry'] = ['LS:1024-2-2_ED:2_EA:tanh_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1', 'LS:1024-2-2_ED:2_EA:tanh_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1']
+        # Overall plotting - aggregate results across both folds and iteration
+        plot_overall = True
 
-    # # This produced 0.947 AUC and 0.914 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-    # # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-    # dataset_config['SingleDiseaseIBD'] = ['LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:__NR:1',
-    #                                       'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1'
-    # ]
+        # For testing supervised models - normalization across samples needs to be on
+        set_config(norm_input_key, [1])
 
-    # # This produced 0.759 AUC and 0.693 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-    # # - a drop from the previous model as a result of avoiding overfitting.
-    # # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-    # dataset_config['SingleDiseaseT2D'] = ['LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1', 'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1']
+        set_config(dataset_key, ['AllContinent', 'AllCountry', 'SingleDiseaseIBD', 'SingleDiseaseT2D', 'SingleDiseaseRA'])
 
-    # # This produced 0.604 AUC and 0.601 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-    # # but the std is too big (around 0.1 for both), suggesting again that the RA data is not amenable to this technique.
-    # dataset_config['SingleDiseaseRA'] = ['LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1',
-    #                                      'LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1'
-    # ]
+        # Models chosen after supervised grid search whose performance stats wre reported in the Siemens paper.
+        # These come in pairs - one for the real model, the other for the null/shuffled one
+        #
+        # You can add any specific models to be tested by add ing them to their respective dataset_config list
 
-    # For testing autoencoder - normalization across samples is turned off
-    set_config(dataset_key, ['HMP', 'SingleDiseaseIBD', 'SingleDiseaseT2D', 'SingleDiseaseRA'])
 
-    # MSE=1.625*10^(-8) after 20 runs of 10-fold CV
-    dataset_config['SingleDiseaseT2D'] = ['DS:SingleDiseaseT2D_LS:1024-2-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:10_SL:0_SA:0',
-                                          'DS:SingleDiseaseT2D_LS:1024-2-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:10_SL:0_SA:1',                                          
-    ]
+        # This produced 0.998 AUC and 0.987 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
+        # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
+        dataset_config['AllContinent'] = ['LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1',
+                                          'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1'
+        ]
 
-    # MSE=1.577*10^(-8) after 20 runs of 10-fold CV
-    set_config(dataset_key, ['SingleDiseaseRA'])
-    dataset_config['SingleDiseaseRA'] = ['DS:SingleDiseaseRA_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:0',
-                                         'DS:SingleDiseaseRA_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:1',
-    ]
+        # This produced 0.989 AUC and 0.939 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
+        # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
+        dataset_config['AllCountry'] = ['LS:1024-2-2_ED:2_EA:tanh_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1', 'LS:1024-2-2_ED:2_EA:tanh_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1']
+        
+        # This produced 0.947 AUC and 0.914 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
+        # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
+        dataset_config['SingleDiseaseIBD'] = ['LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:__NR:1',
+                                              'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1'
+        ]
 
-    # MSE=2.176*10^(-8) after 20 runs of 10-fold CV
-    dataset_config['SingleDiseaseIBD'] = ['DS:SingleDiseaseIBD_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:0',
-                                          'DS:SingleDiseaseIBD_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:1',
-    ]
+        # This produced 0.759 AUC and 0.693 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
+        # - a drop from the previous model as a result of avoiding overfitting.
+        # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
+        dataset_config['SingleDiseaseT2D'] = ['LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1', 'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1']
 
-    set_config(dataset_key, ['SingleDiseaseIBD'])
-    dataset_config['SingleDiseaseIBD'] = ['DS:SingleDiseaseIBD_LS:1024-512-2_ED:2_EA:linear_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:10_SL:0_SA:0',
-                                          'DS:SingleDiseaseIBD_LS:1024-512-2_ED:2_EA:linear_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:10_SL:0_SA:1',
-    ]
+        # This produced 0.604 AUC and 0.601 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
+        # but the std is too big (around 0.1 for both), suggesting again that the RA data is not amenable to this technique.
+        dataset_config['SingleDiseaseRA'] = ['LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1',
+                                             'LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1'
+        ]
 
-    # MSE=2.617*10^(-8) after 20 runs of 10-fold CV
-    dataset_config['HMP'] = ['DS:HMP_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:0',
-                             'DS:HMP_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:1',
-    ]
+        loop_over_datasets()
+    elif exp_mode == "AUTO_MODELS":
+        plot_ae_fold = False
+        plot_ae_overall = True
 
-    # To do your own grid search or test any specific model config, just edit exp_configs to your needs and comment out the above
-    loop_over_datasets()
+        plot_fold = False
+        plot_iter = False
+        plot_overall = False
+
+        # Models chosen after unsupervised grid search whose performance stats were reported in the Siemens paper.
+        # These come in pairs - one for the real model, the other for the null/shuffled one
+        #
+        # You can add any specific models to be tested by adding them to their respective dataset_config list
+
+        # For testing autoencoder - normalization across samples is turned off
+        # make your your config string has NI:0
+        exp_configs[norm_input_key] = [0]
+        # set the supervised epochs to be 1 to make the ROC calculations happy and to avoid wasting time on supervised
+        # learning. We have to use the supervised part only because the K-fold cross-validation code was tangled with
+        # supervised learning. Make sure your config string has SEP:1 to avoid wasting computing time
+        set_config(super_epochs_key, [1])
+        
+        set_config(dataset_key, ['HMP', 'SingleDiseaseIBD', 'SingleDiseaseT2D', 'SingleDiseaseRA'])
+        
+        # MSE=1.625*10^(-8) after 20 runs of 10-fold CV
+        dataset_config['SingleDiseaseT2D'] = ['DS:SingleDiseaseT2D_LS:1024-2-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:10_SL:0_SA:0',
+                                              'DS:SingleDiseaseT2D_LS:1024-2-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:10_SL:0_SA:1',                                          
+                                          ]
+
+        # MSE=1.577*10^(-8) after 20 runs of 10-fold CV
+        dataset_config['SingleDiseaseRA'] = ['DS:SingleDiseaseRA_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:0',
+                                             'DS:SingleDiseaseRA_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:1',
+                                         ]
+
+        # MSE=2.176*10^(-8) after 20 runs of 10-fold CV
+        dataset_config['SingleDiseaseIBD'] = ['DS:SingleDiseaseIBD_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:0',
+                                              'DS:SingleDiseaseIBD_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:1',
+                                          ]
+
+        # MSE=2.617*10^(-8) after 20 runs of 10-fold CV
+        dataset_config['HMP'] = ['DS:HMP_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:0',
+                                 'DS:HMP_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:1',
+                             ]
+
+        loop_over_datasets()
+    elif exp_mode == "SEARCH_SUPER_MODELS":
+        plot_ae_fold = False
+        plot_ae_overall = False
+
+        plot_fold = False
+        plot_iter = False
+        plot_overall = True
+
+        # For searching supervised models - normalization across samples needs to be on
+        set_config(norm_input_key, [1])
+
+        # edit exp_configs to your needs
+        loop_over_datasets()
+    elif exp_mode == "SEARCH_AUTO_MODELS":
+        plot_ae_fold = False
+        plot_ae_overall = True
+
+        plot_fold = False
+        plot_iter = False
+        plot_overall = False
+
+        # For searching unsupervised models - normalization across samples needs to be off
+        set_config(norm_input_key, [0])
+        # set the supervised epochs to be 1 to make the ROC calculations happy and to avoid wasting time on supervised
+        # learning. We have to use the supervised part only because the K-fold cross-validation code was tangled with
+        # supervised learning
+        set_config(super_epochs_key, [1])
+
+        # edit exp_configs to your needs
+        loop_over_datasets()
+    else:
+        # anything goes, just edit exp_configs to your needs - it can be for a single specific model, or for
+        # arbitrary grid search
+        loop_over_datasets()
 
