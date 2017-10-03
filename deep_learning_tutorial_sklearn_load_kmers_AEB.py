@@ -1,21 +1,14 @@
 #!/usr/bin/env python
 
-
 ###Importing things
 import gzip
-# 'as pd' and 'as sp' are to avoid overlap w/built-in Python functions
 import pandas as pd
 import scipy.sparse as sp
 import numpy as np
 
-#from BioPython, importing SeqIO (sequence input/output)
 from Bio import SeqIO
-#glob module finds pathnames matching a specified pattern
 from glob import glob
-#looks like this is for iterator algebra. helps make loops more efficient.
-##not sure where it was used
 from itertools import product
-# joblib allows you to run multiple parllel jobs from python.
 from sklearn.externals.joblib import Parallel, delayed
 # Tf means term-frequences
 # Tfid means term frequency times inverse document-frequency
@@ -26,7 +19,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 def get_kmers(fn):
     
     # fn = abbrev for file name
-    ## this is where you'd type in your zip file
     # gzip.open lets me open a file in text mode and returns file object
     ## 'rt' is open for read, text mode (non-binary)
     # SeqIO.parse() takes filename (fn) & format name (fastq) and returns SeqRecord iterator
@@ -43,7 +35,7 @@ def get_kmers(fn):
     return vectorizer.fit_transform(sequences).sum(axis=0) 
 
 
-kmer_size = 5
+kmer_size = 3
 all_kmers = [''.join(_) for _ in product(['a', 'c', 'g', 't'], repeat = kmer_size)]
 
 # create vectorizer class (this is an object):
@@ -53,7 +45,7 @@ vectorizer = TfidfVectorizer(
     vocabulary = all_kmers,
     use_idf = False, # false makes idf similar to countVectorizer. # TFidf -- frequency of word vs document frequency (i.e. 'the' and 'and'). May not want to do this. 
     #norm = None # scale vector (L1 or L2 norm)
-    norm='l1' # change this to None or l2 later?
+    norm = None # change this to None or l2 later?
 )
 
 # -1 means that you use all the CPUs (be very careful, because if one CPU takes a lot of ram, then you can really swamp system.

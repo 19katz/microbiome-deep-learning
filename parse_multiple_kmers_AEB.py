@@ -1,24 +1,14 @@
 
 
 import gzip
-#the “as pd” and “as np” are to avoid overlap with built-in methods in python like max() and min()
-import pandas as pd 
+import pandas as pd
 import numpy as np 
-#looks like this is for operating system functionality on a Windows
-##not sure why it was needed
 import ntpath
 
-#from BioPython, importing SeqIO (sequence input/output) 
 from Bio import SeqIO
-#glob module finds pathnames matching a specified pattern
 from glob import glob
-#looks like this is for iterator algebra. helps make loops more efficient.
-##not sure where it was used
 from itertools import product
-
-#makes a new version of a function with one more arguments already filled in
 from functools import partial
-#is this for thread stuff?
 from multiprocessing import Pool
 
 kmer_sizes = [2]
