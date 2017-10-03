@@ -5,6 +5,7 @@ import gzip
 import pandas as pd
 import scipy.sparse as sp
 import numpy as np
+import pickle
 
 from Bio import SeqIO
 from glob import glob
@@ -70,4 +71,9 @@ sparse_kmers_df = pd.DataFrame(
 #sparse_kmers_df.info()
 #print()
 
-print(sparse_kmers_df)
+sparse_kmers_df.to_pickle('/pollard/home/abustion/deep_learning_microbiome/tmp_intermediate_files/sparse_kmers_df_pickle.pickle')
+
+#TO READ THE PICKLE LATER
+#import pandas as pd
+#import picle
+#pd.read_pickle('/pollard/home/abustion/deep_learning_microbiome/tmp_intermediate_files/sparse_kmers_df_pickle.pickle')
