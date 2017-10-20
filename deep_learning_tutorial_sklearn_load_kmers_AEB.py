@@ -45,7 +45,7 @@ def get_kmers(fn):
     final = np.zeros([1,(4**kmer_size)])
 
     for i in range(step + 1):
-        final = final + vectorizer.fit_fit_transform(sequences[(cap*i):(cap*(i+1))]).sum(axis=0)
+        final = final + vectorizer.fit_transform(sequences[(cap*i):(cap*(i+1))]).sum(axis=0)
 
     return(final)
     print("vectorizer finished at:" + time.ctime())
