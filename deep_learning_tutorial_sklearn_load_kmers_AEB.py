@@ -21,51 +21,54 @@ def get_kmers(fn):
     # Will return a vector with the number of rows = number of unique seq. 
     
     kmer_gzip = gzip.open(fn, 'rt')
-
     seq_stuff = SeqIO.parse(kmer_gzip, 'fastq') 
 
     print("started appending into list loop:" + time.ctime())
     sequences = []
-#    x = 0
+    x = 0
     for record in seq_stuff:
         sequences.append(str(record.seq))
-#        x = x + 1
-#        if x > 500:
-#            break
+        x = x + 1
+        if x > 500:
+            break
     print("finished appending into list loop:" + time.ctime())
-#    print(len(sequences))
+    print(len(sequences))
 
     # Vectorization = turning collection of text documents into numerical feature vectors
     # returns a numpy array (columns = kmers, rows = frequencies)
     # returns a numpy array (with exactly 1 row taking the sum across all rows (above))
     print("started vectorizer at.." + time.ctime())
-    # set vectorizer.fit statement to a variable and then print instead of returning
-    # also print out what the .sum(axis=0) is for 2mers versus 3mers
-    # This is what makes it 1:4^kmer length columns, rather than 1:1 
 
-    #Split into two pieces because the Vectorizer wasn't able to store all the numbers
-    #Zip file had a total of 67,000,000 seqeunces, and I knew running 30 mil worked.
-    first_half = vectorizer.fit_transform(sequences[0:int(len(sequences)/2)]).sum(axis=0)
-    second_half = vectorizer.fit_transform(sequences[int(len(sequences)/2):]).sum(axis=0)
-    return (first_half + second_half)
-#    return vectorizer.fit_transform(sequences[0:int(len(sequences)/2)]).sum(axis=0)
+    #I know running 30 mil worked.
+    cap = 30000000
+    step = int(np.ceil(len(sequences)/cap))
+    final = np.zeros([1,(4**kmer_size)])
+
+    for i in range(step + 1):
+        final = final + vectorizer.fit_fit_transform(sequences[(cap*i):(cap*(i+1))]).sum(axis=0)
+
+    return(final)
     print("vectorizer finished at:" + time.ctime())
     
-##This happens first
+####This happens first
 kmer_size = 3
 all_kmers = [''.join(_) for _ in product(['a', 'c', 'g', 't'], repeat = kmer_size)]
 print("all_kmers just finished setting at: " + time.ctime())
 
-##This happens second
+####This happens second
 # create vectorizer class (this is an object):
 # seems equivalent to CountVectorizer bc use_idf = False and norm = None
 # idea for later-- try out Marisa-trie again but with CountVectorizer instead of TfidfVectorizer
 vectorizer = TfidfVectorizer(
-    analyzer = 'char', # count at level of character instead of word. 
-    ngram_range = (kmer_size, kmer_size), # can set a range (min, max). The longer kmer is, the less accurate the predicition is. 
+    # count at level of character rather than word
+    analyzer = 'char',
+    # can set range (min, max)
+    ngram_range = (kmer_size, kmer_size),
     vocabulary = all_kmers,
-    use_idf = False, # false makes idf similar to countVectorizer. # TFidf -- frequency of word vs document frequency (i.e. 'the' and 'and'). May not want to do this. 
-    norm = None # change this to None or l2 later?
+    # False makes idf similar to CountVectorizer
+    use_idf = False,
+    # could also be 'l1' or 'l2'
+    norm = None
 )
 print("vectorizer just finished setting:" + time.ctime())
 
@@ -87,12 +90,13 @@ sparse_kmers_df = pd.DataFrame(
     # naming all the columns with the kmers from the vectorizer
     columns = all_kmers,
 )
+
 #will tell you how much memory etc. 
 #sparse_kmers_df.info()
 #print()
 
 #pickled dataframe
-sparse_kmers_df.to_pickle('/pollard/home/abustion/play/pickles/fullfinalstack.pickle')
+sparse_kmers_df.to_pickle('/pollard/home/abustion/deep_learning_microbiome/data/sample_reps_' + str(kmer_size) + '.pickle')
 
 #how to read later
 #pd.read_pickle('/pollard/home/abustion/play/pickles/fullfinalstack.pickle')
