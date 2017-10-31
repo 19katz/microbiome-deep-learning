@@ -5,9 +5,8 @@ from itertools import product
 from glob import glob
 import re
 import os.path
-#for row header
 from os.path import basename
-
+import pickle
 
 # Load the given list of 5mer count files, can take a list of ids to skip.
 # If a file name has _1 in it, it will automatically load the corresponding _2 file
@@ -247,9 +246,11 @@ def load_kmer_cnts_for_hmp(shuffle=False, kmer_cnts_dir = '/pollard/home/ngarud/
     no_path_files = [os.path.basename(x) for x in files]
     kmers_df.index = no_path_files
 
+    kmers_df.to_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/loaded_katherine_5mers.pickle')
     return kmers_df
 
-print(load_kmer_cnts_for_hmp())
+print(pd.read_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/loaded_katherine_5mers.pickle'))
+#print(load_kmer_cnts_for_hmp())
 
 ###just the labels 174 X 1024
 #def load_kmer_cnts_for_hmp_with_labels(kmer_cnts_dir = '/pollard/home/ngarud/deep_learning_microbiome/data/5mer_data_katherine', filter=True, load_1_only=False, shuffle_labels=False):
