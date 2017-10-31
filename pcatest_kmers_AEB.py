@@ -35,7 +35,7 @@ import pickle
 #print(sparse_kmers_df.values.shape)
 
 #Pickle time
-data = pd.read_pickle('/pollard/home/abustion/play/pickles/fullfinalstack.pickle')
+data = pd.read_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/loaded_katherine_5mers.pickle')
 
 pca = PCA(n_components=2)
 pca.fit(data)
@@ -53,7 +53,7 @@ pylab.title('PC2 VS PC1')
 pylab.xlabel('PC1')
 pylab.ylabel('PC2')
 
-graph_dir = '/pollard/home/abustion/play/analysis'
+graph_dir = '/pollard/home/abustion/deep_learning_microbiome/analysis'
 
 pylab.scatter(data_new[:, 0],data_new[:, 1])
 pylab.gca().set_position((.1, .4, .8, .6))

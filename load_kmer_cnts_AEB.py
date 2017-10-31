@@ -249,7 +249,8 @@ def load_kmer_cnts_for_hmp(shuffle=False, kmer_cnts_dir = '/pollard/home/ngarud/
     kmers_df.to_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/loaded_katherine_5mers.pickle')
     return kmers_df
 
-print(pd.read_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/loaded_katherine_5mers.pickle'))
+###To check ouput
+#print(pd.read_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/loaded_katherine_5mers.pickle'))
 #print(load_kmer_cnts_for_hmp())
 
 ###just the labels 174 X 1024
