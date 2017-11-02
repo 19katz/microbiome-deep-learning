@@ -22,6 +22,5 @@ for file in $input_folder;
 do 
 mover_name=$(basename $file)
 echo $mover_name
-zcat $file | jellyfish count /dev/fd/0 -m 3 -s 100M -t 2 -C -o $file.jf
-mv $file.jf $output_folder/$mover_name.jf
+zcat $file | jellyfish count /dev/fd/0 -m 3 -s 100M -t 2 -C -o $output_folder/$mover_name.jf
 done
