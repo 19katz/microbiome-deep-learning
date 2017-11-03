@@ -35,7 +35,7 @@ import pickle
 #print(sparse_kmers_df.values.shape)
 
 #Pickle time
-data = pd.read_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/loaded_katherine_5mers.pickle')
+data = pd.read_pickle('/pollard/home/abustion/play/pickles/jf.pickle')
 
 pca = PCA(n_components=2)
 pca.fit(data)
@@ -53,12 +53,12 @@ pylab.title('PC2 VS PC1')
 pylab.xlabel('PC1')
 pylab.ylabel('PC2')
 
-graph_dir = '/pollard/home/abustion/deep_learning_microbiome/analysis'
+graph_dir = '/pollard/home/abustion/play/analysis'
 
 pylab.scatter(data_new[:, 0],data_new[:, 1])
 pylab.gca().set_position((.1, .4, .8, .6))
 pylab.figtext(0.02, .24, 'This graph shows the relative abundance data plotted with 2-component PCA')
-pylab.savefig(os.path.expanduser(graph_dir + '/pca_two_components' + '.pdf'), bbox_inches='tight')
+pylab.savefig(os.path.expanduser(graph_dir + '/3mer_pca_two_components' + '.pdf'), bbox_inches='tight')
 
 
 
@@ -81,4 +81,4 @@ for i in range(1, nComponents):
 pylab.gca().set_position((.1, .4, .8, .6))
 pylab.figtext(0.02, .24, 'This graph plots the total variance explained over the number of components used in PCA.')
 pylab.figtext(0.02, .2, 'Maximum number of components: {}'.format(nComponents))
-pylab.savefig(os.path.expanduser(graph_dir + '/pca_total_variance_vs_num_components' + fileInfo + '.pdf'), bbox_inches='tight')
+pylab.savefig(os.path.expanduser(graph_dir + '/3mer_pca_total_variance_vs_num_components' + fileInfo + '.pdf'), bbox_inches='tight')
