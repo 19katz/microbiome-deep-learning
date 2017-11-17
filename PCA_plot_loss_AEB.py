@@ -18,15 +18,6 @@ data = pd.read_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pick
 #also include axis=1 statement in here
 data_normalized = normalize(data, axis = 1, norm = 'l1')
 
-#PCA w/set number of components
-#pca = PCA(n_components=25)
-#pca.fit(data_normalized)
-#data_normalized_pca = pca.transform(data_normalized)
-#data_normalized_projected = pca.inverse_transform(data_normalized_pca)
-#loss = ((data_normalized - data_normalized_projected)**2).mean()
-#print(loss)
-
-
 #Initialize figure
 pylab.figure()
 pylab.title("Loss versus Number of Components with 5mers")
