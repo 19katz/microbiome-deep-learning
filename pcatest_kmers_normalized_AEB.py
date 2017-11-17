@@ -12,7 +12,7 @@ import os
 import pickle
 
 #Read pickle
-data = pd.read_pickle('/pollard/home/abustion/play/pickles/jf.pickle')
+data = pd.read_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/3mer_sample_reps.pickle')
 
 #Normalize
 #also include axis=1 statement in here
@@ -27,9 +27,18 @@ pca.fit(data_normalized)
 PCA(copy=True, iterated_power = 'auto', n_components=2, random_state=None,
     svd_solver = 'auto', tol=0.0, whiten = False)
 data_new = pca.transform(data_normalized)
+
+#Plot losss, i.e. (yhat - y)^2
+#denoised_data = pca.inverse_transform(data_new)
+#loss = ((data_normalized - denoised_data)**2).mean()
+
 print(data_new)
-print("Shape")
+print("Data_new Shape")
 print(data_new.shape)
+
+#print(denoised_data)
+#print("denoised_data_Shape")
+#print(denoised_data.shape)
 
 pylab.figure()
 
@@ -38,12 +47,12 @@ pylab.title('PC2 VS PC1')
 pylab.xlabel('PC1')
 pylab.ylabel('PC2')
 
-graph_dir = '/pollard/home/abustion/play/analysis'
+graph_dir = '/pollard/home/abustion/deep_learning_microbiome/analysis'
 
 pylab.scatter(data_new[:, 0],data_new[:, 1])
 pylab.gca().set_position((.1, .4, .8, .6))
 pylab.figtext(0.02, .24, 'This graph shows the relative abundance data plotted with 2-component PCA')
-pylab.savefig(os.path.expanduser(graph_dir + '/3mer_pca_two_components_normalized' + '.pdf'), bbox_inches='tight')
+pylab.savefig(os.path.expanduser(graph_dir + '/3mer_sample_reps_pca_two_components_normalized' + '.pdf'), bbox_inches='tight')
 
 
 pylab.figure()
@@ -64,6 +73,6 @@ for i in range(1, nComponents):
     pylab.scatter(i, total_variance)
 pylab.gca().set_position((.1, .4, .8, .6))
 pylab.figtext(0.02, .24, 'This graph plots the total variance explained over the number of components used i\
-n PCA.')
+#n PCA.')
 pylab.figtext(0.02, .2, 'Maximum number of components: {}'.format(nComponents))
-pylab.savefig(os.path.expanduser(graph_dir + '/3mer_pca_total_variance_vs_num_components_norm' + fileInfo + '.pdf'), box_inches='tight')
+pylab.savefig(os.path.expanduser(graph_dir + '/3mer_sample_reps_pca_total_variance_vs_num_components_norm' + fileInfo + '.pdf'), box_inches='tight')

@@ -10,10 +10,10 @@ import pickle
 newDF = pd.DataFrame()
 
 #and then loop add                                                                                                                                                                                          
-csv_files=os.listdir('/pollard/home/abustion/play/dummy_files/')
+csv_files=os.listdir('/pollard/home/abustion/deep_learning_microbiome/data/jf_files/3mers_tech_reps/')
 for csv in csv_files:
-    if csv.endswith(".csv"):
-        csv_df = pd.read_csv(csv, sep = ' ', header = None).T
+    if csv.endswith(".csv") and not ('700117172_1.fastq.gz.jf.csv'):
+        csv_df = pd.read_csv(csv, sep = ' ', header = None)
         csv_df.columns = csv_df.iloc[0]
         csv_df = csv_df[1:]
         newDF = newDF.append(csv_df)
@@ -24,5 +24,5 @@ newDF.index = no_path_files
 
 #print(newDF)                                                                                                                                                                                               
 
-newDF.to_pickle('/pollard/home/abustion/play/pickles/jf.pickle')
-print(pd.read_pickle('/pollard/home/abustion/play/pickles/jf.pickle'))
+newDF.to_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/3mer_tech_reps.pickle')
+print(pd.read_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/3mer_tech_reps.pickle'))
