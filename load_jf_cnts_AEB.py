@@ -1,3 +1,4 @@
+#run from inside directory with csv files
 import pandas as pd
 import numpy as np
 import os
@@ -6,6 +7,7 @@ from itertools import product
 import pickle
 
 # List of unique HMP gut sample ids from Nandita
+# Some have been commented out due to unusual output (i.e. values < 10, and NaN)
 hmp_ids_314 = [
     "700113954",
     "700023788",
@@ -401,3 +403,5 @@ collapsed_df.index = hmp_ids_314
 #check output
 print(collapsed_df) #worked
 
+#pickle output
+collapsed_df.to_pickle('/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/3mer_314_hmp.pickle')
