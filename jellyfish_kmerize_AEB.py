@@ -26,7 +26,12 @@ for src_name in listdir(source_dir):
     # If jf already exists, WE GOOD
     if os.path.isfile(result_file):
         continue
-    
+
+    # 11.20: if something breaks, this is the culprit block
+    # If tmp file already exists, skip
+    if os.path.isfile(fastq_path):
+        continue
+
     # Open it with gzip, and write it out line by line!
     if not os.path.isfile(fastq_path):   
         print("Unzipping " + src_name + " to " + fastq_path)
