@@ -1,0 +1,642 @@
+# set up directories:
+
+~/deep_learning_microbiome/scripts
+~/deep_learning_microbiome/analysis
+~/deep_learning_microbiome/data
+~/deep_learning_microbiome/tmp_intermediate_files
+
+
+# get metadata:
+
+mysql -h westway.gladstone.internal -p -e"select subject_id, sample_id, run_accession, country, continent,ibd,bmi_type from MetaQuery.run_to_study a join MetaQuery.run_to_sample b using(run_accession) join MetaQuery.sample_to_subject c using(sample_id) join MetaQuery.subject_attributes d using(subject_id) where study_id = 'MetaHIT'" > MetaHIT_ids.txt
+
+#####################
+# run kmerizer
+#####################
+
+#compile
+You can make the following change at the line 124, from
+auto fh = fstream(out_path, ios::out | ios::binary)
+to
+ofstream fh(out_path, ofstream::out | ofstream::binary);
+
+g++ -O3 --std=c++11 -o vfkmrz_fastq vfkmrz_fastq.cpp
+
+gzip -dc /path/exp.fastq.gz | ./vfkmrz_fastq
+/pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/joined_fastq_files_hmp_combine_sample_reps/700015245c_1.fastq.gz
+
+gzip -dc /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/joined_fastq_files_hmp_combine_tech_reps/700173119_1.fastq.gz  | ./vfkmrz_fastq > tmp_out/700173119_1_kmer.txt
+
+#include <cstring> -- line 7
+g++ -O --std=c++11 -o vfkmrz_bunion vfkmrz_bunion.cpp  
+
+./vfkmrz_bunion -k1 vfkmrz_fastq.out -k2 vfkmrz_fastq.out 
+
+./vfkmrz_bunion -k1 tmp_out/700173119_1_kmer.txt -k2 tmp_out/700173119_1_kmer.txt > tmp_out/700173119_1_kmer_union.txt
+
+
+
+g++ -O --std=c++14 -o vfkmrz_match vfkmrz_match.cpp 
+g++-7.2 -O3 --std=c++14 -o vfkmrz_match vfkmrz_match.cpp
+
+# 1) vfkmrz_fastq.cpp: pass in the r_len and other parameters as arguments (python). Jason will write. 
+
+# 2) wrapper will autoamtically determine the read length from the fastq file. 
+
+# 3) Compile vfkmrz_match.cpp (either IT will update compiler version or we can install something locally). 
+
+
+
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/joined_fastq_files_hmp_combine_sample_reps/700015245c_1.fastq.gz --k 10 --offset 1 > tmpOut.txt
+
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 tmp.fastq.gz --k 10 --offset 1 --compile-overwrite > tmpOut.txt
+
+export VFKMRZPATH=$VFKMRZPATH:/pollard/home/ngarud/deep_learning_microbiome/vfkmrz
+
+
+~/miniconda2/bin/python vfkmrz_bunion_wrapper.py -k1 tmpOut.txt -k2 tmpOut.txt --k 10 --compile-overwrite > tmp_bunion.txt
+
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db tmp_bunion.txt --in tmpOut.txt --compile-overwrite --kpr 0
+
+kpr tells us how many kmers for each read. 
+
+
+
+# set up kmerizing all the data. Do this in two rounds so that first the dictionary gets made, second the counts are made against the dictionary (match). Must be done linearly. 
+
+#forward
+while read file; do
+    
+    echo $file
+    num=`echo $file | wc -c`
+    let num-=1
+    last=`echo $file | cut -c$num`
+    
+    if [ $last == 'c' ]
+    then
+	dir='joined_fastq_files_hmp_combine_sample_reps'
+    else 
+	dir='joined_fastq_files_hmp_combine_tech_reps'
+    fi
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_1.fastq.gz --k 10 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1.txt
+
+~/miniconda2/bin/python vfkmrz_bunion_wrapper.py -k1 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1.txt -k2 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt --k 10 --compile-overwrite >   ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion_intermediate.txt
+
+mv ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion_intermediate.txt ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt
+
+done < /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt
+
+# reverse
+while read file; do
+echo $file
+
+    echo $file
+    num=`echo $file | wc -c`
+    let num-=1
+    last=`echo $file | cut -c$num`
+    
+    if [ $last == 'c' ]
+    then
+	dir='joined_fastq_files_hmp_combine_sample_reps'
+    else 
+	dir='joined_fastq_files_hmp_combine_tech_reps'
+    fi
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_2.fastq.gz --k 10 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_2.txt
+
+echo 'bunion\n'
+
+~/miniconda2/bin/python vfkmrz_bunion_wrapper.py -k1 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_2.txt -k2 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_2_bunion.txt --k 10 --compile-overwrite >   ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_2_bunion_intermediate.txt
+
+echo 'moving the file\n'
+
+mv ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_2_bunion_intermediate.txt ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_2_bunion.txt
+
+
+done < /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt
+
+
+# It turns out that ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt contains all the 10mers possible after kmerizing the first file.
+
+######################
+# repeat for 20mers  #
+######################
+
+# set up kmerizing all the data. Do this in two rounds so that first the dictionary gets made, second the counts are made against the dictionary (match). Must be done linearly. 
+
+#forward
+while read file; do
+    
+    echo $file
+    num=`echo $file | wc -c`
+    let num-=1
+    last=`echo $file | cut -c$num`
+    
+    if [ $last == 'c' ]
+    then
+	dir='joined_fastq_files_hmp_combine_sample_reps'
+    else 
+	dir='joined_fastq_files_hmp_combine_tech_reps'
+    fi
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_1.fastq.gz --k 20 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_1.txt
+
+~/miniconda2/bin/python vfkmrz_bunion_wrapper.py -k1 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_1.txt -k2 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_1_bunion.txt --k 20 --compile-overwrite >   ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_1_bunion_intermediate.txt
+
+mv ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_1_bunion_intermediate.txt ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_1_bunion.txt
+
+du -h ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_1_bunion.txt 
+
+done < /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt
+
+
+#reverse
+while read file; do
+    
+    echo $file
+    num=`echo $file | wc -c`
+    let num-=1
+    last=`echo $file | cut -c$num`
+    
+    if [ $last == 'c' ]
+    then
+	dir='joined_fastq_files_hmp_combine_sample_reps'
+    else 
+	dir='joined_fastq_files_hmp_combine_tech_reps'
+    fi
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_2.fastq.gz --k 20 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_2.txt
+
+~/miniconda2/bin/python vfkmrz_bunion_wrapper.py -k1 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_2.txt -k2 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_2_bunion.txt --k 20 --compile-overwrite >   ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_2_bunion_intermediate.txt
+
+mv ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_2_bunion_intermediate.txt ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_2_bunion.txt
+
+done < /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt
+
+
+######################
+# repeat for 5mers  #
+######################
+file=700013715
+dir='joined_fastq_files_hmp_combine_tech_reps'
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_1.fastq.gz --k 5 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1.txt
+
+~/miniconda2/bin/python vfkmrz_bunion_wrapper.py -k1 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1.txt -k2 ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt --k 5 --compile-overwrite >   ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1_bunion_intermediate.txt
+
+mv ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1_bunion_intermediate.txt ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1_bunion.txt
+
+### all the 5mers needed are in tmp_5mers_1_bunion.txt ###
+
+
+
+
+
+
+##############################
+# Set up the match script:   #
+##############################
+##########
+# HMP    #
+##########
+
+##########
+# 10mers #
+##########
+#forward
+while read file; do
+echo $file
+
+    echo $file
+    num=`echo $file | wc -c`
+    let num-=1
+    last=`echo $file | cut -c$num`
+    
+    if [ $last == 'c' ]
+    then
+	dir='joined_fastq_files_hmp_combine_sample_reps'
+    else 
+	dir='joined_fastq_files_hmp_combine_tech_reps'
+    fi
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_1.fastq.gz --k 10 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/${file}_1_10mers.txt
+
+done < /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt
+
+
+
+#reverse
+while read file; do
+echo $file
+
+    echo $file
+    num=`echo $file | wc -c`
+    let num-=1
+    last=`echo $file | cut -c$num`
+    
+    if [ $last == 'c' ]
+    then
+	dir='joined_fastq_files_hmp_combine_sample_reps'
+    else 
+	dir='joined_fastq_files_hmp_combine_tech_reps'
+    fi
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_2.fastq.gz --k 10 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_2.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_2.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/${file}_2_10mers.txt
+
+done < /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt
+
+# cut the files and gzip
+
+while read file; do
+    echo $file
+
+    cat /pollard/home/ngarud/deep_learning_microbiome/data/10mers/HMP/${file}_1_10mers.txt | cut -f2 | gzip > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/HMP/${file}_1_10mers.gz
+
+    cat /pollard/home/ngarud/deep_learning_microbiome/data/10mers/HMP/${file}_2_10mers.txt | cut -f2 | gzip > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/HMP/${file}_2_10mers.gz
+
+done < /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt
+
+
+
+##########
+# 5mers #
+##########
+#forward
+while read file; do
+echo $file
+
+    echo $file
+    num=`echo $file | wc -c`
+    let num-=1
+    last=`echo $file | cut -c$num`
+    
+    if [ $last == 'c' ]
+    then
+	dir='joined_fastq_files_hmp_combine_sample_reps'
+    else 
+	dir='joined_fastq_files_hmp_combine_tech_reps'
+    fi
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_1.fastq.gz --k 5 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/5mers/HMP/${file}_1_5mers.txt
+
+done < /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt
+
+
+
+#reverse
+while read file; do
+echo $file
+
+    echo $file
+    num=`echo $file | wc -c`
+    let num-=1
+    last=`echo $file | cut -c$num`
+    
+    if [ $last == 'c' ]
+    then
+	dir='joined_fastq_files_hmp_combine_sample_reps'
+    else 
+	dir='joined_fastq_files_hmp_combine_tech_reps'
+    fi
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_2.fastq.gz --k 5 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_2.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_2.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/5mers/HMP/${file}_2_5mers.txt
+
+done < /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt
+
+
+
+########################
+# Qin et al. data set: #
+########################
+ls /pollard/shattuck0/snayfach/metagenomes/T2D/fastq/*gz | cut -f8 -d'/' | cut -f1 -d'_' | uniq > ~/deep_learning_microbiome/Qin_et_al_samples.txt
+
+###########
+# 10mers: #
+###########
+
+#forward
+while read file; do
+    echo $file
+    dir=/pollard/shattuck0/snayfach/metagenomes/T2D/fastq/
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 ${dir}/${file}_1.fastq.gz --k 10 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_Qin_1.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_Qin_1.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/Qin_et_al/${file}_1_10mers.txt
+
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+
+#reverse
+while read file; do
+    echo $file
+    dir=/pollard/shattuck0/snayfach/metagenomes/T2D/fastq/
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 ${dir}/${file}_2.fastq.gz --k 10 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_Qin_2.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_Qin_2.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/Qin_et_al/${file}_2_10mers.txt
+
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+
+
+while read file; do
+    echo $file
+
+    cat /pollard/home/ngarud/deep_learning_microbiome/data/10mers/Qin_et_al/${file}_1_10mers.txt | cut -f2 | gzip > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/Qin_et_al/${file}_1_10mers.gz
+
+    cat /pollard/home/ngarud/deep_learning_microbiome/data/10mers/Qin_et_al/${file}_2_10mers.txt | cut -f2 | gzip > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/Qin_et_al/${file}_2_10mers.gz
+
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt
+
+
+#############
+# 20mers    #
+#############
+#forward
+while read file; do
+    echo $file
+    dir=/pollard/shattuck0/snayfach/metagenomes/T2D/fastq/
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 ${dir}/${file}_1.fastq.gz --k 20 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_Qin_1.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_Qin_1.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/20mers/Qin_et_al/${file}_1_20mers.txt
+
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+
+#reverse
+while read file; do
+    echo $file
+    dir=/pollard/shattuck0/snayfach/metagenomes/T2D/fastq/
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 ${dir}/${file}_2.fastq.gz --k 20 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_Qin_2.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_20mers_Qin_2.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/20mers/Qin_et_al/${file}_2_20mers.txt
+
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+
+
+
+#############
+# 5mers    #
+#############
+#forward
+while read file; do
+    echo $file
+    dir=/pollard/shattuck0/snayfach/metagenomes/T2D/fastq/
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 ${dir}/${file}_1.fastq.gz --k 5 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_Qin_1.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_Qin_1.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/5mers/Qin_et_al/${file}_1_5mers.txt
+
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+
+#reverse
+while read file; do
+    echo $file
+    dir=/pollard/shattuck0/snayfach/metagenomes/T2D/fastq/
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 ${dir}/${file}_2.fastq.gz --k 5 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_Qin_2.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_5mers_Qin_2.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/5mers/Qin_et_al/${file}_2_5mers.txt
+
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+
+
+
+#################################
+# Rheumatoid Arthirtis data set:#
+#################################
+
+ls /pollard/shattuck0/snayfach/metagenomes/RheumatoidArthritis/fastq/*_1.fastq.gz | cut -f8 -d'/' | cut -f1 -d'_' | uniq > ~/deep_learning_microbiome/RheumatoidArthritis_samples.txt
+
+
+
+#forward
+while read file; do
+    echo $file
+    dir=/pollard/shattuck0/snayfach/metagenomes/RheumatoidArthritis/fastq/
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 ${dir}/${file}_1.fastq.gz --k 10 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_RA_1.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_RA_1.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/RA/${file}_1_10mers.txt
+
+done <  ~/deep_learning_microbiome/RheumatoidArthritis_samples.txt 
+
+
+
+#reverse
+while read file; do
+    echo $file
+    dir=/pollard/shattuck0/snayfach/metagenomes/RheumatoidArthritis/fastq/
+
+~/miniconda2/bin/python vfkmrz_wrapper.py -1 ${dir}/${file}_2.fastq.gz --k 10 --offset 1 --compile-overwrite > ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_RA_2.txt
+
+~/miniconda2/bin/python vfkmrz_match_wrapper.py --db ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_1_bunion.txt --in ~/deep_learning_microbiome/tmp_intermediate_files/tmp_10mers_RA_2.txt --compile-overwrite --kpr 0 > /pollard/home/ngarud/deep_learning_microbiome/data/10mers/RA/${file}_2_10mers.txt
+
+done <  ~/deep_learning_microbiome/RheumatoidArthritis_samples.txt 
+
+
+
+##########################################
+# try out code from LSA (cleary et al.)  #
+##########################################
+
+# try this out on Qin et al. because the files are smaller
+dir=/pollard/shattuck0/snayfach/metagenomes/T2D/fastq/
+python LSFScripts/setupDirs.py -i $dir -n 726
+
+./miniconda2/bin/conda install gensim
+
+
+
+####################
+# Jellyfish
+####################
+file=700013715
+dir='joined_fastq_files_hmp_combine_tech_reps'
+in_file_1=/pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_1.fastq.gz
+
+in_file_2=/pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/${dir}/${file}_2.fastq.gz
+
+jellyfish count /dev/fd/0 -m 5 -s 100M -t 2 -C -F 2 -o test_5mer.jf < (zcat $in_file_1) < (zcat $in_file_2)
+
+nohup nice zcat $in_file | jellyfish count /dev/fd/0 -m 5 -s 100M -t 2 -C -o test_5mer.jf &
+nohup nice zcat $in_file | jellyfish count /dev/fd/0 -m 20 -s 10000000000 -t 2 -C -o test_20mer.jf &
+
+
+#5mers on Qin et al:
+
+while read file; do
+    echo $file
+    dir=/pollard/shattuck0/snayfach/metagenomes/T2D/fastq/
+    jellyfish count < (zcat ${dir}/${file}_1.fastq.gz) < (zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m 5 -s 100M -t 2 -C -F 2 -o ${file}_5mer.jf
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+
+
+# Run Jellyfish on Qin et al.
+python ~/deep_learning_microbiome/scripts/jellyfish_wrapper.py
+
+nohup nice bash ~/deep_learning_microbiome/tmp_intermediate_files/all_commands_qin_10mers.sh &
+
+# manually do this, but included in next round of jellyfish -- dump the output. 
+
+while read file; do
+    jellyfish dump ~/deep_learning_microbiome/data/5mers_jf/Qin_et_al/${file}_5mer.jf | grep '>' | gzip > ~/deep_learning_microbiome/data/5mers_jf/Qin_et_al/${file}_5mer.gz
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+while read file; do
+    jellyfish dump ~/deep_learning_microbiome/data/10mers_jf/Qin_et_al/${file}_10mer.jf | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/Qin_et_al/${file}_10mer.gz
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+
+# check if all the kmers are outputted. If not, I need to then add in a zero
+data_set='Qin_et_al'
+kmer_size=10
+while read file; do
+    echo $file
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+    num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
+    if [ $num_lines = 1049600 ]
+	then
+	echo 'file is ok...'
+	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
+	else
+	echo 'filling in zeros...'
+	# rerun jellyfish
+	dir='/pollard/shattuck0/snayfach/metagenomes/T2D/fastq'
+	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
+	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+	# run a script to find the missing kmers and fill in a zero
+	~/miniconda3/bin/python3 ~/deep_learning_microbiome/scripts/fill_in_zeros.py $file $kmer_size $data_set
+    fi
+    
+done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+
+# Run Jellyfish on HMP
+cat /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt | grep 'c' >  /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314_c.txt
+
+cat /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314.txt | grep -v 'c' >  /pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314_no_c.txt
+
+python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_HMP_no_c.py
+python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_HMP_c.py
+
+
+data_set='HMP'
+kmer_size=5
+while read file; do
+    echo $file
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+    num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
+    if [ $num_lines = 1049600 ]
+	then
+	echo 'file is ok...'
+	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
+	else
+	echo 'filling in zeros...'
+	# rerun jellyfish
+	dir='/pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/joined_fastq_files_hmp_combine_tech_reps/'
+	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
+	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+	# run a script to find the missing kmers and fill in a zero
+	~/miniconda3/bin/python3 ~/deep_learning_microbiome/scripts/fill_in_zeros.py $file $kmer_size $data_set
+    fi
+    
+done <  ~/deep_learning_microbiome/RheumatoidArthritis_samples.txt 
+
+
+
+
+# Jellyfish on RA
+python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_RA.py
+
+
+# check if all the kmers are outputted. If not, I need to then add in a zero
+data_set='RA'
+kmer_size=10
+while read file; do
+    echo $file
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+    num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
+    if [ $num_lines = 1049600 ]
+	then
+	echo 'file is ok...'
+	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
+	else
+	echo 'filling in zeros...'
+	# rerun jellyfish
+	dir='/pollard/shattuck0/snayfach/metagenomes/RheumatoidArthritis/fastq'
+	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
+	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+	# run a script to find the missing kmers and fill in a zero
+	~/miniconda3/bin/python3 ~/deep_learning_microbiome/scripts/fill_in_zeros.py $file $kmer_size $data_set
+    fi
+    
+done <  ~/deep_learning_microbiome/RheumatoidArthritis_samples.txt 
+
+
+# Jellyfish on metaHIT
+MetaHIT_accessions_only.txt
+python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_MetaHIT.py
+
+# check if all the kmers are outputted. If not, I need to then add in a zero
+data_set='MetaHIT'
+kmer_size=10
+while read file; do
+    echo $file
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+    num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
+    if [ $num_lines = 1049600 ]
+	then
+	echo 'file is ok...'
+	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
+	else
+	echo 'filling in zeros...'
+	# rerun jellyfish
+	dir='/pollard/shattuck0/snayfach/metagenomes/MetaHIT/fastq'
+	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
+	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+	# run a script to find the missing kmers and fill in a zero
+	~/miniconda3/bin/python3 ~/deep_learning_microbiome/scripts/fill_in_zeros.py $file $kmer_size $data_set
+    fi
+    
+done <  ~/deep_learning_microbiome/MetaHIT_accessions_only.txt 
+
+
+
+
+
+
+####################
+# Analysis!        #
+####################
+# remember, we want to be using python3. 
+~/miniconda3/bin/python3
+
+# are all the kmers outputted in the same order?
+# to test this, I need to read in data. 
+kmer_order_jason.py
+
+# yes, outputted in same order.
+# go back and trim input files so that I just have the counts. Also gzip them. 
+
+#################################################
+# Load kmer counts using the jellyfish notation #
+#################################################
