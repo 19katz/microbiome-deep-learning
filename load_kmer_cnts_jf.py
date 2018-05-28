@@ -16,38 +16,40 @@ import os.path
 
     
 
-def load_kmers(kmer_size,data_set):
-
-    #kmer_size=5
-    #data_set='Qin_et_al'
-    input_dir = os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s') %(kmer_size, data_set)
-    file_pattern='*.gz'
-    files=glob(input_dir + '/' + file_pattern)
+def load_kmers(kmer_size,data_sets, allowed_labels=['0','1']):
 
     kmer_cnts=[]
     accessions=[]
     labels=[]
     metadata=load_metadata()
 
-    for inFN in files:
-        
-        run_accession=inFN.split('/')[-1].split('_')[0]
-        if run_accession in metadata.keys():
-            labels.append(metadata[run_accession])
-            accessions.append(run_accession)
+    for data_set in data_sets:
+        print(data_set)
+        input_dir = os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s') %(kmer_size, data_set)
+        file_pattern='*.gz'
+        files=glob(input_dir + '/' + file_pattern)
 
-            file = gzip.open(inFN, 'rb')
+        for inFN in files:        
+            run_accession=inFN.split('/')[-1].split('_')[0]
+            if run_accession in metadata.keys():
+                label=metadata[run_accession]
+                if label in allowed_labels:
+                    labels.append(metadata[run_accession])
+                    accessions.append(run_accession)
 
-            new_cnts=[]
-            for line in file:   
-                new_cnts.append(float(line.decode('utf8').strip('\n')[1:]))
-            new_cnts=np.asarray(new_cnts)
-            kmer_cnts.append(new_cnts)
+                    file = gzip.open(inFN, 'rb')
+                
+                    new_cnts=[]
+                    for line in file:   
+                        new_cnts.append(float(line.decode('utf8').strip('\n')[1:]))
+                    new_cnts=np.asarray(new_cnts)
+                    kmer_cnts.append(new_cnts)
 
     kmer_cnts=np.asarray(kmer_cnts)
 
     return kmer_cnts, accessions, labels
     
+
 
     
 

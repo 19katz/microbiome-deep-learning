@@ -26,14 +26,17 @@ import deep_learning_models
 # Load the data # 
 #################
 
-#kmer_size=5
-kmer_size=10
-data_set='Qin_et_al'
+#kmer_size=3
+kmer_size=5
+#kmer_size=10
+#data_set='Qin_et_al'
 #data_set='RA'
 #data_set='MetaHIT'
-#data_set='HMP'
+data_set='HMP'
 
-kmer_cnts, accessions, labels =load_kmer_cnts_jf.load_kmers(kmer_size,data_set)
+data_sets=['HMP']
+
+kmer_cnts, accessions, labels =load_kmer_cnts_jf.load_kmers(kmer_size,data_sets)
 labels=np.asarray(labels)
 healthy=np.where(labels=='0')
 disease=np.where(labels=='1')
@@ -48,7 +51,7 @@ data_normalized = normalize(data, axis = 1, norm = 'l1')
 ################################
 
 input_dim=len(data_normalized[0]) # this is the number of input kmers
-encoding_dim=10000
+encoding_dim=10
 
 encoded_activation = 'relu'
 #encoded_activation = 'linear'
@@ -57,7 +60,7 @@ decoded_activation = 'softmax'
 # sigmoid used to give values between 0 and 1
 loss='kullback_leibler_divergence'
 bias=True
-autoencoder=deep_learning_models.create_autoencoder(encoding_dim, input_dim, encoded_activation, decoded_activation)
+autoencoder, encoder, decoder =deep_learning_models.create_autoencoder(encoding_dim, input_dim, encoded_activation, decoded_activation)
 
 #weightFile = os.environ['HOME'] + '/deep_learning_microbiome/data/weights.txt'
 
@@ -145,10 +148,26 @@ pylab.savefig(os.path.expanduser(graph_dir + '/epoch_vs_loss_varied_training_sam
 # how do the points before and after encoding compare (can we make a y=x line?)
 ######################################################
 
+input_dim=len(data_normalized[0]) # this is the number of input kmers
+encoding_dim=10
+
+encoded_activation = 'relu'
+#encoded_activation = 'linear'
+#decoded_activation = 'linear'
+decoded_activation = 'softmax'
+#decoded_activation = 'sigmoid'
+# sigmoid used to give values between 0 and 1
+loss='kullback_leibler_divergence'
+bias=True
+autoencoder, encoder, decoder =deep_learning_models.create_autoencoder(encoding_dim, input_dim, encoded_activation, decoded_activation)
+
 
 cut = 250
 x_train=data_normalized[:cut]
 x_test=data_normalized[cut:]
+
+x_train=data_normalized
+x_test=data_normalized
 
 #x_train=data_normalized
 #x_test=data_normalized
@@ -217,9 +236,7 @@ pylab.figtext(0.02, .08, 'Activation function used for encoding: ' + encoded_act
 pylab.figtext(0.02, .04, 'Activation function used for decoding: ' + decoded_activation)
 
 plt.show()
-pylab.savefig(os.path.expanduser(graph_dir + '/data_decoded'
-                                 + fileInfo
-                                 + testTrainInfo
+pylab.savefig(os.path.expanduser(graph_dir + '/data_decoded_input_vs_output'
                                  + '.pdf')
               , bbox_inches='tight')
 
@@ -234,8 +251,16 @@ pylab.savefig(os.path.expanduser(graph_dir + '/data_decoded'
 
 #encoding_dims=[1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50,60,70,80,90,100,125,150,175,200,250,300,350,400,450,500,512]
 
+#for 5mers:
+encoding_dims=[1,5,10,20,50,100,200,300,400,500]
+
 # for 10mers:
-encoding_dims=[5,50,100,1000,10000]
+#encoding_dims=[5,50,100,1000,10000]
+
+# for 3mers:
+#encoding_dims=[1,3,10,15,20]
+
+input_dim=len(data_normalized[0])
 
 encoded_activation = 'relu'
 #encoded_activation = 'linear'
@@ -244,13 +269,14 @@ decoded_activation = 'softmax'
 # sigmoid used to give values between 0 and 1
 
 numEpochs = 1000
-batchSize = 100
+batchSize = 10
+cut=200
 
 allHistories = []
 
 for encoding_dim in encoding_dims:
     print(encoding_dim)
-    autoencoder=deep_learning_models.create_autoencoder(encoding_dim, input_dim, encoded_activation, decoded_activation)
+    autoencoder, encoder, decoder=deep_learning_models.create_autoencoder(encoding_dim, input_dim, encoded_activation, decoded_activation)
     #
     cut = 200
     x_train=data_normalized[:cut]
@@ -261,7 +287,6 @@ for encoding_dim in encoding_dims:
     if backend == 'tensorflow':
         callbacks.append(TensorBoard(log_dir='/tmp/autoencoder'))
     #    
-    numEpochs=100
     #autoencoder.load_weights(weightFile)
     autoencoder.fit(x_train, x_train,
                     epochs=numEpochs,
@@ -290,9 +315,14 @@ for hs in allHistories:
 #for 5mers:
 #pylab.legend(['1','2','3','4','5','6','7','8','9','10','15','20','25','30','40','50','60','70','80','90','100','125','150','175','200','250','300','350','400','450','500','512'], loc='upper right')
 
-#for 10mers:
+pylab.legend(['1','5','10','20','50','100','200','300','400','500'], loc='upper right')
 
-pylab.legend=(['5','50','100','1000','10000'],loc='upper right')
+#for 10mers:
+#pylab.legend(['5','50','100','1000','10000'],loc='upper right')
+
+# for 3mers:
+#pylab.legend(['1','3','10','15','20'], loc='upper right')
+
 
 pylab.title('Model loss by epochs and number of encoding dimensions')
 pylab.ylabel('Test Loss (KL divergence)')
@@ -343,12 +373,12 @@ decoded_activation = 'softmax'
 # sigmoid used to give values between 0 and 1
 
 numEpochs = 1000
-batchSize = 100
+batchSize = 10
 
 allHistories_linear = []
 
 for encoding_dim in encoding_dims:
-    autoencoder=deep_learning_models.create_autoencoder(encoding_dim, input_dim, encoded_activation, decoded_activation)
+    autoencoder, encoder, decoder=deep_learning_models.create_autoencoder(encoding_dim, input_dim, encoded_activation, decoded_activation, regularize=True)
     #
     cut = 200
     x_train=data_normalized[:cut]
@@ -358,8 +388,7 @@ for encoding_dim in encoding_dims:
     callbacks = [history]
     if backend == 'tensorflow':
         callbacks.append(TensorBoard(log_dir='/tmp/autoencoder'))
-    #    
-    numEpochs=100
+    #
     #autoencoder.load_weights(weightFile)
     autoencoder.fit(x_train, x_train,
                     epochs=numEpochs,
@@ -388,7 +417,10 @@ for hs in allHistories_linear:
 #pylab.legend(['1','2','3','4','5','6','7','8','9','10','15','20','25','30','40','50','60','70','80','90','100','125','150','175','200','250','300','350','400','450','500','512'], loc='upper right')
 
 #for 10mers:
-pylab.legend=(['5','50','100','1000','10000'], loc='upper right')
+#pylab.legend(['5','50','100','1000','10000'], loc='upper right')
+
+#for 3mers:
+pylab.legend(['1','3','10','15','20'], loc='upper right')
 
 pylab.title('Model loss by epochs and number of encoding dimensions')
 pylab.ylabel('Test Loss (KL divergence)')
@@ -434,12 +466,12 @@ for hs in allHistories_linear:
 
 pylab.figure()
 
-pylab.plot(encoding_dims, epoch_80_ReLU, c='r')
-pylab.plot(encoding_dims, epoch_80_linear, c='b')
+pylab.plot(encoding_dims, epoch_40_ReLU, c='r')
+pylab.plot(encoding_dims, epoch_40_linear, c='b')
 
-pylab.legend(['ReLU','linear'], loc='upper right')
+pylab.legend(['ReLU','linear'], loc='upper left')
 
-pylab.title('Model loss by and number of encoding dimensions at Epoch 80')
+pylab.title('Model loss by and number of encoding dimensions at Epoch 40')
 pylab.ylabel('Test Loss (KL divergence)')
 pylab.xlabel('Number of encoding dimensions')
 
@@ -457,6 +489,73 @@ pylab.figtext(0.02, .04, 'Activation function used for decoding: ' + decoded_act
 
 
 
-pylab.savefig(os.path.expanduser(graph_dir + '/number_inner_nodes_vs_loss_linear_ReLU_epoch80'
+pylab.savefig(os.path.expanduser(graph_dir + '/number_inner_nodes_vs_loss_linear_ReLU_epoch40'
+                                 + '.pdf')
+              , bbox_inches='tight')
+
+
+
+
+#######################################################
+# For 10mers -- why am I getting oscillating losses?  #
+#######################################################
+
+# try fit_generator instead of fit https://groups.google.com/forum/#!topic/keras-users/Hy6k8gEd4T8
+
+encoding_dim=5
+
+encoded_activation = 'relu'
+#encoded_activation = 'linear'
+decoded_activation = 'softmax'
+#decoded_activation = 'sigmoid'
+# sigmoid used to give values between 0 and 1
+
+numEpochs = 1000
+batchSize = 100
+
+
+autoencoder, encoder, decoder=deep_learning_models.create_autoencoder(encoding_dim, input_dim, encoded_activation, decoded_activation)
+
+cut = 200
+x_train=data_normalized[:cut]
+x_test=data_normalized[cut:]
+history = History()
+callbacks = [history]
+if backend == 'tensorflow':
+    callbacks.append(TensorBoard(log_dir='/tmp/autoencoder'))
+
+    
+numEpochs=15000
+batchSize=10
+
+#autoencoder.load_weights(weightFile)
+autoencoder.fit(x_train, x_train,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(x_test, x_test),
+                    callbacks=callbacks)
+
+
+
+graph_dir = '~/deep_learning_microbiome/analysis/'
+
+pylab.figure()
+pylab.plot(history.history['val_loss'], c='b')
+pylab.title('Model loss by epochs and number of encoding dimensions')
+pylab.ylabel('Test Loss (KL divergence)')
+pylab.xlabel('Epoch')
+pylab.gca().set_position((.1, .6, .8, .6))
+pylab.figtext(0.02, .4, 'This graph shows how loss changes with number of epochs for different numbers of encoding dimensions.')
+pylab.figtext(0.02, .32, 'Backend: ' + backend)
+pylab.figtext(0.02, .28, 'Loss function: ' + loss)
+#pylab.figtext(0.02, .24, 'Number of encoding dimensions: {}'.format(encoding_dim))
+pylab.figtext(0.02, .2, 'Use bias: {}'.format(bias))
+pylab.figtext(0.02, .16, 'Number of epochs of training: {}'.format(numEpochs))
+pylab.figtext(0.02, .12, 'Batch size used during training: {}'.format(batchSize))
+pylab.figtext(0.02, .08, 'Activation function used for encoding: ' + encoded_activation)
+pylab.figtext(0.02, .04, 'Activation function used for decoding: ' + decoded_activation)
+
+pylab.savefig(os.path.expanduser(graph_dir + '/debug_epoch_vs_loss_10mer'
                                  + '.pdf')
               , bbox_inches='tight')
