@@ -100,5 +100,87 @@ def load_metadata():
         if run_accession not in exclude:
             metadata[run_accession] = disease_status
     
-        
+
+    # Karlsson et al. (T2D European women)
+    
+    # there are two files. One matches the Run accession with the id. the other matches the id with the disease status. 
+    Karlsson_inFN='%s/Karlsson.txt' %directory
+    Karlsson_file=open(Karlsson_inFN, 'r')
+
+    run_acc_inFN='%s/PRJEB1786.txt' %directory
+    run_acc_file=open(run_acc_inFN, 'r')
+    
+    # read in run_acc into a dictionary:
+    #key=id, value=run_acc
+    run_acc_dict={}
+    for line in run_acc_file:
+        items=line.strip('\n').split('\t')
+        run_accession=items[4]
+        sample_id = items[6]
+        run_acc_dict[sample_id]=run_accession
+
+    for line in Karlsson_file:
+        items=line.strip('\n').split('\t')
+        sample_id=items[0]
+        if sample_id != 'Sample ID':
+            disease_status=items[2]
+            run_accession=run_acc_dict[sample_id]
+            
+            if disease_status == 'NGT':
+                disease_status ='0'
+            else:
+                disease_status ='1' # note that I'm collapsing T2D and Impaired Glucose Toleraance (IGT) into one group
+            if run_accession not in exclude:
+                metadata[run_accession] = disease_status
+    
+
+
+    # LiverCirrhosis 
+
+    LiverCirrhosis_inFN='%s/LiverCirrhosis.txt' %directory
+    LiverCirrhosis_file=open(LiverCirrhosis_inFN, 'r')
+    for line in LiverCirrhosis_file:
+        items=line.strip('\n').split('\t')
+        sample_id=items[1]
+        disease_status=items[6]
+        if disease_status == 'N':
+            disease_status ='0'
+        else:
+            disease_status ='1' 
+        if sample_id not in exclude:
+            metadata[sample_id] = disease_status
+    
+
+    #Feng_CRC
+    Feng_CRC_inFN='%s/Feng_CRC.txt' %directory
+    Feng_CRC_file=open(Feng_CRC_inFN, 'r')
+    for line in Feng_CRC_file:
+        items=line.strip('\n').split('\t')
+        sample_id=items[7]
+        disease_status=items[8]
+        if disease_status == 'Stool sample from controls':
+            disease_status ='0'
+        else:
+            disease_status ='1' 
+        if sample_id not in exclude:
+            metadata[sample_id] = disease_status
+
+    #Zeller_CRC, France
+    # 61 healthy, 27 small, 15 large adenocarcinmoas, 15,7,10,21 various stages of CRC
+    # I am ignoring adenocarcinomas, just like Zeller et al. did. 
+    
+    Zeller_inFN='%s/Zeller_metadata.txt' %directory
+    Zeller_file=open(Zeller_inFN, 'r')
+    Zeller_file.readline() #header
+    for line in Zeller_file:
+        items=line.strip('\n').split('\t')
+        sample_id=items[1]
+        disease_status=items[12]
+        if disease_status == 'Control':
+            disease_status ='0'
+        elif disease_status == 'CRC':
+            disease_status ='1' 
+        if sample_id not in exclude and disease_status != 'NA':
+            metadata[sample_id] = disease_status
+    
     return metadata

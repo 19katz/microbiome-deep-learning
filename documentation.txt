@@ -570,12 +570,12 @@ python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_RA.py
 
 # check if all the kmers are outputted. If not, I need to then add in a zero
 data_set='RA'
-kmer_size=10
+kmer_size=6
 while read file; do
     echo $file
     jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
     num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
-    if [ $num_lines = 1049600 ]
+    if [ $num_lines = 4096 ]
 	then
 	echo 'file is ok...'
 	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
@@ -620,6 +620,70 @@ while read file; do
 done <  ~/deep_learning_microbiome/MetaHIT_accessions_only.txt 
 
 
+# Jellyfish on Feng et al. 
+python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_Feng.py
+
+# check if all the kmers are outputted. If not, I need to then add in a zero
+data_set='Feng'
+kmer_size=5
+while read file; do
+    echo $file
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+    num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
+    if [ $num_lines = 1024 ]
+	then
+	echo 'file is ok...'
+	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
+	else
+	echo 'filling in zeros...'
+	# rerun jellyfish
+	dir='/pollard/shattuck0/snayfach/metagenomes/${data_set}/fastq'
+	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
+	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+	# run a script to find the missing kmers and fill in a zero
+	~/miniconda3/bin/python3 ~/deep_learning_microbiome/scripts/fill_in_zeros.py $file $kmer_size $data_set
+    fi
+    
+done <  ~/deep_learning_microbiome/data/metadata/Feng_CRC_samples_only.txt 
+
+
+
+
+# Jellyfish on LiverCirrhosis
+# first have to combine fastq files
+python ~/shattuck/metagenomic_fastq_files/LiverCirrhosis/combine_fastq_files.py
+python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_LiverCirrhosis.py
+
+# check if all the kmers are outputted. If not, I need to then add in a zero
+data_set='LiverCirrhosis'
+kmer_size=5
+while read file; do
+    echo $file
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+    num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
+    if [ $num_lines = 1024 ]
+	then
+	echo 'file is ok...'
+	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
+	else
+	echo 'filling in zeros...'
+	# rerun jellyfish
+	dir='/pollard/shattuck0/snayfach/metagenomes/${data_set}/fastq'
+	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
+	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+	# run a script to find the missing kmers and fill in a zero
+	~/miniconda3/bin/python3 ~/deep_learning_microbiome/scripts/fill_in_zeros.py $file $kmer_size $data_set
+    fi
+    
+done <  ~/deep_learning_microbiome/data/metadata/LiverCirrhosis_ids.txt
+
+
+
+# Jellyfish on Karlsson et al. 
+python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_Karlsson.py
+
+# Jellyfish on Zeller et al. 
+
 
 
 
@@ -640,3 +704,31 @@ kmer_order_jason.py
 #################################################
 # Load kmer counts using the jellyfish notation #
 #################################################
+
+
+
+
+
+#####################################################################
+# June 4, 2018
+# separate reads based on whether they map to human genomes or not. 
+# create a bowtie index uisng Jason's code
+#####################################################################
+
+cd ~/deep_learning_microbiome/separate_reads
+
+cut -f1 human_patric.txt | sed '1d' | sed 's/$/\.fna/g' | xargs -I{} sh -c "cat /pollard/data/microbial_genomes/patric/genomes/{}" > human_patric.fna 2> err.log
+#Maybe pause a little bit to check the err.log after the command line execution finished, in case some ids in the list doesn't have genome sequence copies on server bueno.
+
+mkdir human_patric_bt2
+bowtie2-build --large-index human_patric.fna human_patric_bt2/human_patric
+#Bowtie2 suite is needed here, and the argument "--threads" may be used for speeding up the index building.
+
+
+
+#################################################
+# June 11, 2018                                 #
+# Implement different versions of the  model    #
+#################################################
+
+supervised_learning_model_test_Nandita.py
