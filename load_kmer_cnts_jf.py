@@ -4,6 +4,7 @@
 import gzip
 import pandas as pd
 import numpy as np
+from numpy import array
 import ntpath
 
 from Bio import SeqIO
@@ -14,7 +15,9 @@ from functools import partial
 from multiprocessing import Pool
 import os.path
 
-    
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
+
 
 def load_kmers(kmer_size,data_sets, allowed_labels=['0','1']):
 
@@ -22,7 +25,9 @@ def load_kmers(kmer_size,data_sets, allowed_labels=['0','1']):
     accessions=[]
     labels=[]
     metadata=load_metadata()
+    domain_labels=[] # this keeps track of which domain we have
 
+    domain_label=1
     for data_set in data_sets:
         print(data_set)
         input_dir = os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s') %(kmer_size, data_set)
@@ -36,6 +41,7 @@ def load_kmers(kmer_size,data_sets, allowed_labels=['0','1']):
                 if label in allowed_labels:
                     labels.append(metadata[run_accession])
                     accessions.append(run_accession)
+                    domain_labels.append(domain_label)
 
                     file = gzip.open(inFN, 'rb')
                 
@@ -44,12 +50,30 @@ def load_kmers(kmer_size,data_sets, allowed_labels=['0','1']):
                         new_cnts.append(float(line.decode('utf8').strip('\n')[1:]))
                     new_cnts=np.asarray(new_cnts)
                     kmer_cnts.append(new_cnts)
+        
+        domain_label +=1
 
     kmer_cnts=np.asarray(kmer_cnts)
+    
+    # one hot encode the domain_labels
+    domain_labels = onehot_encode(domain_labels)
 
-    return kmer_cnts, accessions, labels
+    return kmer_cnts, accessions, labels, domain_labels
     
 
+def onehot_encode(labels):
+    
+    values = array(labels)
+    # integer encode
+    label_encoder = LabelEncoder()
+    integer_encoded = label_encoder.fit_transform(values)
+
+    # binary encode
+    onehot_encoder = OneHotEncoder(sparse=False)
+    integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
+    onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
+
+    return onehot_encoded
 
     
 
