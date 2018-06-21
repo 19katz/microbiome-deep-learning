@@ -10,6 +10,7 @@ from sklearn.model_selection import cross_val_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import RepeatedStratifiedKFold
 
 import argparse
 
@@ -77,7 +78,6 @@ param_dict = {
 # This is used by Lasso and Elastic Net
 def evaluate(model, test_features, test_labels):
     predictions = np.array(model.predict(test_features))
-
     # Convert the predicted values to 0 or 1
     for r in range(len(predictions)):
         if (predictions[r] > 0.5):
@@ -105,14 +105,17 @@ if __name__ == '__main__':
     parser.add_argument('-k', type = int, default = 5, help = "Kmer size")
     parser.add_argument('-cvg', type = int, default = 9, help = "Number of CV folds for grid search")
     parser.add_argument('-cvt', type = int, default = 10, help = "Number of CV folds for testing")
-    parser.add_argument('-n', type = int, default = 20, help = "Number of iterations of k-fold cross validation")
+    parser.add_argument('-ng', type = int, default = 10, help = "Number of iterations of k-fold cross validation for grid search")
+    parser.add_argument('-nt', type = int, default = 20, help = "Number of iterations of k-fold cross validation for testing")
+
 
     arg_vals = parser.parse_args()
     learn_type = arg_vals.m
     kmer_size = arg_vals.k
     cv_gridsearch = arg_vals.cvg
     cv_testfolds = arg_vals.cvt
-    n_iter = arg_vals.n
+    n_iter_grid = arg_vals.ng
+    n_iter_test = arg_vals.nt
     print("Using model " + learn_type)
     # Loop over all data sets
     for data_set in data_sets_to_use:
@@ -148,35 +151,29 @@ if __name__ == '__main__':
         # For SVM and Random forest, use GridSearchCV
         # and cross_val_score to do a nested cross-validation
         if learn_type == "svm" or learn_type == "rf":
-            cross_vals = []
-            for i in range(n_iter):
-                # Set the estimator based on the model type
-                if (learn_type == "svm"):
-                    estimator = SVC(C = 1, probability = True)
-                else:
-                    estimator = RandomForestClassifier()
-                k_fold = StratifiedKFold(n_splits = cv_gridsearch, shuffle = True)
-                grid_search = GridSearchCV(estimator, param_grid, cv = k_fold)
-                grid_search.fit(x, y)
-                
-                best_grid = grid_search.best_estimator_
-                
-                print("Best params for healthy samples from " + str(data_sets_healthy) +
-                      " and diseased samples from " + str(data_sets_diseased) + 
-                      " with model " + learn_type 
-                      + ": " + str(grid_search.best_params_) + " produces "
-                      + " best score of " + str(grid_search.best_score_)
-                      + " in iteration " + str(i + 1))
+            # Set the estimator based on the model type
+            if (learn_type == "svm"):
+                estimator = SVC(C = 1, probability = True)
+            else:
+                estimator = RandomForestClassifier(n_estimators=500, max_depth=None, min_samples_split=2, n_jobs=-1)
+            k_fold = RepeatedStratifiedKFold(n_splits=cv_gridsearch, n_repeats=n_iter_grid)
+            grid_search = GridSearchCV(estimator, param_grid, cv = k_fold)
+            grid_search.fit(x, y)
+            
+            best_grid = grid_search.best_estimator_
+            
+            print("Best params for healthy samples from " + str(data_sets_healthy) +
+                  " and diseased samples from " + str(data_sets_diseased) + 
+                  " with model " + learn_type 
+                  + ": " + str(grid_search.best_params_) + " produces "
+                  + " best score of " + str(grid_search.best_score_))
 
-                
-                cross_val = cross_val_score(grid_search, x, y, cv = StratifiedKFold(n_splits = cv_testfolds, shuffle = True))
-                
-                cross_vals.append(np.mean(cross_val))
- 
+            
+            cross_val = cross_val_score(best_grid, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
+             
             print("Aggregated cross validation accuracies for healthy samples from " + str(data_sets_healthy) +
                       " and diseased samples from " + str(data_sets_diseased) + 
-                      " with model " + learn_type + ": " + str(np.mean(cross_vals)) + 
-                      " with standard deviation " +  str(np.std(cross_vals)))
+                      " with model " + learn_type + ": " + str(np.mean(cross_val)))
 
         # For Elastic Net and Lasso, do a stratified k-fold cross validation
         # For each test fold, fit the estimator to the training data
@@ -184,33 +181,30 @@ if __name__ == '__main__':
         # This essentially performs the nested cross-validation as well. 
         elif learn_type == "enet" or learn_type == "lasso":
             accuracies = []
-            for i in range(n_iter):
-                # Set the estimator based on the model type
-                if (learn_type == "enet"):
-                    # doing a separate grid search using stratified k fold -- k - 1 folds should be used
-                    # for training/grid search, the last fold should be used for test
-                    estimator = ElasticNetCV(alphas = param_grid["alpha"][0], l1_ratio = param_grid["l1"], cv = cv_gridsearch)
-                else:
-                    estimator = LassoCV(alphas = param_grid["alpha"][0], cv = cv_gridsearch)
-                skf = StratifiedKFold(n_splits = cv_testfolds, shuffle = True)
-                for train_i, test_i in skf.split(x, y):
-                    x_train, x_test = x[train_i], x[test_i]
-                    y_train, y_test = y[train_i], y[test_i]
-                    
-                    y_train = list(map(int, y_train))
-                    y_test = list(map(int, y_test))
+            # Set the estimator based on the model type
+            if (learn_type == "enet"):
+                # doing a separate grid search using stratified k fold -- k - 1 folds should be used
+                # for training/grid search, the last fold should be used for test
+                estimator = ElasticNetCV(alphas = param_grid["alpha"][0], l1_ratio = param_grid["l1"], cv = cv_gridsearch)
+            else:
+                estimator = LassoCV(alphas = param_grid["alpha"][0], cv = cv_gridsearch)
+            skf = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test)
+            for train_i, test_i in skf.split(x, y):
+                x_train, x_test = x[train_i], x[test_i]
+                y_train, y_test = y[train_i], y[test_i]
+                y_train = list(map(int, y_train))
+                y_test = list(map(int, y_test))
 
-                    estimator.fit(x_train, y_train)
-                    
-                    accuracy = evaluate(estimator, x_test, y_test)
-                    accuracies.append(accuracy)
+                estimator.fit(x_train, y_train)
+                
+                accuracy = evaluate(estimator, x_test, y_test)
+                accuracies.append(accuracy)
 
-                    print("Best params for healthy samples from " + str(data_sets_healthy) +
-                      " and diseased samples from " + str(data_sets_diseased) + 
-                      " with model " + learn_type 
-                      + ": " + str(estimator.get_params()) + " produces "
-                      + " accuracy of " + str(accuracy)
-                      + " in iteration " + str(i + 1))
+                print("Best params for healthy samples from " + str(data_sets_healthy) +
+                  " and diseased samples from " + str(data_sets_diseased) + 
+                  " with model " + learn_type 
+                  + ": " + str(estimator.get_params()) + " produces "
+                  + " accuracy of " + str(accuracy))
             print("Aggregated cross validation accuracies for healthy samples from " + str(data_sets_healthy) +
                       " and diseased samples from " + str(data_sets_diseased) + 
                       " with model " + learn_type + ": " + str(np.mean(accuracies)) + 
