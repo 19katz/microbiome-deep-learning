@@ -86,13 +86,13 @@ dataset_config_iter_fold_results = {}
 # Values based on the values used in the
 # Pasolli paper 
 dataset_model_grid = {
-    "Qin": "svm1",
-    "MetaHIT": "svm2",
-    "Feng": "svm3",
-    "RA": "svm4",
-    "Zeller": "svm5",
-    "LiverCirrhosis": "svm6",
-    "Karlsson": "svm7",
+    "Qin": "rf1",
+    "MetaHIT": "rf2",
+    "Feng": "rf3",
+    "RA": "rf4",
+    "Zeller": "rf5",
+    "LiverCirrhosis": "rf6",
+    "Karlsson": "rf7",
     }
 model_param_grid = {
     "rf1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
@@ -177,7 +177,6 @@ def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config=''
                   desc="ROC/AUC plots using 5mers", xlabel='False Positive Rate', ylabel='True Positive Rate'):
     fig = pylab.figure()
     lw = 2
-
     if n_classes > 2:
         pylab.plot(fpr["micro"], tpr["micro"],
                    label='micro-average ROC (AUC = {0:0.4f})'
@@ -245,7 +244,7 @@ if __name__ == '__main__':
         data_sets = param_grid["data"]
         data_sets_healthy=data_sets[0]
         data_sets_diseased=data_sets[1]
-
+        
         # Retrieve healthy data and labels
         allowed_labels=['0']
         kmer_cnts_healthy, accessions_healthy, labels_healthy, domain_labels = load_kmer_cnts_jf.load_kmers(kmer_size, data_sets_healthy, allowed_labels)
@@ -306,7 +305,7 @@ if __name__ == '__main__':
                 y_test = np.array(y_test)
 
                 estimator.fit(x_train, y_train)
-                y_test_pred= np.array(estimator.predict(x_test))
+                y_test_pred= np.array(estimator.predict_proba(x_test))
 
                 if learn_type == 'enet' or learn_type == 'lasso':
                     # Convert the predicted values to 0 or 1
@@ -320,24 +319,24 @@ if __name__ == '__main__':
                 # compare the true label index (with max value (1.0) in the target vector) against the predicted
                 # label index (index of label with highest predicted probability)
 
-                conf_mat = confusion_matrix(y_test, y_test_pred, labels=range(n_classes))
+                conf_mat = confusion_matrix(y_test, np.argmax(y_test_pred, axis=1), labels=range(n_classes))
                 if plot_fold:
                     plot_confusion_matrix(conf_mat, name = dataset + "_" + model, config = "IT_" + str(i) + "_FO_" + str(kfold))
 
                 # printing the accuracy rates for diagnostics
                 print("Total accuracy for " + str(len(y_test_pred)) + " test samples: " +
-                      str(np.mean(np.equal(y_test, y_test_pred))))
+                      str(np.mean(np.equal(y_test, np.argmax(y_test_pred, axis=1)))))
 
                 for cls in classes:
                     idx = []
                     for j in range(y_test_pred.shape[0]):
-                        if y_test_pred[j] == cls:
+                        if y_test[j] == cls:
                             idx.append(j)
                     if len(idx) == 0:
                         continue
                     idx = np.array(idx)
                     print("Accuracy for total of " + str(len(idx)) + " " + str(cls) + " samples: " +
-                          str(np.mean(np.equal(y_test[idx], y_test_pred[idx]))))
+                          str(np.mean(np.equal(y_test[idx], np.argmax(y_test_pred[idx], axis=1)))))
 
                 # Compute ROC curve and AUC for each class - http://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
                 fpr = dict()
@@ -345,14 +344,14 @@ if __name__ == '__main__':
                 roc_auc = dict()
                 acc = dict()
                 for j in range(n_classes):
-                    fpr[j], tpr[j], _ = roc_curve(y_test, y_test_pred)
+                    fpr[j], tpr[j], _ = roc_curve(y_test, y_test_pred[:, j])
                     roc_auc[j] = auc(fpr[j], tpr[j])
                     # Round float 1.0 to integer 1 and 0.0 to 0 in the target vectors, and 1 for max predicted prob
                     # index being this one (i), 0 otherwise
-                    acc[j] = accuracy_score(np.round(y_test), np.equal(y_test_pred, j))
-
+                    acc[j] = accuracy_score(np.round(y_test), np.equal(np.argmax(y_test_pred, axis=1), j))
+                
                 # Compute micro-average ROC curve and ROC area
-                fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), y_test_pred.ravel())
+                fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), np.argmax(y_test_pred, axis = 1).ravel())
                 roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 
                 # First aggregate all false positive rates
@@ -378,7 +377,7 @@ if __name__ == '__main__':
 
                 # calculate the accuracy/f1/precision/recall for this test fold - same way as in Pasolli
                 test_true_label_inds = y_test
-                test_pred_label_inds = y_test_pred
+                test_pred_label_inds = np.argmax(y_test_pred, axis = 1)
                 accuracy = accuracy_score(test_true_label_inds, test_pred_label_inds)
                 f1 = f1_score(test_true_label_inds, test_pred_label_inds, pos_label=None, average='weighted')
                 precision = precision_score(test_true_label_inds, test_pred_label_inds, pos_label=None, average='weighted')
@@ -443,7 +442,7 @@ if __name__ == '__main__':
             all_y_test_pred = np.concatenate(iter_results[:, 2])
             
             all_y_test = np.array(np.concatenate([r[0] for r in all_y_test_pred], axis = 0))
-            all_y_pred = np.array(np.concatenate([r[1] for r in all_y_test_pred]))
+            all_y_pred = np.array(np.concatenate([r[1] for r in all_y_test_pred], axis = 0))
 
             fpr = dict()
             tpr = dict()
@@ -454,12 +453,12 @@ if __name__ == '__main__':
 
             for i in range(n_classes):
                 true_probs = [r for r in all_y_test]
-                pred_probs = [r for r in all_y_pred]
+                pred_probs = [r[i] for r in all_y_pred]
                 fpr[i], tpr[i], _ = roc_curve(true_probs, pred_probs)
                 roc_auc[i] = auc(fpr[i], tpr[i])
-                accs[i] = accuracy_score(np.round(true_probs), np.equal(all_y_pred, i))
+                accs[i] = accuracy_score(np.round(true_probs), np.equal(np.argmax(all_y_pred, axis=1), i))
 
-            fpr["micro"], tpr["micro"], _ = roc_curve(all_y_test.ravel(), all_y_pred.ravel())
+            fpr["micro"], tpr["micro"], _ = roc_curve(all_y_test.ravel(), np.argmax(all_y_pred, axis=1).ravel())
             roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 
             # First aggregate all false positive rates

@@ -11,6 +11,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import RepeatedStratifiedKFold
+from sklearn.model_selection import train_test_split
 
 import argparse
 
@@ -56,7 +57,7 @@ learn_type = "rf"
 # Values based on the values used in the
 # Pasolli paper 
 param_dict = {
-    "svm": [ {'C': [1, 10, 100, 1000], 'kernel': ['linear']}, {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}],
+    "svm": [ {'C': [1, 10, 100, 1000], 'gamma': [0.0001, 0.00001, 0.000001], 'kernel': ['rbf'], 'probability': [True]}],
     
     "rf": {"n_estimators": [100, 200, 400, 500],
             "criterion": ["gini"],
@@ -147,13 +148,14 @@ if __name__ == '__main__':
         y = labels
 
         param_grid = param_dict[learn_type]
-
+        
+                
         # For SVM and Random forest, use GridSearchCV
         # and cross_val_score to do a nested cross-validation
         if learn_type == "svm" or learn_type == "rf":
             # Set the estimator based on the model type
             if (learn_type == "svm"):
-                estimator = SVC(C = 1, probability = True)
+                estimator = SVC()
             else:
                 estimator = RandomForestClassifier(n_estimators=500, max_depth=None, min_samples_split=2, n_jobs=-1)
             k_fold = RepeatedStratifiedKFold(n_splits=cv_gridsearch, n_repeats=n_iter_grid)
@@ -167,13 +169,13 @@ if __name__ == '__main__':
                   " with model " + learn_type 
                   + ": " + str(grid_search.best_params_) + " produces "
                   + " best score of " + str(grid_search.best_score_))
-
-            
             cross_val = cross_val_score(best_grid, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
              
             print("Aggregated cross validation accuracies for healthy samples from " + str(data_sets_healthy) +
                       " and diseased samples from " + str(data_sets_diseased) + 
                       " with model " + learn_type + ": " + str(np.mean(cross_val)))
+
+        
 
         # For Elastic Net and Lasso, do a stratified k-fold cross validation
         # For each test fold, fit the estimator to the training data
@@ -209,5 +211,4 @@ if __name__ == '__main__':
                       " and diseased samples from " + str(data_sets_diseased) + 
                       " with model " + learn_type + ": " + str(np.mean(accuracies)) + 
                       " with standard deviation " +  str(np.std(accuracies)))
-                
             
