@@ -86,13 +86,13 @@ dataset_config_iter_fold_results = {}
 # Values based on the values used in the
 # Pasolli paper 
 dataset_model_grid = {
-    "Qin": "rf1",
-    "MetaHIT": "rf2",
-    "Feng": "rf3",
-    "RA": "rf4",
-    "Zeller": "rf5",
-    "LiverCirrhosis": "rf6",
-    "Karlsson": "rf7",
+    "Qin": "rf1_norm",
+    "MetaHIT": "rf2_norm",
+    "Feng": "rf3_norm",
+    "RA": "rf4_norm",
+    "Zeller": "rf5_norm",
+    "LiverCirrhosis": "rf6_norm",
+    "Karlsson": "rf7_norm",
     }
 model_param_grid = {
     "rf1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
@@ -109,7 +109,7 @@ model_param_grid = {
             'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': 1},
     "rf7": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
             'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 100, 'n_jobs': 1},
-    "svm1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
+    "svm1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5, 'cvt': 10,'n': 2,'m': "svm",'classes': [0, 1],
              'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
     "svm2": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
              'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
@@ -123,21 +123,35 @@ model_param_grid = {
              'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
     "svm7": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
              'C': 1, 'gamma': 0.001, 'kernel': 'rbf'},
+    "svm1_norm": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5, 'cvt': 10,'n': 2,'m': "svm",'classes': [0, 1],
+             'C': 10, 'kernel': 'rbf', 'gamma': 0.001},
+    "svm2_norm": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
+             'C': 1000, 'kernel': 'rbf', 'gamma': 0.0001},
+    "svm3_norm": {'data': [["Feng"],["Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
+             'C': 1, 'kernel': 'rbf', 'gamma': 0.001},
+    "svm4_norm": {'data': [["RA"],["RA"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
+             'C': 100, 'gamma': 0.0001, 'kernel': 'rbf'},
+    "svm5_norm": {'data': [["Zeller_2014"],["Zeller_2014"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
+             'C': 100, 'kernel': 'rbf', 'gamma': 0.0001},
+    "svm6_norm": {'data': [["LiverCirrhosis"],["LiverCirrhosis"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
+             'C': 10, 'kernel': 'rbf', 'gamma': 0.001},
+    "svm7_norm": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
+             'C': 100, 'gamma': 0.0001, 'kernel': 'rbf'},
+    "rf1_norm": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
+            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 500, 'n_jobs': -1},
+    "rf2_norm": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
+            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 100, 'n_jobs': -1},
+    "rf3_norm": {'data': [["Feng"],["Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
+            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 200, 'n_jobs': -1},
+    "rf4_norm": {'data': [["RA"],["RA"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
+            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
+    "rf5_norm": {'data': [["Zeller_2014"],["Zeller_2014"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
+            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
+    "rf6_norm": {'data': [["LiverCirrhosis"],["LiverCirrhosis"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
+            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
+    "rf7_norm": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
+            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
     }
-
-'''
-"svm1": {'data': [["Qin_et_al"],["Qin_et_al"]],
-              'k': 5,
-              'm': "rf",
-              'cvt': 3,
-              'n': 1,
-              'C': 1,
-              'gamma': 0.001,
-              'kernel': 'linear',
-              'classes': [0, 1],
-              'probability': True
-              },
-'''
 
 def class_to_target(cls):
     target = np.zeros((n_classes,))
@@ -300,6 +314,14 @@ if __name__ == '__main__':
             for train_i, test_i in skf.split(x, y):
                 x_train, y_train = x[train_i], y[train_i]
                 x_test, y_test = x[test_i], y[test_i]
+
+                sample_mean = x_train.mean(axis=0)
+                sample_std = x_train.std(axis=0)
+
+                # Normalize both training and test samples with the training mean and std
+                x_train = (x_train - sample_mean) / sample_std
+                # test samples are normalized using only the mean and std of the training samples
+                x_test = (x_test - sample_mean) / sample_std
                 
                 y_train = np.array(y_train)
                 y_test = np.array(y_test)

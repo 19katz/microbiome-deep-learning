@@ -15,10 +15,11 @@ from sklearn.model_selection import train_test_split
 
 import argparse
 
-
 import load_kmer_cnts_jf
 import warnings
 from sklearn.exceptions import ConvergenceWarning
+from sklearn.utils import shuffle
+import _search
 
 
 # filter out warnings about convergence 
@@ -57,7 +58,8 @@ learn_type = "rf"
 # Values based on the values used in the
 # Pasolli paper 
 param_dict = {
-    "svm": [ {'C': [1, 10, 100, 1000], 'gamma': [0.0001, 0.00001, 0.000001], 'kernel': ['rbf'], 'probability': [True]}],
+    "svm": [ {'C': [1, 10, 100, 1000], 'kernel': ['linear']},
+             {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}],
     
     "rf": {"n_estimators": [100, 200, 400, 500],
             "criterion": ["gini"],
@@ -73,7 +75,6 @@ param_dict = {
     "enet": {"alpha": [np.logspace(-4, -0.5, 50)],
              "l1": [0.1, 0.5, 0.7, 0.9, 0.95, 0.99, 1.0]}                              
     }
-
 # Uses the model to predict labels given the test features
 # and compares them to the labels by calculating accuracy and error
 # This is used by Lasso and Elastic Net
@@ -117,7 +118,6 @@ if __name__ == '__main__':
     cv_testfolds = arg_vals.cvt
     n_iter_grid = arg_vals.ng
     n_iter_test = arg_vals.nt
-    print("Using model " + learn_type)
     # Loop over all data sets
     for data_set in data_sets_to_use:
         data_sets_healthy=data_set[0]
@@ -141,7 +141,9 @@ if __name__ == '__main__':
         labels=labels.astype(np.int)
 
         # Normalize and shuffle the data
-        data_normalized = normalize(kmer_cnts, axis = 1, norm = 'l1')
+        kmer_cnts = normalize(kmer_cnts, axis = 1, norm = 'l1')
+        kmer_cnts, labels = shuffle(kmer_cnts, labels)
+
 
         # Set up data and labels
         x = kmer_cnts
@@ -155,11 +157,11 @@ if __name__ == '__main__':
         if learn_type == "svm" or learn_type == "rf":
             # Set the estimator based on the model type
             if (learn_type == "svm"):
-                estimator = SVC()
+                estimator = SVC(C = 1, probability = True)
             else:
                 estimator = RandomForestClassifier(n_estimators=500, max_depth=None, min_samples_split=2, n_jobs=-1)
             k_fold = RepeatedStratifiedKFold(n_splits=cv_gridsearch, n_repeats=n_iter_grid)
-            grid_search = GridSearchCV(estimator, param_grid, cv = k_fold)
+            grid_search = _search.GridSearchCV(estimator, param_grid, cv = k_fold, n_jobs = -1)
             grid_search.fit(x, y)
             
             best_grid = grid_search.best_estimator_
@@ -187,9 +189,11 @@ if __name__ == '__main__':
             if (learn_type == "enet"):
                 # doing a separate grid search using stratified k fold -- k - 1 folds should be used
                 # for training/grid search, the last fold should be used for test
-                estimator = ElasticNetCV(alphas = param_grid["alpha"][0], l1_ratio = param_grid["l1"], cv = cv_gridsearch)
+                estimator = ElasticNetCV(alphas = param_grid["alpha"][0], l1_ratio = param_grid["l1"], cv = cv_gridsearch,
+                                         n_jobs = -1)
             else:
-                estimator = LassoCV(alphas = param_grid["alpha"][0], cv = cv_gridsearch)
+                estimator = LassoCV(alphas = param_grid["alpha"][0], cv = cv_gridsearch,
+                                    n_jobs = -1)
             skf = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test)
             for train_i, test_i in skf.split(x, y):
                 x_train, x_test = x[train_i], x[test_i]
