@@ -32,8 +32,8 @@ import deep_learning_models
 
 kmer_size=5
 
-#data_sets_healthy=['HMP', 'Qin_et_al','RA','MetaHIT']
-data_sets_healthy=['HMP', 'Qin_et_al']
+data_sets_healthy=['HMP', 'Qin_et_al','RA','MetaHIT','Feng','Karlsson_2013','LiverCirrhosis','Zeller_2014']
+#data_sets_healthy=['Qin_et_al']
 num_data_sets=len(data_sets_healthy)
 allowed_labels=['0']
 kmer_cnts_healthy, accessions_healthy, labels_healthy, domain_labels =load_kmer_cnts_jf.load_kmers(kmer_size,data_sets_healthy, allowed_labels)
@@ -56,21 +56,12 @@ data_normalized, labels, domain_labels = shuffle(data_normalized, labels, domain
 ######################################################################
 
 input_dim=len(data_normalized[0]) # this is the number of input kmers
-encoding_dim=10
+encoding_dim=200
 
-autoencoder, domain_classifier_model, dann_model, healthy_disease_classifier_model =deep_learning_models.create_domain_autoencoder(encoding_dim, input_dim, num_data_sets)
+#autoencoder, domain_classifier_model, dann_model, healthy_disease_classifier_model =deep_learning_models.create_domain_autoencoder(encoding_dim, input_dim, num_data_sets)
 
+autoencoder_domain_classifier_model, dann_model, healthy_disease_classifier_model =deep_learning_models.create_domain_autoencoder(encoding_dim, input_dim, num_data_sets)
 
-# train the autoencoder:
-
-cut = 250
-x_train=data_normalized[:cut]
-domain_train=domain_labels[:cut]
-labels_train=labels[:cut]
-
-x_test=data_normalized[cut:]
-domain_test=domain_labels[cut:]
-labels_test=labels[cut:]
 
 history = History()
 callbacks = [history]
@@ -78,8 +69,81 @@ callbacks = [history]
 if backend == 'tensorflow':
     callbacks.append(TensorBoard(log_dir='/tmp/autoencoder'))
 
-numEpochs=100
-batchSize = 25
+numEpochs=1000
+batchSize = 32
+
+
+# train the autoencoder:
+
+autoencoder_domain_classifier_model.fit(data_normalized, [data_normalized, domain_labels],
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, [data_normalized, domain_labels]),
+                    callbacks=callbacks)
+
+# train the DANN:
+
+dann_model.fit(data_normalized, domain_labels,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, domain_labels),
+                    callbacks=callbacks)
+
+
+# read in diseased data now: 
+data_sets_diseased=['Qin_et_al']
+allowed_labels=['1']
+kmer_cnts_diseased, accessions_diseased, labels_diseased, domain_labels_diseased =load_kmer_cnts_jf.load_kmers(kmer_size,data_sets_diseased, allowed_labels)
+
+# concatenate with healthy
+kmer_cnts=np.concatenate((kmer_cnts_healthy,kmer_cnts_diseased))
+accessions=np.concatenate((accessions_healthy,accessions_diseased))
+labels=np.concatenate((labels_healthy,labels_diseased))
+#domain_labels=np.concatenate((domain_labels, domain_labels_diseased))
+
+labels=np.asarray(labels)
+labels=labels.astype(np.int)
+
+data=pd.DataFrame(kmer_cnts)
+data_normalized = normalize(data, axis = 1, norm = 'l1')
+
+# need to shuffle otherwise the training is done on a lopsided part of the data set
+data_normalized, labels = shuffle(data_normalized, labels, random_state=0)
+
+
+# train the healthy disease classifier:
+
+healthy_disease_classifier_model.fit(data_normalized, labels,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, labels),
+                    callbacks=callbacks)
+
+
+y_pred=healthy_disease_classifier_model.predict(data_normalized)
+
+fpr, tpr, thresholds = roc_curve(labels, y_pred)
+y_pred = (y_pred > 0.5)
+conf_mat=confusion_matrix(labels, y_pred)
+#auc= auc(fpr,tpr)
+acc=accuracy_score(labels, y_pred)
+
+
+'''
+cut = 500
+x_train=data_normalized[:cut]
+domain_train=domain_labels[:cut]
+labels_train=labels[:cut]
+
+x_test=data_normalized[cut:]
+domain_test=domain_labels[cut:]
+labels_test=labels[cut:]
+'''
+
+'''
 #autoencoder.load_weights(weightFile)
 autoencoder.fit(x_train, x_train,
                     epochs=numEpochs,
@@ -108,6 +172,24 @@ dann_model.fit(x_train, domain_train,
                     validation_data=(x_test, domain_test),
                     callbacks=callbacks)
 
+'''
+
+'''
+model.fit(x_train, [x_train, domain_train, domain_train],
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(x_test, [x_test, domain_test, domain_test]),
+                    callbacks=callbacks)
+'''
+
+model.fit(data_normalized, [data_normalized, domain_labels, domain_labels],
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, [data_normalized, domain_labels, domain_labels]),
+                    callbacks=callbacks)
+
 
 # read in diseased data now: 
 data_sets_diseased=['Qin_et_al']
@@ -132,6 +214,7 @@ data_normalized, labels = shuffle(data_normalized, labels, random_state=0)
 #labels=load_kmer_cnts_jf.onehot_encode(labels)
 
 # train the healthy_disease_classifier
+'''
 cut = 250
 x_train=data_normalized[:cut]
 labels_train=labels[:cut]
@@ -146,6 +229,18 @@ healthy_disease_classifier_model.fit(x_train, labels_train,
                     validation_data=(x_test, labels_test),
                     callbacks=callbacks)
 
+'''
+
+healthy_disease_classifier_model.fit(data_normalized, labels,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, labels),
+                    callbacks=callbacks)
+
+
+
+
 y_pred=healthy_disease_classifier_model.predict(data_normalized)
 
 fpr, tpr, thresholds = roc_curve(labels, y_pred)
@@ -157,52 +252,179 @@ acc=accuracy_score(labels, y_pred)
 
 
 
+###################################################################
+# Look at just the categorical classification part of this model. #
+###################################################################
 
-
-
-
-
-
-#######################################
-# plain vanilla supervised learning.  #
-#######################################
-
-
-
-input_dim=len(data_normalized[0]) # this is the number of input kmers
 encoding_dim=200
+lambda_value=1
+domain_classifier_model, dann_model, model =deep_learning_models.create_domain_classifier(encoding_dim, input_dim, num_data_sets, lambda_value)
 
-encoded_activation = 'relu'
-#encoded_activation = 'linear'
-#decoded_activation = 'softmax'
-decoded_activation = 'sigmoid'
 
-loss='binary_crossentropy'
 
-model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded_activation)
+domain_classifier_model.fit(data_normalized, domain_labels,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, domain_labels),
+                    callbacks=callbacks)
 
-#weightFile = os.environ['HOME'] + '/deep_learning_microbiome/data/weights.txt'
 
-#################
-# Fit the model #
-#################
+y_pred=domain_classifier_model.predict(data_normalized)
+conf_mat=confusion_matrix(domain_labels.argmax(axis=1), y_pred.argmax(axis=1))
 
-numEpochs = 1000
-batchSize = 32
 
-history = History()
+graph_dir = '~/deep_learning_microbiome/analysis/'
+file_name=os.path.expanduser(graph_dir + 'confusion_matrix.pdf')
+classes=data_sets_healthy
+deep_learning_models.plot_confusion_matrix(conf_mat, classes,file_name)
 
-model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
-#model.fit(data_normalized, labels, epochs=numEpochs, batch_size=batchSize, shuffle=True, callbacks=[history])
+
+# test the gradient reversal part of this now
+# want to plot lambda vs accuracy. 
+
+
+dann_model.fit(data_normalized, domain_labels,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, domain_labels),
+                    callbacks=callbacks)
+
+
+y_pred=dann_model.predict(data_normalized)
+conf_mat=confusion_matrix(domain_labels.argmax(axis=1), y_pred.argmax(axis=1))
+
+
+graph_dir = '~/deep_learning_microbiome/analysis/'
+file_name=os.path.expanduser(graph_dir + 'confusion_matrix.pdf')
+classes=data_sets_healthy
+deep_learning_models.plot_confusion_matrix(conf_mat, classes,file_name)
+
+
+
+# now test it in the tandem model
+# reinstantiate the model:
+lambda_value=1
+domain_classifier_model, dann_model, model =deep_learning_models.create_domain_classifier(encoding_dim, input_dim, num_data_sets, lambda_value)
+
+model.fit(data_normalized, [domain_labels, domain_labels],
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, [domain_labels, domain_labels]),
+                    callbacks=callbacks)
+
 
 y_pred=model.predict(data_normalized)
-fpr, tpr, thresholds = roc_curve(labels, y_pred)
-y_pred = (y_pred > 0.5)
-conf_mat=confusion_matrix(labels, y_pred)
-#auc= auc(fpr,tpr)
-acc=accuracy_score(labels, y_pred)
+conf_mat=confusion_matrix(domain_labels.argmax(axis=1), y_pred[1].argmax(axis=1))
 
-# history is a dictionary. To get the keys, type print(history.history.keys())
+
+
+
+
+
+
+
+######################################################################################
+# Repeat, but this time look at categorical classificaiton after running Autoencoder #
+######################################################################################
+
+encoding_dim=200
+autoencoder, domain_classifier_model, dann_model, model =deep_learning_models.create_domain_classifier_with_autoencoder(encoding_dim, input_dim, num_data_sets)
+
+
+autoencoder.fit(data_normalized, data_normalized,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, data_normalized),
+                    callbacks=callbacks)
+
+
+domain_classifier_model.fit(data_normalized, domain_labels,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, domain_labels),
+                    callbacks=callbacks)
+
+
+y_pred=domain_classifier_model.predict(data_normalized)
+conf_mat=confusion_matrix(domain_labels.argmax(axis=1), y_pred.argmax(axis=1))
+
+
+graph_dir = '~/deep_learning_microbiome/analysis/'
+file_name=os.path.expanduser(graph_dir + 'confusion_matrix.pdf')
+classes=data_sets_healthy
+deep_learning_models.plot_confusion_matrix(conf_mat, classes,file_name)
+
+
+# test the gradient reversal part of this now
+# want to plot lambda vs accuracy. 
+
+
+dann_model.fit(data_normalized, domain_labels,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, domain_labels),
+                    callbacks=callbacks)
+
+
+y_pred=dann_model.predict(data_normalized)
+conf_mat=confusion_matrix(domain_labels.argmax(axis=1), y_pred.argmax(axis=1))
+
+
+graph_dir = '~/deep_learning_microbiome/analysis/'
+file_name=os.path.expanduser(graph_dir + 'confusion_matrix.pdf')
+classes=data_sets_healthy
+deep_learning_models.plot_confusion_matrix(conf_mat, classes,file_name)
+
+
+
+# now test it in the tandem model
+# reinstantiate the model:
+autoencoder, domain_classifier_model, dann_model, model =deep_learning_models.create_domain_classifier_with_autoencoder(encoding_dim, input_dim, num_data_sets)
+
+
+model.fit(data_normalized, [data_normalized, domain_labels],
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, [data_normalized, domain_labels]),
+                    callbacks=callbacks)
+
+
+y_pred=model.predict(data_normalized)
+conf_mat=confusion_matrix(domain_labels.argmax(axis=1), y_pred[1].argmax(axis=1))
+
+
+dann_model.fit(data_normalized, domain_labels,
+                    epochs=numEpochs,
+                    batch_size=batchSize,
+                    shuffle=True,
+                    validation_data=(data_normalized, domain_labels),
+                    callbacks=callbacks)
+
+
+y_pred=dann_model.predict(data_normalized)
+conf_mat=confusion_matrix(domain_labels.argmax(axis=1), y_pred.argmax(axis=1))
+
+
+###########################
+# Plot a confusion matrix #
+###########################
+graph_dir = '~/deep_learning_microbiome/analysis/'
+file_name=os.path.expanduser(graph_dir + 'confusion_matrix.pdf')
+classes=['0','1']
+#classes=data_sets_healthy
+deep_learning_models.plot_confusion_matrix(conf_mat, classes,file_name)
+
+
+
+
+
 
 #############
 # plot roc: #
@@ -239,12 +461,6 @@ pylab.savefig(os.path.expanduser(graph_dir + '/accuracy.pdf') , bbox_inches='tig
 
 
 
-###########################
-# Plot a confusion matrix #
-###########################
-file_name=os.path.expanduser(graph_dir + 'confusion_matrix.pdf')
-classes=['0','1']
-deep_learning_models.plot_confusion_matrix(conf_mat, classes,file_name)
 
 
 ######################################################
