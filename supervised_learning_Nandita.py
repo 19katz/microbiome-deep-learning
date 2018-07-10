@@ -30,21 +30,17 @@ import deep_learning_models
 # Load the data # 
 #################
 
-kmer_size=5
-#kmer_size=10
-data_set='Qin_et_al'
-#data_set='RA'
-#data_set='MetaHIT'
-#data_set='HMP'
+kmer_size=6
 
-data_sets_healthy=['HMP', 'Qin_et_al','RA','MetaHIT']
-#data_sets_healthy=['Qin_et_al']
+#data_sets_healthy=['HMP', 'Qin_et_al','RA','MetaHIT','Feng','Karlsson_2013','LiverCirrhosis','Zeller_2014']
+
+data_sets_healthy=['Qin_et_al']
 allowed_labels=['0']
-kmer_cnts_healthy, accessions_healthy, labels_healthy =load_kmer_cnts_jf.load_kmers(kmer_size,data_sets_healthy, allowed_labels)
+kmer_cnts_healthy, accessions_healthy, labels_healthy, domain_labels =load_kmer_cnts_jf.load_kmers(kmer_size,data_sets_healthy, allowed_labels)
 
 data_sets_diseased=['Qin_et_al']
 allowed_labels=['1']
-kmer_cnts_diseased, accessions_diseased, labels_diseased =load_kmer_cnts_jf.load_kmers(kmer_size,data_sets_diseased, allowed_labels)
+kmer_cnts_diseased, accessions_diseased, labels_diseased, domain_labels =load_kmer_cnts_jf.load_kmers(kmer_size,data_sets_diseased, allowed_labels)
 
 kmer_cnts=np.concatenate((kmer_cnts_healthy,kmer_cnts_diseased))
 accessions=np.concatenate((accessions_healthy,accessions_diseased))
