@@ -6,6 +6,9 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import LassoCV
 from sklearn.linear_model import ElasticNetCV
 
+from sklearn.ensemble import GradientBoostingClassifier  #GBM algorithm
+from sklearn import cross_validation, metrics
+
 from sklearn.model_selection import cross_val_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
@@ -17,9 +20,11 @@ matplotlib.use('Agg') # this suppresses the console for plotting
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from itertools import cycle, product
 from sklearn.utils import shuffle
+from sklearn.metrics import precision_recall_curve
+
 
 import pickle
-
+import matplotlib.pyplot as plt
 
 import argparse
 import load_kmer_cnts_jf
@@ -47,8 +52,6 @@ plot_iter = False
 # Overall plotting - aggregate results across both folds and iteration
 plot_overall = True
 
-
-
 # controls transparency of the CI (Confidence Interval) band around the ROCs as in Pasolli
 plot_alpha = 0.2
 
@@ -63,36 +66,23 @@ graph_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/kmers'
 plot_title_size = 12
 plot_text_size = 10
 
-# Lists of data sets to be tested
-# Each item consists of two lists: from the first, the healthy samples will be extracted.
-# From the second, diseased samples will be extracted.
-# The two sets will then be combined. 
-data_sets_to_use = [
-    [['Qin_et_al'], ['Qin_et_al']],
-    [['MetaHIT'], ['MetaHIT']],
-    [['RA'], ['RA']],
-    [['Feng'], ['Feng']],
-    [['Zeller_2014'], ['Zeller_2014']],
-    [['LiverCirrhosis'], ['LiverCirrhosis']],
-    [['Karlsson_2013'], ['Karlsson_2013']]
-    ]
 
 dataset_config_iter_fold_results = {}
 
-# For indicating which models to run
-# ["svm", "rf", "lasso", "enet"]
 
 # Dictionary of parameters for each model
 # Values based on the values used in the
 # Pasolli paper 
 dataset_model_grid = {
-    "Qin": "rf1_norm",
-    "MetaHIT": "rf2_norm",
+    "Qin": "svm1_norm",
+    "MetaHIT": "svm2_norm",
     "Feng": "rf3_norm",
-    "RA": "rf4_norm",
-    "Zeller": "rf5_norm",
-    "LiverCirrhosis": "rf6_norm",
+    "RA": "svm4_norm",
+    "Zeller": "svm5_norm",
+    "LiverCirrhosis": "svm6_norm",
     "Karlsson": "rf7_norm",
+    "All-CRC": "svm9_norm",
+    "All-T2D": "svm8_norm",
     }
 model_param_grid = {
     "rf1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
@@ -109,7 +99,7 @@ model_param_grid = {
             'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': 1},
     "rf7": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
             'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 100, 'n_jobs': 1},
-    "svm1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5, 'cvt': 10,'n': 2,'m': "svm",'classes': [0, 1],
+    "svm1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5, 'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
              'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
     "svm2": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
              'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
@@ -123,7 +113,7 @@ model_param_grid = {
              'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
     "svm7": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
              'C': 1, 'gamma': 0.001, 'kernel': 'rbf'},
-    "svm1_norm": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5, 'cvt': 10,'n': 2,'m': "svm",'classes': [0, 1],
+    "svm1_norm": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5, 'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
              'C': 10, 'kernel': 'rbf', 'gamma': 0.001},
     "svm2_norm": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
              'C': 1000, 'kernel': 'rbf', 'gamma': 0.0001},
@@ -137,6 +127,10 @@ model_param_grid = {
              'C': 10, 'kernel': 'rbf', 'gamma': 0.001},
     "svm7_norm": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
              'C': 100, 'gamma': 0.0001, 'kernel': 'rbf'},
+    "svm8_norm": {'data': [["Karlsson_2013", "Qin_et_al"],["Karlsson_2013", "Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
+             'C': 10, 'gamma': 0.001, 'kernel': 'rbf'},
+    "svm9_norm": {'data': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
+             'C': 10, 'kernel': 'rbf', 'gamma': 0.001},
     "rf1_norm": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
             'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 500, 'n_jobs': -1},
     "rf2_norm": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
@@ -151,12 +145,48 @@ model_param_grid = {
             'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
     "rf7_norm": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
             'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
+    "rf8_norm": {'data': [["Karlsson_2013", "Qin_et_al"],["Karlsson_2013", "Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
+            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 200, 'n_jobs': -1},
+    "rf9_norm": {'data': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
+            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 500, 'n_jobs': -1},
+    "gb1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
+             'learning_rate': 0.1, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 5, 'min_samples_split': 2, 'n_estimators': 500, 'subsample': 0.8},
+    "gb2": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
+            'learning_rate': 0.1, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 5, 'min_samples_split': 2, 'n_estimators': 400, 'subsample': 0.8},
+    "gb3": {'data': [["Feng"],["Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
+            'learning_rate': 0.01, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 500, 'subsample': 0.8},
+    "gb4": {'data': [["RA"],["RA"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
+            'learning_rate': 0.05, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 2, 'n_estimators': 100, 'subsample': 0.8},
+    "gb5": {'data': [["Zeller_2014"],["Zeller_2014"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
+            'learning_rate': 0.01, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 2, 'n_estimators': 500, 'subsample': 0.8},
+    "gb6": {'data': [["LiverCirrhosis"],["LiverCirrhosis"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
+            'learning_rate': 0.05, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 4, 'min_samples_split': 2, 'n_estimators': 500, 'subsample': 0.8},
+    "gb7": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
+            'learning_rate': 0.01, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 4, 'min_samples_split': 2, 'n_estimators': 200, 'subsample': 0.8}
     }
 
 def class_to_target(cls):
     target = np.zeros((n_classes,))
     target[class_to_ind[cls]] = 1.0
     return target
+
+def plot_precision_recall(precision, recall,  average_precision, f1_score, name ='', config = ''):
+    fig = pylab.figure()
+
+    plt.step(recall, precision, color='b', alpha=0.2,
+         where='post')
+    plt.fill_between(recall, precision, step='post', alpha=0.2,
+         color='b')
+
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.ylim([0.0, 1.05])
+    plt.xlim([0.0, 1.0])
+    pylab.gca().set_position((.1, .7, 0.8, .8))
+    add_figtexts_and_save(fig, name + '_precision_recall', '2-class Precision-Recall curve: AP={0:0.4f}, F1={1:0.4f}'.format(
+              average_precision, f1_score), config=config)
+
+    
 def plot_confusion_matrix(cm, name = '', config='', cmap=pylab.cm.Reds):
     """
     This function plots the confusion matrix.
@@ -229,13 +259,13 @@ def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config=''
     pylab.title(title, size=plot_title_size)
     pylab.legend(loc="lower right", prop={'size': plot_text_size})
     pylab.gca().set_position((.1, .7, .8, .8))
-    add_figtexts_and_save(fig, name, desc, config=config)
+    add_figtexts_and_save(fig, name + "_roc_auc", desc, config=config)
     
 def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, config=None):
-    filename = graph_dir + '/' + name + "_roc_auc" + '_' + config + '.svg'
+    filename = graph_dir + '/' + name + '_' + config + '.png'
+    pylab.figtext(x_off, y_off, desc)
     pylab.savefig(filename , bbox_inches='tight')
     pylab.close(fig)
-
 
 # This reference explains some of the things I'm doing here
 # http://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html
@@ -299,6 +329,15 @@ if __name__ == '__main__':
                 gamma = param_grid["gamma"]
                 kernel = param_grid["kernel"]
                 estimator = SVC(C = C, gamma = gamma, kernel = kernel, probability = True)
+            elif (learn_type == "gb"):
+                learning_rate = param_grid["learning_rate"]
+                n_estimators = param_grid["n_estimators"]
+                subsample = param_grid["subsample"]
+                max_depth = param_grid["max_depth"]
+                max_features = param_grid["max_features"]
+                min_samples_split = param_grid["min_samples_split"]
+                min_samples_leaf = param_grid["min_samples_leaf"]
+                estimator = GradientBoostingClassifier(learning_rate=0.1, n_estimators=400, max_depth=9, max_features='sqrt', subsample=0.8)
             else:
                 criterion = param_grid["criterion"]
                 max_depth = param_grid["max_depth"]
@@ -308,7 +347,6 @@ if __name__ == '__main__':
                 n_jobs = -1
                 estimator = RandomForestClassifier(criterion=criterion, max_depth=max_depth, max_features=max_features,
                                                    min_samples_split=min_samples_split, n_estimators=n_estimators, n_jobs=n_jobs)
-
             skf = StratifiedKFold(n_splits = cv_testfolds, shuffle = True)
             kfold = 0
             for train_i, test_i in skf.split(x, y):
@@ -336,7 +374,6 @@ if __name__ == '__main__':
                             predictions[r] = 1
                         else:
                             predictions[r] = 0
-
                 # plot the confusion matrix
                 # compare the true label index (with max value (1.0) in the target vector) against the predicted
                 # label index (index of label with highest predicted probability)
@@ -365,6 +402,8 @@ if __name__ == '__main__':
                 tpr = dict()
                 roc_auc = dict()
                 acc = dict()
+
+                    
                 for j in range(n_classes):
                     fpr[j], tpr[j], _ = roc_curve(y_test, y_test_pred[:, j])
                     roc_auc[j] = auc(fpr[j], tpr[j])
@@ -404,6 +443,7 @@ if __name__ == '__main__':
                 f1 = f1_score(test_true_label_inds, test_pred_label_inds, pos_label=None, average='weighted')
                 precision = precision_score(test_true_label_inds, test_pred_label_inds, pos_label=None, average='weighted')
                 recall = recall_score(test_true_label_inds, test_pred_label_inds, pos_label=None, average='weighted')
+
                 print(('{}\t{}\t{}\t{}\t{}\t{}\tfold-perf-metrics for ' + class_name).
                       format(accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']))
                 # the config info for this exp but no fold/iter indices because we need to aggregate stats over them
@@ -422,12 +462,9 @@ if __name__ == '__main__':
                 if len(config_iter_fold_results[model][i]) <= kfold:
                     config_iter_fold_results[model][i].append([])
 
-
                 config_iter_fold_results[model][i][kfold] = [conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred], [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']]]
                 fold_results = np.array(config_iter_fold_results[model][i])
                 kfold += 1
-
-
                 
             for config in config_iter_fold_results:
                 # K-fold results
@@ -446,12 +483,13 @@ if __name__ == '__main__':
                 if not config in config_results:
                     config_results[config] = []
 
+
                 config_results[config].append([conf_mat, fold_results[:, 1], fold_results[:, 3], fold_results[:, 4]])
 
                 # Per-iteration plots across K folds
                 if plot_iter:
                     # plot the confusion matrix
-                    plot_confusion_matrix(conf_mat, name = dataset + "_" + model, config = "IT_" + str(i))
+                    plot_confusion_matrix(conf_mat, name = dataset + "_" + model + "_cvt_ " + str(cv_testfolds) + "_n_" + str(n_iter), config = "IT_" + str(i))
         
         for config in config_results:
             # per iteration results
@@ -479,7 +517,7 @@ if __name__ == '__main__':
                 fpr[i], tpr[i], _ = roc_curve(true_probs, pred_probs)
                 roc_auc[i] = auc(fpr[i], tpr[i])
                 accs[i] = accuracy_score(np.round(true_probs), np.equal(np.argmax(all_y_pred, axis=1), i))
-
+            
             fpr["micro"], tpr["micro"], _ = roc_curve(all_y_test.ravel(), np.argmax(all_y_pred, axis=1).ravel())
             roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 
@@ -512,18 +550,25 @@ if __name__ == '__main__':
                 std_down[i] = np.maximum(tpr[i] - np.std(i_tpr[i], axis=0)*plot_factor/np.sqrt(cv_testfolds), 0)
                 std_up[i] = np.minimum(tpr[i] + np.std(i_tpr[i], axis=0)*plot_factor/np.sqrt(cv_testfolds), 1.0)
 
-            if plot_overall:
-                # plot the confusion matrix
-                plot_confusion_matrix(conf_mat, name = dataset + "_" + model)
-
-                # plot the ROCs with AUCs/ACCs
-                plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, name = dataset + "_" + model)
-
-            print('tkfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + class_name + ':' + dataset + "_" + model)
+            precision_graph, recall_graph, _ = precision_recall_curve(all_y_test, all_y_pred[:, 1])
             
             perf_metrics = np.vstack(np.concatenate(iter_results[:, 3]))
             perf_means = np.mean(perf_metrics, axis=0)
             perf_stds = np.std(perf_metrics, axis=0)
+
+            if plot_overall:
+                # plot the confusion matrix
+                plot_confusion_matrix(conf_mat, name = dataset + "_" + model + "_cvt_ " + str(cv_testfolds)
+                                          + "_n_" + str(n_iter))
+
+                # plot the ROCs with AUCs/ACCs
+                plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, name = dataset + "_" + model + "_cvt_ " + str(cv_testfolds)
+                                          + "_n_" + str(n_iter))
+
+                plot_precision_recall(precision_graph, recall_graph, perf_means[2], perf_means[1], name = dataset + "_" + model + "_cvt_ " + str(cv_testfolds)
+                                          + "_n_" + str(n_iter))
+
+            print('tkfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + class_name + ':' + dataset + "_" + model)
 
             # log the results for offline analysis
             print(('{}({})\t{}({})\t{}({})\t{}({})\t{}\t{}\tkfold-overall-perf-metrics for ' + class_name + ':{}').
@@ -537,4 +582,5 @@ if __name__ == '__main__':
                 dump_dict = { "dataset_info": dataset, "results": [aggr_results, dataset_config_iter_fold_results[dataset][config]]}
                 pickle.dump(dump_dict, f)
                 
-            
+
+

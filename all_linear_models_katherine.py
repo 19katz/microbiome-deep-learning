@@ -49,11 +49,6 @@ data_sets_to_use = [
     ]
 
 
-# For indicating which models to run
-learn_type = "rf"
-# ["svm", "rf", "lasso", "enet"]
-
-
 # Dictionary of parameters for each model
 # Values based on the values used in the
 # Pasolli paper 
