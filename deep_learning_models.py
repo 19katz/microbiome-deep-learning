@@ -48,6 +48,113 @@ def create_domain_autoencoder(encoding_dim, input_dim, num_data_sets):
     decoded = Dense(input_dim, activation='softmax')(encoded)
 
     # this model maps an input to its reconstruction
+    #autoencoder = Model(inputs=input_img, outputs=decoded)
+
+
+    ### Step 2: create a categorical classifier for datasets (domains) without the decoded step. 
+    domain_classifier = Dense(num_data_sets, activation='softmax')(encoded)
+    #domain_classifier_model = Model(inputs=input_img, outputs=domain_classifier)
+
+    
+    ### Step 3: next create a model with the flipped gradient to unlearn the domains
+    hp_lambda=1
+    Flip = flipGradientTF.GradientReversal(hp_lambda)
+    dann_in = Flip(encoded)
+    dann_out = Dense(num_data_sets, activation='softmax')(dann_in)
+    dann_model= Model(inputs=input_img, outputs=dann_out)
+
+    ### Step 4: create a classifier for healthy vs diseased based on this flipped gradient
+    healthy_disease_classifier=Dense(1, activation='sigmoid')(encoded)
+    healthy_disease_classifier_model = Model(inputs=input_img, outputs=healthy_disease_classifier)
+
+    # multitask learning:
+    autoencoder_domain_classifier_model = Model(inputs=input_img, outputs=[decoded, domain_classifier])
+
+    
+    ######################
+    # compile the models:
+    ######################
+
+    #autoencoder.compile(optimizer='adadelta', loss='kullback_leibler_divergence')
+    #domain_classifier_model.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
+    autoencoder_domain_classifier_model.compile(optimizer='adadelta', loss=['kullback_leibler_divergence','categorical_crossentropy'],  metrics=['accuracy'])
+
+    dann_model.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    healthy_disease_classifier_model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy']) 
+
+    
+    #return autoencoder, domain_classifier_model, dann_model, healthy_disease_classifier_model
+    return autoencoder_domain_classifier_model, dann_model, healthy_disease_classifier_model
+
+
+
+
+#################################################
+
+
+def create_domain_classifier(encoding_dim, input_dim, num_data_sets, lambda_value):
+
+    ################################
+    # set up the  models
+    ################################
+
+    # encoding_dim is the size of our encoded representations 
+    #input_dim is the number of kmers (or columns) in our input data
+    input_img = Input(shape=(input_dim,))
+
+    ### Step 1: create a categorical classifier for datasets (domains). 
+    
+    # "encoded" is the encoded representation of the input
+    encoded = Dense(encoding_dim, activation='relu')(input_img)
+    domain_classifier = Dense(num_data_sets, activation='softmax')(encoded)
+    domain_classifier_model = Model(inputs=input_img, outputs=domain_classifier)
+
+    
+    ### Step 2: next create a model with the flipped gradient to unlearn the domains
+    hp_lambda=lambda_value
+    Flip = flipGradientTF.GradientReversal(hp_lambda)
+    dann_in = Flip(encoded)
+    dann_out = Dense(num_data_sets, activation='softmax')(dann_in)
+    dann_model= Model(inputs=input_img, outputs=dann_out)
+
+    # multitask learning:
+    model = Model(inputs=input_img, outputs=[domain_classifier, dann_out])
+
+    
+    ######################
+    # compile the models:
+    ######################
+
+    domain_classifier_model.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
+    dann_model.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='adadelta', loss=['categorical_crossentropy', 'categorical_crossentropy'],  metrics=['accuracy'])
+    
+    #return domain_classifier_model, dann_model, multi-task model
+    return domain_classifier_model, dann_model, model 
+
+
+
+def create_domain_classifier_with_autoencoder(encoding_dim, input_dim, num_data_sets):
+
+    ################################
+    # set up the  models
+    ################################
+
+    # encoding_dim is the size of our encoded representations 
+    #input_dim is the number of kmers (or columns) in our input data
+    input_img = Input(shape=(input_dim,))
+
+
+    ### Step 1: create an autoencoder:
+    
+    # "encoded" is the encoded representation of the input
+    encoded = Dense(encoding_dim, activation='relu')(input_img)
+
+    # "decoded" is the lossy reconstruction of the input
+    decoded = Dense(input_dim, activation='softmax')(encoded)
+
+    # this model maps an input to its reconstruction
     autoencoder = Model(inputs=input_img, outputs=decoded)
 
 
@@ -63,10 +170,10 @@ def create_domain_autoencoder(encoding_dim, input_dim, num_data_sets):
     dann_out = Dense(num_data_sets, activation='softmax')(dann_in)
     dann_model= Model(inputs=input_img, outputs=dann_out)
 
-    ### Step 4: create a classifier for healthy vs diseased based on this flipped gradient
-    healthy_disease_classifier=Dense(1, activation='sigmoid')(encoded)
-    healthy_disease_classifier_model = Model(inputs=input_img, outputs=healthy_disease_classifier)
+    # multitask learning:
+    model = Model(inputs=input_img, outputs=[decoded, domain_classifier])
 
+    
     ######################
     # compile the models:
     ######################
@@ -74,9 +181,11 @@ def create_domain_autoencoder(encoding_dim, input_dim, num_data_sets):
     autoencoder.compile(optimizer='adadelta', loss='kullback_leibler_divergence')
     domain_classifier_model.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
     dann_model.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
-    healthy_disease_classifier_model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy']) 
+    model.compile(optimizer='adadelta', loss=['kullback_leibler_divergence','categorical_crossentropy'],  metrics=['accuracy'])
+    
+    #return autoencoder, domain_classifier_model, dann_model, healthy_disease_classifier_model
+    return autoencoder, domain_classifier_model, dann_model, model
 
-    return autoencoder, domain_classifier_model, dann_model, healthy_disease_classifier_model
 
 
 
@@ -196,7 +305,8 @@ def create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded
 
     # For a binary classification problem
               
-    model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
+    #model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return model
  
 
@@ -225,8 +335,8 @@ def plot_confusion_matrix(cm, classes, file_name):
                  horizontalalignment="center",
                  color="white" if cm[i, j] > thresh else "black")
 
-    pylab.xlabel('True label')
-    pylab.ylabel('Predicted label')
+    pylab.xlabel('Predicted label')
+    pylab.ylabel('True label')
     pylab.gca().set_position((.1, 10, 0.8, .8))
 
     pylab.savefig(file_name , bbox_inches='tight')

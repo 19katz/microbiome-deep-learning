@@ -8,7 +8,7 @@ def write_command(batch, kmer_size):
     command += "echo $file\n"
     command += "dir=/pollard/shattuck0/snayfach/metagenomes/T2D/fastq/\n"
     command += "jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m %s -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/%smers_jf/Qin_et_al/${file}_%smer.jf \n" %(kmer_size,kmer_size, kmer_size) 
-    command += "jellyfish dump ~/deep_learning_microbiome/data/%smers_jf/Qin_et_al/${file}_%smer.jf | grep '>' | gzip > ~/deep_learning_microbiome/data/%smers_jf/Qin_et_al/${file}_%smer.gz\n" %(kmer_size,kmer_size, kmer_size)
+    command += "jellyfish dump ~/deep_learning_microbiome/data/%smers_jf/Qin_et_al/${file}_%smer.jf | grep '>' | gzip > ~/deep_learning_microbiome/data/%smers_jf/Qin_et_al/${file}_%smer.gz\n" %(kmer_size,kmer_size, kmer_size,kmer_size)
     command += "done <  ~/deep_learning_microbiome/tmp_intermediate_files/Qin_batch_" + str(batch) + ".txt\n" 
 
     bash_script=os.path.expanduser('~/deep_learning_microbiome/tmp_intermediate_files/') + 'Qin_batch_' + str(batch) + '_bash_script.sh'
@@ -22,7 +22,7 @@ def write_command(batch, kmer_size):
 # main  #
 #########
 
-kmer_size=10
+kmer_size=4
 number_of_processes=40
 
 list_of_samples=os.path.expanduser('~/deep_learning_microbiome/Qin_et_al_samples.txt')

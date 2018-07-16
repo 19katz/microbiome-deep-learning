@@ -570,12 +570,12 @@ python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_RA.py
 
 # check if all the kmers are outputted. If not, I need to then add in a zero
 data_set='RA'
-kmer_size=6
+kmer_size=7
 while read file; do
     echo $file
     jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
     num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
-    if [ $num_lines = 4096 ]
+    if [ $num_lines = 16384 ]
 	then
 	echo 'file is ok...'
 	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
@@ -598,12 +598,12 @@ python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_MetaHIT.py
 
 # check if all the kmers are outputted. If not, I need to then add in a zero
 data_set='MetaHIT'
-kmer_size=10
+kmer_size=7
 while read file; do
     echo $file
     jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
     num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
-    if [ $num_lines = 1049600 ]
+    if [ $num_lines = 16384 ]
 	then
 	echo 'file is ok...'
 	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
@@ -625,12 +625,12 @@ python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_Feng.py
 
 # check if all the kmers are outputted. If not, I need to then add in a zero
 data_set='Feng'
-kmer_size=5
+kmer_size=7
 while read file; do
     echo $file
     jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
     num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
-    if [ $num_lines = 1024 ]
+    if [ $num_lines = 16384 ]
 	then
 	echo 'file is ok...'
 	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
@@ -656,12 +656,12 @@ python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_LiverCirrhosis.py
 
 # check if all the kmers are outputted. If not, I need to then add in a zero
 data_set='LiverCirrhosis'
-kmer_size=5
+kmer_size=7
 while read file; do
     echo $file
     jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
     num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
-    if [ $num_lines = 1024 ]
+    if [ $num_lines = 16384 ]
 	then
 	echo 'file is ok...'
 	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
@@ -682,11 +682,57 @@ done <  ~/deep_learning_microbiome/data/metadata/LiverCirrhosis_ids.txt
 # Jellyfish on Karlsson et al. 
 python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_Karlsson.py
 
+
+data_set='Karlsson_2013'
+kmer_size=7
+while read file; do
+    echo $file
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+    num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
+    if [ $num_lines = 16384 ]
+	then
+	echo 'file is ok...'
+	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
+	else
+	echo 'filling in zeros...'
+	# rerun jellyfish
+	dir='/pollard/shattuck0/snayfach/metagenomes/${data_set}/fastq'
+	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
+	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+	# run a script to find the missing kmers and fill in a zero
+	~/miniconda3/bin/python3 ~/deep_learning_microbiome/scripts/fill_in_zeros.py $file $kmer_size $data_set
+    fi
+    
+done <  ~/shattuck/metagenomic_fastq_files/Karlsson_2013/PRJEB1786_run_accessions_only.txt
+
+
+
 # Jellyfish on Zeller et al. 
 
 
 
 
+data_set='Zeller'
+kmer_size=7
+while read file; do
+    echo $file
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+    num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
+    if [ $num_lines = 16384 ]
+	then
+	echo 'file is ok...'
+	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
+	else
+	echo 'filling in zeros...'
+	# rerun jellyfish
+	dir='/pollard/shattuck0/snayfach/metagenomes/${data_set}/fastq'
+	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
+	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
+	# run a script to find the missing kmers and fill in a zero
+	~/miniconda3/bin/python3 ~/deep_learning_microbiome/scripts/fill_in_zeros.py $file $kmer_size $data_set
+    fi
+    
+done < ~/deep_learning_microbiome/data/metadata/Zeller_2014_ids.txt
 
 ####################
 # Analysis!        #
@@ -721,8 +767,14 @@ cut -f1 human_patric.txt | sed '1d' | sed 's/$/\.fna/g' | xargs -I{} sh -c "cat 
 #Maybe pause a little bit to check the err.log after the command line execution finished, in case some ids in the list doesn't have genome sequence copies on server bueno.
 
 mkdir human_patric_bt2
-bowtie2-build --large-index human_patric.fna human_patric_bt2/human_patric
+bowtie2-build --large-index human_patric.fna human_patric_bt2/human_patric > build_err.log
 #Bowtie2 suite is needed here, and the argument "--threads" may be used for speeding up the index building.
+
+# run bowtie2
+bowtie2 --no-unal -x [bowtie2db directory/bowtie2db basename] -u [maximum reads] --very-fast-local --threads [number of threads] -q|-f [fasta input|fastq input] -1 [input reads file 1] -2 [input reads file 2]
+
+
+bowtie2 --no-unal -x /pollard/home/ngarud/deep_learning_microbiome/separate_reads/human_patric_bt2/human_patric -u 10 --very-fast-local --threads 5 -f -1 /pollard/shattuck0/snayfach/metagenomes/T2D/fastq/SRR341641_1.fastq.gz -2 /pollard/shattuck0/snayfach/metagenomes/T2D/fastq/SRR341641_2.fastq.gz
 
 
 

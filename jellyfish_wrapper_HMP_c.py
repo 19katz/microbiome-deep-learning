@@ -22,8 +22,8 @@ def write_command(batch, kmer_size):
 # main  #
 #########
 
-kmer_size=5
-number_of_processes=2
+kmer_size=7
+number_of_processes=10
 
 list_of_samples=os.path.expanduser('/pollard/home/ngarud/BenNanditaProject/MIDAS_intermediate_files_hmp/HMP_samples_314_c.txt')
 file=open(list_of_samples,'r')
