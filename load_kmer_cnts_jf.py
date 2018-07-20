@@ -105,18 +105,20 @@ def load_metadata():
     
     MetaHIT_inFN='%s/MetaHIT_ids.txt' %directory
     MetaHIT_file=open(MetaHIT_inFN, 'r')
+    exclude=['ERR011293', 'ERR011236', 'ERR011182']
     for line in MetaHIT_file:
         items=line.strip('\n').split('\t')
         run_accession=items[2]
         disease_status=items[5]
-        metadata[run_accession] = disease_status
+        if run_accession not in exclude:
+            metadata[run_accession] = disease_status
     
 
     # HMP data (everyone is healthy):
     
     HMP_inFN='%s/HMP_samples_314.txt' %directory
     HMP_file=open(HMP_inFN, 'r')
-    exclude=['SRR2822459', '700034024', '700109173', '700107759', '700119226']
+    exclude=['SRR2822459', '700034024', '700109173', '700107759', '700119226', '700171341', '700035237', '700123959', '700123827', '700171390', '700164641']
     for line in HMP_file:
         items=line.strip('\n').split('\t')
         run_accession=items[0]
@@ -142,7 +144,8 @@ def load_metadata():
         run_accession=items[4]
         sample_id = items[6]
         run_acc_dict[sample_id]=run_accession
-
+    
+    exclude=['ERR260135']
     for line in Karlsson_file:
         items=line.strip('\n').split('\t')
         sample_id=items[0]

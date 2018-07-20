@@ -113,7 +113,15 @@ y = np.array(labels)
 
 #TsNE plot                                                                                                                                                                                                 
 X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)
-plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=y, cmap="Spectral", alpha = 0.7)
+plt.figure()
+y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+color_map = np.argmax(y_test_cat, axis=1)
+for cl in range(2):
+    indices = np.where(color_map==cl)
+    indices = indices[0]
+    plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
+plt.legend()
+#plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=y, cmap="Spectral", alpha = 0.7)
 plt.title('TsNE Plot for ' + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
 plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/TsNE_encoded_weights.pdf")
 
@@ -130,15 +138,25 @@ X = intermediate_output
 y = np.array(labels)
 
 X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)                                                                                                                                             
-plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=y, cmap="Spectral", alpha = 0.7)                                                                                                                                 
+plt.figure()
+y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+color_map = np.argmax(y_test_cat, axis=1)
+for cl in range(2):
+    indices = np.where(color_map==cl)
+    indices = indices[0]
+    plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
+plt.legend()
+#plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=y, cmap="Spectral", alpha = 0.7)                                                                                                                                
 plt.title('TsNE Plot hidden layer output')                                                                                                                                                                 
 plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/TsNE_hiddenlayer_output.pdf") 
+
 
 ############################################################################
 # How does number of encoding dimensions change the weights visualization? #
 ############################################################################  
-encoding_dims = []
-#encoding_dims=[1,2,10,50,100,200,300,400,500]
+
+#encoding_dims = []
+encoding_dims=[1,2,10,50,100,200,300,400,500]
 
 for encoding_dim in encoding_dims:
     input_dim=len(data_normalized[0]) # this is the number of input kmers
@@ -173,7 +191,14 @@ for encoding_dim in encoding_dims:
     #TsNE plot                                                                                                                                                                                             
     X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X.data)
     plt.figure()
-    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=y, cmap="Spectral", alpha = 0.7)
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
+    plt.legend()
+    #plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=y, cmap="Spectral", alpha = 0.7)
     plt.title('TsNE Plot hidden layer weights, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
     plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/TsNE_hiddenlayerweights_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
 
@@ -214,7 +239,14 @@ for encoding_dim in encoding_dims:
 
     X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)
     plt.figure()
-    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=y, cmap="Spectral", alpha = 0.7)
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
+    plt.legend()    
+#plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=y, cmap="Spectral", alpha = 0.7)
     plt.title('TsNE Plot hidden layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
     plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/TsNE_hiddenlayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
 
