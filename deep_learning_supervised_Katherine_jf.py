@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 import random as rn
 from keras import backend as K
+from sklearn.utils import shuffle
 
 import matplotlib
 matplotlib.use('Agg') # this suppresses the console for plotting
@@ -16,12 +17,6 @@ from keras.layers.core import Dropout
 from keras.models import Input, Model, Sequential
 from keras.callbacks import History, EarlyStopping
 from keras import regularizers
-from load_kmer_cnts import load_kmer_cnts_for_hmp, load_kmer_cnts_for_metahit,\
-    load_kmer_cnts_for_ra, load_kmer_cnts_for_t2d, load_kmer_cnts_for_ra_with_labels,\
-    load_kmer_cnts_for_metahit_with_labels, load_kmer_cnts_for_t2d_with_labels,\
-    load_kmer_cnts_for_hmp_with_labels, load_hmp_metahit_with_labels, load_ra_t2d_with_labels,\
-    load_metahit_with_obesity_labels, load_metahit_with_bmi_labels, load_all_kmer_cnts_with_labels,\
-    load_single_disease_plus_healthy_others, load_kmer_cnts_for_hmp_with_random_labels
 from kmer_norms import norm_by_l1, norm_by_l2
 from sklearn.metrics import mean_squared_error, confusion_matrix
 from sklearn.cross_validation import StratifiedShuffleSplit
@@ -32,41 +27,35 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pickle
 import re
 from load_kmer_cnts_Katherine_jf import load_kmers
+from exp_configs import *
 
-# Experiment config keys - these are used to iterate thru the experiment configs and uniquely name 
-# the plot files associated to the configs.
-auto_epochs_key = 'AEP'
-super_epochs_key = 'SEP'
-batch_size_key = 'BS'
-loss_func_key = 'LF'
-enc_dim_key = 'ED'
-enc_act_key = 'EA'
-code_act_key = 'CA'
-dec_act_key = 'DA'
-out_act_key = 'OA'
-layers_key = 'LS'
-batch_norm_key = 'BN'
-dropout_key = 'DO'
-act_reg_key = 'AR'
-norm_input_key = 'NI'
-early_stop_key = 'ES'
-patience_key = 'PA'
-dataset_key = 'DS'
-norm_sample_key = 'NO'
-backend_key = 'BE'
-version_key = 'V'
-use_ae_key = 'AE'
-use_kfold_key = 'UK'
-kfold_key = 'KF'
-no_random_key = 'NR'
-iter_key = 'IT'
-shuffle_labels_key = 'SL'
-num_iters_key = 'ITS'
-shuffle_abunds_key = 'SA'
 
-input_dim = 512
 
-kmer_size = 5
+# index of the data source name in the label list - used for more stratified splits between training and test samples and for plotting
+source_ind = 2
+
+# classification name - used only for plotting
+class_name = None
+
+# index of the true label in the label list - used for classifying and testing. It determines the y_train/y_test matrices
+label_ind = None
+
+# class names
+classes = None
+
+# number of classes
+n_classes = None
+
+# class name to index map - used for mapping class name to target vector and finding index of the color for plotting the class.
+class_to_ind = None
+
+# colors for plotting
+colors = None
+
+data_loader = None
+
+# data source to marker dict for the currently active exp dataset
+markers = None
 
 graph_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/kmers'
 
@@ -95,20 +84,18 @@ add_fig_desc = False
 plot_text_size = 10
 plot_title_size = plot_text_size + 2
 
-''''AllContinent': ('Continent', load_all_kmer_cnts_with_labels, 1, [ 'North America', 'Europe', 'Asia', ],
-                 ['green', 'red', 'blue'], datasource_marker),
+test_pct = 0.2
+drop_pct = 0.5
+input_drop_pct = 0
 
-'AllContinentLabelShuffled': ('Continent-LabelShuffled', lambda: load_all_kmer_cnts_with_labels(shuffle_labels=True), 1, [ 'North America', 'Europe', 'Asia', ],
-                              ['green', 'red', 'blue'], datasource_marker),
 
-'AllCountry': ('Country', load_all_kmer_cnts_with_labels, 3, [ 'United States', 'Denmark', 'Spain', 'China', ],
-               ['green', 'red', 'darkorange', 'blue'], datasource_marker),
-
-'AllCountryLabelShuffled': ('Country-LabelShuffled', lambda: load_all_kmer_cnts_with_labels(shuffle_labels=True), 3, [ 'United States', 'Denmark', 'Spain', 'China', ],
-                            ['green', 'red', 'darkorange', 'blue'], datasource_marker),'''
+# map of <dataset_name, iteration index, K fold index> to list of <history>, <2d-codes-predicted>, etc,
+# for storing per-fold results
+global dataset_config_iter_fold_results
+dataset_config_iter_fold_results = {}
 
 # datasource name to marker map for plotting
-datasource_marker = {'HMP': 'o', 'MetaHIT': '*', 'Qin': 'D', 'RA': '^', 'Feng': 'P', 'LiverCirrhosis': 'X', 'Zeller_2014':'s', 'Karlsson_2013': 'h'}
+datasource_marker = {'HMP': 'o', 'MetaHIT': '*', 'Qin_et_al': 'D', 'RA': '^', 'Feng': 'P', 'LiverCirrhosis': 'X', 'Zeller_2014':'s', 'Karlsson_2013': 'h'}
 
 # dataset dictionary - this determines the specific model data and type of classification.
 # Some of the datasets are not fully experimented with, e.g., obesity and BMI
@@ -116,51 +103,51 @@ dataset_dict = {
     # <dataset_name>: (<classification_name>, <function for loading the data(wrapped in lambda if it takes arguments)>, 
     # <index of the label in the list of labels>, <class name list>, <color list for plotting (in order of class names)>, <data source marker dict>)
     
-    'AllHealth': ('Disease', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al']),
+    'AllHealth': ('Disease', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al']),
                    3 , [ 'Healthy', 'IBD', 'RA', 'T2D', 'LC', 'CRC'], ['green', 'red', 'darkorange', 'purple', 'fucshia', 'blue', ], datasource_marker),
 
-    'AllHealthBinary': ('Diseased', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al'])
+    'AllHealthBinary': ('Diseased', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al'])
                        , 0 , [ '0', '1', ], ['green', 'red'], datasource_marker),
 
     # For testing the autoencoder - because the K-fold cross validation code is shared with supervised learning
     # , it needs some positive labels to work, so we randomly generate some positives, which do not affect the
     # autoencoder experiment results.
-    'HMP': ('HMP', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'HMP']), 3, [ 'Healthy', 'IBD', ],
+    'HMP': ('HMP', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'HMP']), 3, [ 'Healthy', 'IBD', ],
             ['green', 'red', ], datasource_marker),
     
-    'SingleDiseaseMetaHIT': ('IBD', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'MetaHIT']), 3, [ 'Healthy', 'IBD', ],
+    'SingleDiseaseMetaHIT': ('IBD', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'MetaHIT']), 3, [ 'Healthy', 'IBD', ],
                           ['green', 'red', ], datasource_marker),
-    'SingleDiseaseMetaHITLabelShuffled': ('IBD-LabelShuffled', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'MetaHIT']),3, [ 'Healthy', 'IBD', ],
+    'SingleDiseaseMetaHITLabelShuffled': ('IBD-LabelShuffled', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'MetaHIT']),3, [ 'Healthy', 'IBD', ],
                                       ['green', 'red', ], datasource_marker),
-    'SingleDiseaseQin': ('T2D', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al']), 3, [ 'Healthy', 'T2D', ],
+    'SingleDiseaseQin': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al']), 3, [ 'Healthy', 'T2D', ],
                          ['green', 'purple', ], datasource_marker),
     
-    'SingleDiseaseQinLabelShuffled': ('T2D-LabelShuffled', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al']), 3, [ 'Healthy', 'T2D', ],
+    'SingleDiseaseQinLabelShuffled': ('T2D-LabelShuffled', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al']), 3, [ 'Healthy', 'T2D', ],
                                       ['green', 'purple', ], datasource_marker),
     
-    'SingleDiseaseRA': ('RA', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'RA']), 3, [ 'Healthy', 'RA', ],
+    'SingleDiseaseRA': ('RA', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'RA']), 3, [ 'Healthy', 'RA', ],
                         ['green', 'darkorange', ], datasource_marker),
 
-    'SingleDiseaseFeng': ('CRC', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng']), 3, [ 'Healthy', 'CRC', ],
+    'SingleDiseaseFeng': ('CRC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng']), 3, [ 'Healthy', 'CRC', ],
                         ['green', 'blue', ], datasource_marker),
     
-    'SingleDiseaseZeller': ('CRC', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng']), 3, [ 'Healthy', 'CRC', ],
+    'SingleDiseaseZeller': ('CRC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng']), 3, [ 'Healthy', 'CRC', ],
                         ['green', 'turquoise', ], datasource_marker),
     
-    'SingleDiseaseLiverCirrhosis': ('LC', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'LiverCirrhosis']), 3, [ 'Healthy', 'LC', ],
+    'SingleDiseaseLiverCirrhosis': ('LC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'LiverCirrhosis']), 3, [ 'Healthy', 'LC', ],
                         ['green', 'fucshia', ], datasource_marker),
 
-    'SingleDiseaseKarlsson': ('T2D', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013']), 3, [ 'Healthy', 'T2D', ],
+    'SingleDiseaseKarlsson': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013']), 3, [ 'Healthy', 'T2D', ],
                         ['green', 'brown', ], datasource_marker),
 
-    'T2D-HMP': ('T2D', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al', 'Karlsson_2013', 'HMP']), 3, [ 'Healthy', 'T2D', ],
+    'T2D-HMP': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al', 'Karlsson_2013', 'HMP']), 3, [ 'Healthy', 'T2D', ],
                 ['green', 'purple', ], datasource_marker),
 
-    'RA-HMP': ('RA', lambda:  load_kmers(kmer_size = kmer_size, data_sets = [ 'RA', 'HMP']), 3, [ 'Healthy', 'RA', ],
+    'RA-HMP': ('RA', lambda kmer_size:  load_kmers(kmer_size = kmer_size, data_sets = [ 'RA', 'HMP']), 3, [ 'Healthy', 'RA', ],
                 ['green', 'darkorange', ], datasource_marker),
-    'All-T2D': ('T2D', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013', 'Qin_et_al']), 3, [ 'Healthy', 'T2D', ],
+    'All-T2D': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013', 'Qin_et_al']), 3, [ 'Healthy', 'T2D', ],
             ['green', 'purple', ], datasource_marker),
-    'All-CRC': ('CRC', lambda: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng', 'Zeller']), 3, [ 'Healthy', 'CRC', ],
+    'All-CRC': ('CRC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng', 'Zeller']), 3, [ 'Healthy', 'CRC', ],
             ['green', 'blue', ], datasource_marker)
     
     #'AllHealthObese': ('Disease (with obesity replacing IBD for MetaHIT)', lambda: load_all_kmer_cnts_with_labels(metahit_obesity=True), 6, [ 'Healthy', 'Obese', 'RA', 'T2D', ],
@@ -175,7 +162,8 @@ dataset_dict = {
 # that's embedded in plot file names and printed in log files.
 #
 # When a datasource has a corresponding entry in this dict, its config from this map overrides what's in exp_configs
-dataset_config = {}
+dataset_configs = {}
+dataset_k_fold = {}
 
 # Normalization per sample to be experimented with
 norm_func_dict = {
@@ -186,140 +174,34 @@ norm_func_dict = {
 # - used for testing whether the data has nonlinear structure.
 SAME_AS_ENC = "asenc"
 
+def set_config(exp_config, config_key, val):
+    exp_config[config_key] = val
 
-# This is the experiment setup - for grid search of model candidates. It can also be used to evalue individual models.
-# Most of the time, this is the only place that needs to be modified.
-#
-# <exp_config_key>: [ <list of values to be experimented with for this key>, <format string for the exp config value> ]
-# Boolean values use 1 for True and 0 for False to avoid exceeding plot file name length limit on Linux.
-exp_configs = {
-                # Datasets to use
-                dataset_key:       [ [
-                                       # 'AllContinent',
-                                       # 'AllCountry',
-                                       'SingleDiseaseMetaHIT',
-                                       'SingleDiseaseQin',
-                                       'SingleDiseaseRA',
-                                       'SingleDiseaseFeng',
-                                       'SingleDiseaseZeller',
-                                       'SingleDiseaseKarlsson',
-                                       'SingleDiseaseLiverCirrhosis',
-                                       'AllHealth',
-                                       'All-T2D',
-                                       'All-CRC'
-                                       #'HMP',
-                                     ], 'Dataset: {}'],
-                norm_sample_key:   [ [
-                                       'L1',
-                                       # 'L2'
-                                     ], 'Normalize each sample with: {}' ],
-                # 1 for supervised and 0 for autoencoder only -- CHANGE IT BACK TO 1 FOR ANY SUPERVISED LEARNING!!!
-                norm_input_key:    [ [1], 'Normalize across samples (each component with zero mean/unit std across training samples): {}' ],
+def set_dataset_exp_config(exp_config, dataset):
+    exp_config[dataset_key] = dataset
 
-                # Deep net structure
-                # The last entry (-1 is the placeholder) of the layer list is for code layer dimensions - this is so we don't
-                # have to list too many network layer lists when we vary only the code layer dimension.
-                layers_key:        [ [
-                                       [input_dim, -1],
-                                       #[input_dim, input_dim // 2, -1],
-                                       [input_dim, 2, -1],
-                                       #[input_dim, input_dim // 2, input_dim // 4, -1],
-                                       #[input_dim, input_dim // 2, input_dim // 4, input_dim // 8, -1],
-                                       #[input_dim, input_dim // 2, input_dim // 4, input_dim // 8, input_dim // 16, -1],
-                                     ], "Layers for autoencoder's first half : {}" ],
-                enc_dim_key:       [ [2],  'Encoding dimensions: {}' ],
-
-                enc_act_key:       [ [
-                                         'sigmoid',
-                                         'relu',
-                                         'linear',
-                                         'softmax',
-                                         'tanh',
-                                     ], 'Encoding activation: {}' ],
-                code_act_key:      [ [
-                                         #SAME_AS_ENC,
-                                         'linear',
-                                         'softmax',
-                                         'sigmoid',
-                                         'relu',
-                                         'tanh',
-
-                                     ], 'Code (last encoding) layer activation: {}' ],
-    
-                # Decoding activations are fixed as linear as they are popped off anyway
-                # after autoencoder training
-                dec_act_key:       [ [
-                                         #SAME_AS_ENC,
-                                         'linear',
-                                         'sigmoid',
-                                         'relu',
-                                         'softmax',
-                                         'tanh',
-                                     ], 'Decoding layer activation: {}' ],
-                out_act_key:       [ [
-
-                                         #SAME_AS_ENC,
-                                         'linear',
-                                         'sigmoid',
-                                         'relu',
-                                         'softmax',
-                                         'tanh',
-                                     ], 'Last decoding layer activation: {}' ],
-                loss_func_key :    [ [
-                                         'mean_squared_error',
-                                         'kullback_leibler_divergence'
-                                     ], 'Autoencoder loss function: {}' ],
-                # boolean for whether to use autoencoder for pretraining before supervised learning
-                use_ae_key:    [ [1], 'Use autoencoder pretraining for supervised learning: {}' ],
-
-
-                # Training options
-                auto_epochs_key :  [ [50], 'Max number of epochs for autoencoder training: {}' ],
-                super_epochs_key : [ [500], 'Max number of epochs for supervised training: {}' ],
-                batch_size_key:    [ [16, 32], 'Batch size used during training: {}' ],
-                # two booleans
-                batch_norm_key:    [ [0], 'Use batch normalization: {}' ],
-                dropout_key:       [ [0], 'Use dropout: {}' ],
-                act_reg_key:       [ [0], 'Activation regularization (for sparsity): {}' ],
-                # boolean
-                early_stop_key:    [ [0],  'Use early stopping: {}' ],
-                patience_key:      [ [2], 'Early stopping patience (consecutive degradations): {}' ],
-                use_kfold_key:    [ [5], 'Stratified K folds (0 means one random shuffle with stratified 80/20 split): {}' ],
-                kfold_key:    [ [0], 'K fold index for the current fold: {}' ],
-                # boolean for whether no randomness should be used
-                no_random_key:    [ [0], "Eliminate randomness in training: {}" ],
-                # number of iterations
-                num_iters_key:    [ [10], "Number of iterations: {}" ],
-                # the current iteration index
-                iter_key:    [ [0], "Iteration: {}" ],
-                # boolean
-                shuffle_labels_key:    [ [0],  'Shuffle labels (for supervised null): {}' ],
-                # boolean
-                shuffle_abunds_key:    [ [0],  'Shuffle abundances (for unsupervised null): {}' ],
-
-                # misc
-                backend_key:   [ [K.backend()], 'Backend: {}' ],
-                version_key:   [ ['2'], 'Version (catching all other unnamed configs): {}' ],
-                         
-            }
-
-def set_config(config_key, val_list):
-    exp_configs[config_key][0] = val_list
-
-test_pct = 0.2
-drop_pct = 0.5
-input_drop_pct = 0
+def set_config_global_vars(dataset):
+    global source_ind, class_name, label_ind, classes, n_classes, class_to_ind, colors, markers, data_loader
+    cls_name, data_load, lbl_ind, lbls, clrs, mkrs = dataset_dict[dataset]
+    class_name = cls_name
+    label_ind = lbl_ind
+    classes = lbls
+    n_classes = len(classes)
+    class_to_ind = { classes[i]: i for i in range(n_classes) }
+    colors = clrs
+    markers = mkrs
+    data_loader = data_load
 
 # The experiment config currently being trained/evaluated
+global exp_config
 exp_config = {}
 
 # The training/test input and label matrices
 x_train, y_train, info_train, x_test, y_test, info_test = None, None, None, None, None, None
 
 # Turn on/off randomness in training.
-def setup_randomness():
-    exp_config[no_random_key] = exp_configs[no_random_key][0][0]
-    if not exp_config[no_random_key]:
+def setup_randomness(no_random):
+    if not no_random:
         return
 
     #print("Removing randomness")
@@ -368,440 +250,301 @@ def add_layer_common(autoencoder, activation):
     if exp_config[dropout_key]:
         autoencoder.add(Dropout(drop_pct))
 
-# index of the data source name in the label list - used for more stratified splits between training and test samples and for plotting
-source_ind = 2
-
-# classification name - used only for plotting
-class_name = None
-
-# index of the true label in the label list - used for classifying and testing. It determines the y_train/y_test matrices
-label_ind = None
-
-# class names
-classes = None
-
-# number of classes
-n_classes = None
-
-# class name to index map - used for mapping class name to target vector and finding index of the color for plotting the class.
-class_to_ind = None
-
-# colors for plotting
-colors = None
-
-# data source to marker dict for the currently active exp dataset
-markers = None
-
-# map of <dataset_name, iteration index, K fold index> to list of <history>, <2d-codes-predicted>, etc,
-# for storing per-fold results
-dataset_config_iter_fold_results = {}
-
-# map of config to list of <avg_val_acc>, <avg_acc>, <avg_val_loss>, <avg_loss>, <conf_mat>, etc, per iteration
-# for calculating average results over all runs
-config_results = {}
-
 # Maps class name to target vector, which is zero everywhere except 1 at the index of the true label
 def class_to_target(cls):
-    target = np.zeros((n_classes,))
+    target = np.zeros(n_classes)
     target[class_to_ind[cls]] = 1.0
     return target
+    
+def get_k_folds(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_labels, shuffle_abunds):
+    if (dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_labels, shuffle_abunds) in dataset_k_fold.keys():
+        return dataset_k_fold[(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_labels, shuffle_abunds)]
 
-# The loop_over_* functions implement the grid search. They go through each of the exp config keys and
-# set the current exp_config for each key to each of the possible values for that key in order, and 
-# , at the end of these loops, perform the training/testing under the then 'active' config setup.
-#
-# I found out that sklearn has support for grid search after implementing this, but I stuck with this because
-# , to use sklearn, a specific interface has to be implemented.
+    set_config_global_vars(dataset)
+    x_y_info_train_test = []
+    
+    data, orig_target = data_loader(kmer_size)
+    orig_target = np.array(orig_target)
 
-# loops over the datasets
-def loop_over_datasets():
-    for dataset_name in exp_configs[dataset_key][0]:
+    for i in range(num_iters):
+        # This is to optionally make the shuffle/fold deterministic
+        setup_randomness(no_random)
         
-        cls_name, data_loader, lbl_ind, lbls, clrs, mkrs = dataset_dict[dataset_name]
-
-        # set the current active dataset
-        exp_config[dataset_key] = dataset_name
-        dataset_config_iter_fold_results[dataset_name] = {}
-        config_results = {}
-
-        global class_name, label_ind, classes, n_classes, class_to_ind, colors, markers
-
-        class_name = cls_name
-        label_ind = lbl_ind
-        classes = lbls
-        n_classes = len(classes)
-        class_to_ind = { classes[i]: i for i in range(n_classes) }
-        colors = clrs
-        markers = mkrs
-
-        # For dumping and replotting model results
-        dataset_info = [source_ind, class_name, label_ind, classes, n_classes, class_to_ind, colors, markers]
-
-        # load the samples and their labels
-        data, orig_target = data_loader()
-        # for autoencoder null
-        data_shuffled = np.array(data)
-
+        if (get_config_val(shuffle_labels_key, exp_config)):
+            np.random.shuffle(orig_target)
+        elif (get_config_val(shuffle_abunds_key, exp_config)):
+            for r in data:
+                np.random.shuffle(r)
+            
+        target = np.array([class_to_target(orig_target[i][label_ind]) for i in range(len(orig_target))])
+        
         # Temp labels just for stratified shuffle split - we split proportionally by datasource+label+health
         # the 0 index is for diseased or not 
         target_labels = [(str(orig_target[i][0]) + orig_target[i][label_ind] + orig_target[i][source_ind]) for i in range(len(orig_target))]
-        orig_target_random = np.array(orig_target)
-        orig_target = np.array(orig_target)
+
+        skf = None
+        if use_kfold:
+            # K folds - we shuffle only if not removing randomness
+            skf = StratifiedKFold(n_splits=use_kfold, shuffle=(not no_random))
+            skf = skf.split(data, target_labels)
+        else:
+            # single fold - the random state is fixed with the value of the fold index if no randomness,
+            # otherwise np.random will be used by the function.
+            skf = StratifiedShuffleSplit(target_labels, n_iter=1, test_size=test_pct, random_state=(i if no_random else None))
+
+        x_y_info_train_test_it = []
+        
+        # the current active fold
+        # This loop is executed K times for K folds and only once for single split
+        for train_idx, test_idx in skf:
+            x_train, y_train, info_train = data[train_idx], target[train_idx], orig_target[train_idx]
+            x_test, y_test, info_test = data[test_idx], target[test_idx], orig_target[test_idx]
+            x_y_info_train_test_it.append([x_train, y_train, info_train, x_test, y_test, info_test])
+        x_y_info_train_test.append(x_y_info_train_test_it)
+    dataset_k_fold[(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_labels, shuffle_abunds)] = x_y_info_train_test
+    return x_y_info_train_test
+
+
+def loop_over_configs(random=False):
+    for config in ConfigIterator(random=random):
+        global exp_config
+        exp_config = config
+        k_folds = get_k_folds(exp_config[dataset_key], exp_config[num_iters_key], exp_config[use_kfold_key],
+                              exp_config[no_random_key], exp_config[kmer_size_key], exp_config[shuffle_labels_key],
+                              exp_config[shuffle_abunds_key])
+        
+        exec_config(k_folds)
+
+def loop_over_dataset_configs():
+    for dataset_name in dataset_configs:
+        for config in dataset_configs[dataset_name]:
+            setup_exp_config_from_config_info(config)
+            set_dataset_exp_config(exp_config, dataset_name)
+            k_folds = get_k_folds(exp_config[dataset_key], exp_config[num_iters_key], exp_config[use_kfold_key],
+                                  exp_config[no_random_key], exp_config[kmer_size_key], exp_config[shuffle_labels_key],
+                                  exp_config[shuffle_abunds_key])
+            exec_config(k_folds)
             
-        # The target matrix for training/testing - note that only the label index is used this time
-        target = np.array([ class_to_target(orig_target[i][label_ind]) for i in range(len(orig_target)) ])
+def exec_config(k_folds):
+    global dataset_config_iter_fold_results
+    config_results = {}
+    
+    set_config_global_vars(exp_config[dataset_key])
+    x_y_info_train_test = k_folds
+    dataset_config_iter_fold_results[exp_config[dataset_key]] = {}
 
-        exp_config[num_iters_key] = exp_configs[num_iters_key][0][0]
-        for i in range(exp_config[num_iters_key]):
-            exp_config[iter_key] = i
-            
-            # This is to optionally make the shuffle/fold deterministic
-            setup_randomness()
+    for i in range(exp_config[num_iters_key]):
+        exp_config[iter_key] = i
+        exp_config[kfold_key] = 0
+        x_y_info_train_test_it  = x_y_info_train_test[i]
+        for x_y_info_fold in x_y_info_train_test_it:
+            global x_train, y_train, info_train, x_test, y_test, info_test
+            # set up the training/test sample and target matrices - the info matrix is used for plotting
+            x_train, y_train, info_train = x_y_info_fold[0], x_y_info_fold[1], x_y_info_fold[2]
+            x_test, y_test, info_test = x_y_info_fold[3], x_y_info_fold[4], x_y_info_fold[5]
 
-            # shuffle labels for supervised null
-            np.random.shuffle(orig_target_random)
-            target_random = np.array([ class_to_target(orig_target_random[k][label_ind]) for k in range(len(orig_target_random)) ])
+            normalize_train_test()
 
-            # shuffle kmer counts for unsupervised null
-            for r in data_shuffled:
-                np.random.shuffle(r)
+            # the next fold
+            exp_config[kfold_key] += 1
 
-            skf = None
-            if get_config_val(use_kfold_key):
-                # K folds - we shuffle only if not removing randomness
-                skf = StratifiedKFold(n_splits=get_config_val(use_kfold_key), shuffle=(not get_config_val(no_random_key)))
-                skf = skf.split(data, target_labels)
-            else:
-                # single fold - the random state is fixed with the value of the fold index if no randomness,
-                # otherwise np.random will be used by the function.
-                skf = StratifiedShuffleSplit(target_labels, n_iter=1, test_size=test_pct, random_state=(i if get_config_val(no_random_key) else None))
+        # aggregate results across K folds for this iteration
+        global config_iter_fold_results
+        config_iter_fold_results = dataset_config_iter_fold_results[exp_config[dataset_key]]
+        for config in config_iter_fold_results:
+            # K-fold results
+            fold_results = np.array(config_iter_fold_results[config][exp_config[iter_key]])
 
-            # the current active fold
-            exp_config[kfold_key] = 0
+            # the config for this iteration
+            config_iter = config + '_' + iter_key + ':' + str(exp_config[iter_key])
+            # sum the confusion matrices over the folds
+            conf_mat = np.sum(fold_results[:, 2], axis=0)
 
-            # This loop is executed K times for K folds and only once for single split
-            for train_idx, test_idx in skf:
-                global x_train, y_train, info_train, x_test, y_test, info_test
+            # mean loss across K folds for this iteration
+            loss = np.mean([fold_results[k, 0]['loss'] for k in range(len(fold_results))], axis=0)
+            val_loss = np.mean([fold_results[k, 0]['val_loss'] for k in range(len(fold_results))], axis=0)
 
-                # set up the training/test sample and target matrices - the info matrix is used for plotting
-                x_train, y_train, info_train = data[train_idx], target[train_idx], orig_target[train_idx]
-                x_test, y_test, info_test = data[test_idx], target[test_idx], orig_target[test_idx]
+            # mean accuracy across K folds for this iteration
+            acc = np.mean([fold_results[k, 0]['acc'] for k in range(len(fold_results))], axis=0)
+            val_acc = np.mean([fold_results[k, 0]['val_acc'] for k in range(len(fold_results))], axis=0)
 
-                try:
-                    # There are specific model configs for this dataset in dataset_config, so use them
-                    for config in dataset_config[dataset_name]:
-                        # Don't use the randomness and the number of folds from the config because,
-                        # as in Pasolli, we removed randomness and used 5 folds for grid search,
-                        # but allow randomness and use 10 folds for evaluation.
-                        prev_no_random = get_config_val(no_random_key)
-                        prev_kfolds = get_config_val(use_kfold_key)
-                        prev_shuffle_labels = get_config_val(shuffle_labels_key)
-                        prev_shuffle_abunds = get_config_val(shuffle_abunds_key)
-
-                        # Parse the config info and set exp_configs accordingly
-                        setup_exp_configs_from_config_info(config)
-
-                        # Because the above will use the config info to set up randomness and # of folds,
-                        # we set them back to their values before the call (what're in exp_configs)
-                        set_config(no_random_key, [prev_no_random])
-                        set_config(use_kfold_key, [prev_kfolds])
-
-                        # use shuffled labels for supervised null. As in Pasolli, the null uses the same K folds as the normal
-                        # model for comparison purpose. That's why label shuffling is here and not done as a separate dataset as
-                        # originally implemented (even though that also adequately showed statistical significance of the models).
-                        if get_config_val(shuffle_labels_key):
-                            # remember the unshuffled targets and set the train/test targets to the shuffled ones
-                            y_train_old, y_test_old, info_train_old, info_test_old = y_train, y_test, info_train, info_test
-                            y_train, y_test, info_train, info_test = target_random[train_idx], target_random[test_idx], orig_target_random[train_idx], orig_target_random[test_idx]
-
-                            loop_over_norm_funcs()
-
-                            # revert back to the unshuffled targets for normal models
-                            y_train, y_test, info_train, info_test = y_train_old, y_test_old, info_train_old, info_test_old
-                        elif get_config_val(shuffle_abunds_key):
-                            # we don't shuffle both kmer counts and labels at the same time
-                            # remember the unshuffled samples and set the train/test samples to the shuffled ones
-                            x_train_old, x_test_old = x_train, x_test
-                            x_train, x_test = data_shuffled[train_idx], data_shuffled[test_idx]
-                            
-                            loop_over_norm_funcs()
-
-                            # revert back to the unshuffled samples for normal models
-                            x_train, x_test = x_train_old, x_test_old
-                        else:
-                            loop_over_norm_funcs()
-                        set_config(shuffle_labels_key, [prev_shuffle_labels])
-                        set_config(shuffle_abunds_key, [prev_shuffle_abunds])
-                except KeyError:
-                    # No specific configs for the dataset, so we loop thru exp_configs - often used for grid search
-                    loop_over_norm_funcs()
-
-                # the next fold
-                exp_config[kfold_key] += 1
-
-            # aggregate results across K folds for this iteration
-            config_iter_fold_results = dataset_config_iter_fold_results[dataset_name]
-            for config in config_iter_fold_results:
-                # K-fold results
-                fold_results = np.array(config_iter_fold_results[config][exp_config[iter_key]])
-
-                # the config for this iteration
-                config_iter = config + '_' + iter_key + ':' + str(exp_config[iter_key])
-
-                # sum the confusion matrices over the folds
-                conf_mat = np.sum(fold_results[:, 2], axis=0)
-
-                # mean loss across K folds for this iteration
-                loss = np.mean([fold_results[k, 0]['loss'] for k in range(len(fold_results))], axis=0)
-                val_loss = np.mean([fold_results[k, 0]['val_loss'] for k in range(len(fold_results))], axis=0)
-
-                # mean accuracy across K folds for this iteration
-                acc = np.mean([fold_results[k, 0]['acc'] for k in range(len(fold_results))], axis=0)
-                val_acc = np.mean([fold_results[k, 0]['val_acc'] for k in range(len(fold_results))], axis=0)
-
-                # ending loss/acc and max validation acc/min validation loss indices - used for testing early stopping
-                last_val_acc = val_acc[-1]
-                last_val_loss = val_loss[-1]
-                max_vai = np.argmax(val_acc)
-                min_vli = np.argmin(val_loss)
-
-                # log the results for offline analysis
-                print(('{}\t{}\t{}\t{}\t{}\t{}\tkfold-iter-val-loss-acc for ' + class_name + ':{}').
-                      format(last_val_acc, last_val_loss, max_vai, min_vli, val_acc[max_vai], val_loss[min_vli], config_iter))
-
-                # save the results for this iteration so we can aggregate the overall results at the end
-                if not config in config_results:
-                    config_results[config] = []
-
-                config_results[config].append([val_acc, acc, val_loss, loss, conf_mat, fold_results[:, 3], fold_results[:, 5], fold_results[:, 6], fold_results[:, 7]])
-
-                # Per-iteration plots across K folds
-                if plot_iter:
-                    # plot the confusion matrix
-                    plot_confusion_matrix(conf_mat, config=config_iter)
-
-                    # plot loss vs epochs
-                    plot_loss_vs_epochs(loss, val_loss, config=config_iter)
-
-                    # plot accuracy vs epochs
-                    plot_acc_vs_epochs(acc, val_acc, config=config_iter)
-
-        for config in config_results:
-            # per iteration results
-            iter_results = np.array(config_results[config])
-
-            # sum the confusion matrices over iterations
-            conf_mat = np.sum(iter_results[:, 4], axis=0)
-            
-            # mean results for loss/val loss/acc/val acc across iterations
-            mean_results = np.mean(iter_results[:, [0,1,2,3]], axis=0)
-                
-            # mean loss across iterations
-            loss = mean_results[3]
-            val_loss = mean_results[2]
-
-            # mean accuracy across iterations
-            acc = mean_results[1]
-            val_acc = mean_results[0]
-
+            # ending loss/acc and max validation acc/min validation loss indices - used for testing early stopping
             last_val_acc = val_acc[-1]
             last_val_loss = val_loss[-1]
-
             max_vai = np.argmax(val_acc)
             min_vli = np.argmin(val_loss)
 
-            all_fold_roc_aucs = np.concatenate(iter_results[:, 5])
-            all_y_test_pred = np.concatenate(iter_results[:, 6])
-            
-            all_y_test = np.array(np.concatenate([r[0] for r in all_y_test_pred]))
-            all_y_pred = np.array(np.concatenate([r[1] for r in all_y_test_pred]))
-
-            fpr = dict()
-            tpr = dict()
-            roc_auc = dict()
-            accs = dict()
-            std_down = dict()
-            std_up = dict()
-
-            for i in range(n_classes):
-                true_probs = [r[i] for r in all_y_test]
-                pred_probs = [r[i] for r in all_y_pred]
-                fpr[i], tpr[i], _ = roc_curve(true_probs, pred_probs)
-                roc_auc[i] = auc(fpr[i], tpr[i])
-                accs[i] = accuracy_score(np.round(true_probs), np.equal(np.argmax(all_y_pred, axis=1), i))
-
-            fpr["micro"], tpr["micro"], _ = roc_curve(all_y_test.ravel(), all_y_pred.ravel())
-            roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
-
-            # First aggregate all false positive rates
-            all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
-
-            # Then interpolate all ROC curves at these points
-            all_tpr = np.zeros_like(all_fpr)
-            for i in range(n_classes):
-                all_tpr += np.interp(all_fpr, fpr[i], tpr[i])
-
-            # Finally average it and compute AUC
-            all_tpr /= n_classes
-
-            fpr["macro"] = all_fpr
-            tpr["macro"] = all_tpr
-            roc_auc['macro'] = auc(all_fpr, all_tpr)
-
-            i_tpr = dict()
-            # use the per-fold ROCs to calculate the CI band around the overall ROC as done in Pasolli
-            for fprs, tprs, roc_aucs in all_fold_roc_aucs:
-                for i in list(range(n_classes)) + ['micro', 'macro']:
-                    if not np.isnan(tprs[i][0]):
-                        try:
-                            i_tpr[i].append(np.interp(fpr[i], fprs[i], tprs[i]))
-                        except KeyError:
-                            i_tpr[i] = [np.interp(fpr[i], fprs[i], tprs[i])]
-
-            for i in list(range(n_classes)) + ['micro', 'macro']:
-                std_down[i] = np.maximum(tpr[i] - np.std(i_tpr[i], axis=0)*plot_factor/np.sqrt(get_config_val(use_kfold_key)), 0)
-                std_up[i] = np.minimum(tpr[i] + np.std(i_tpr[i], axis=0)*plot_factor/np.sqrt(get_config_val(use_kfold_key)), 1.0)
-
-            if plot_overall:
-                # plot the confusion matrix
-                plot_confusion_matrix(conf_mat, config=config)
-
-                # plot loss vs epochs
-                plot_loss_vs_epochs(loss, val_loss, config=config)
-            
-                # plot accuracy vs epochs
-                plot_acc_vs_epochs(acc, val_acc, config=config)
-
-                # plot the ROCs with AUCs/ACCs
-                plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config=config)
-
-            print('tkfold-overall-loss: ' + str(loss) + ' for ' + class_name + ':' + config)
-            print('tkfold-overall-val-loss: ' + str(val_loss) + ' for ' + class_name + ':' + config)
-            print('tkfold-overall-acc: ' + str(acc) + ' for ' + class_name + ':' + config)
-            print('tkfold-overall-val-acc: ' + str(val_acc) + ' for ' + class_name + ':' + config)
-            print('tkfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + class_name + ':' + config)
-            
-            perf_metrics = np.vstack(np.concatenate(iter_results[:, 7]))
-            perf_means = np.mean(perf_metrics, axis=0)
-            perf_stds = np.std(perf_metrics, axis=0)
-            
             # log the results for offline analysis
-            print(('{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tkfold-overall-perf-metrics for ' + class_name + ':{}').
-                  format(perf_means[0], perf_stds[0], perf_means[1], perf_stds[1], perf_means[2], perf_stds[2], perf_means[3], perf_stds[3], perf_means[4], perf_stds[4], perf_means[5], perf_stds[5], roc_auc[1], roc_auc['macro'], last_val_acc, last_val_loss, max_vai, min_vli, val_acc[max_vai], val_loss[min_vli], config))
+            print(('{}\t{}\t{}\t{}\t{}\t{}\tkfold-iter-val-loss-acc for ' + class_name + ':{}').
+                  format(last_val_acc, last_val_loss, max_vai, min_vli, val_acc[max_vai], val_loss[min_vli], config_iter))
 
-            all_ae_results = np.vstack(np.concatenate(iter_results[:, 8]))
-            # mean autoencoder loss vs epochs across iterations times K folds
-            ae_loss = np.mean([ r[0]['loss'] for r in all_ae_results ], axis=0)
-            ae_val_loss = np.mean([ r[0]['val_loss'] for r in all_ae_results ], axis=0)
-            if plot_ae_overall:
+            # save the results for this iteration so we can aggregate the overall results at the end
+            if not config in config_results:
+                config_results[config] = []
+            # hist, [codes_pred, info_test], conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred],
+            # [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']], [ae_hist, ae_val_loss, ae_mse]
+            config_results[config].append([val_acc, acc, val_loss, loss, conf_mat, fold_results[:, 3], fold_results[:, 5], fold_results[:, 6], fold_results[:, 7]])
+
+            # Per-iteration plots across K folds
+            if plot_iter:
+                # plot the confusion matrix
+                plot_confusion_matrix(conf_mat, config=config_iter)
                 # plot loss vs epochs
-                plot_loss_vs_epochs(ae_loss, ae_val_loss, config=config, name='ae_general_loss_vs_epochs')
-            ae_means = np.mean([ [r[1], r[2]] for r in all_ae_results ], axis=0)
-            ae_stds = np.std([ [r[1], r[2]] for r in all_ae_results ], axis=0)
-            print(('{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tkfold-overall-perf-metrics for ' + class_name + ':{}').
-                  format(perf_means[0], perf_stds[0], perf_means[1], perf_stds[1], perf_means[2], perf_stds[2], perf_means[3], perf_stds[3], perf_means[4], perf_stds[4], perf_means[5], perf_stds[5], roc_auc[1], roc_auc['macro'], last_val_acc, last_val_loss, max_vai, min_vli, val_acc[max_vai], val_loss[min_vli], config))
+                plot_loss_vs_epochs(loss, val_loss, config=config_iter)
 
+                # plot accuracy vs epochs
+                plot_acc_vs_epochs(acc, val_acc, config=config_iter)
+    for config in config_results:
+        # per iteration results
+        iter_results = np.array(config_results[config])
 
-            print(('{}({})\t{}({})\tkfold-overall-autoencoder-perf-metrics for ' + class_name + ':{}').
-                  format(ae_means[0], ae_stds[0], ae_means[1], ae_stds[1], config))
-
-            # dump the model results into a file for offline analysis and plotting, e.g., merging plots from
-            # different model instances (real and null)
-            aggr_results = [val_acc, acc, val_loss, loss, conf_mat, fpr, tpr, roc_auc, accs, std_down, std_up, perf_means, perf_stds]
-            ae_aggr_results = [ae_loss, ae_val_loss, ae_means, ae_stds]
-
-            with open("aggr_results" + config +".pickle", "wb") as f:
-                dump_dict = { "dataset_info": dataset_info, "results": [aggr_results, dataset_config_iter_fold_results[dataset_name][config]],
-                              "ae_results": ae_aggr_results }
-                pickle.dump(dump_dict, f)
-            
-def loop_over_norm_funcs():
-    """
-    loops over the choices for per-sample normalization - L1/L2
-    and optionally normalize across samples. Note that normalization across samples (per kmer)
-    does not use the test samples. The test samples are normalized using only the mean and std of the
-    *traning* samples. This is the key to the predictive/generalization power of the models:
-    test samples are not used at all in training the models - only for cross validation.
-    """
-    for norm_name in exp_configs[norm_sample_key][0]:
-        norm_func = norm_func_dict[norm_name]
-        exp_config[norm_sample_key] = norm_name
-        global x_train,  x_test
-        # Per-sample normalization
-        x_train = (norm_func)(x_train) 
-        x_test = (norm_func)(x_test)
-
-        for norm_input in exp_configs[norm_input_key][0]:
-            exp_config[norm_input_key] = norm_input
-            if norm_input:
-                # the mean and std are calculated using only the training samples -
-                # this is the key!
-                sample_mean = x_train.mean(axis=0)
-                sample_std = x_train.std(axis=0)
-
-                # Normalize both training and test samples with the training mean and std
-                x_train = (x_train - sample_mean) / sample_std
-                # test samples are normalized using only the mean and std of the training samples
-                x_test = (x_test - sample_mean) / sample_std
-
-            loop_over_act_loss_funcs()
-
-# loops over the activations and loss functions and sets the current active activations/loss function
-def loop_over_act_loss_funcs():
-    for encoding_activation in exp_configs[enc_act_key][0]:
-        exp_config[enc_act_key] = encoding_activation
-        for code_activation in exp_configs[code_act_key][0]:
-            exp_config[code_act_key] = code_activation
-            for decoding_activation in exp_configs[dec_act_key][0]:
-                exp_config[dec_act_key] = decoding_activation
-                for output_activation in exp_configs[out_act_key][0]:
-                    exp_config[out_act_key] = output_activation
-                    for loss_func in exp_configs[loss_func_key][0]:
-                        exp_config[loss_func_key] = loss_func
-                            
-                        loop_over_batch_norm_early_stop_batch_size()
-
-# loops over other exp configs: batch normalization, dropout, early stopping, batch size, etc.
-def loop_over_batch_norm_early_stop_batch_size():
-    for batch_norm in exp_configs[batch_norm_key][0]:
-        exp_config[batch_norm_key] = batch_norm
-        for dropout in exp_configs[dropout_key][0]:
-            exp_config[dropout_key] = dropout
-            for early_stop in exp_configs[early_stop_key][0]:
-                exp_config[early_stop_key] = early_stop
-                for patience in exp_configs[patience_key][0]:
-                    exp_config[patience_key] = patience
-                    for batch_size in exp_configs[batch_size_key][0]:
-                        exp_config[batch_size_key] = batch_size
-                    
-                        loop_over_layers()
-
+        # sum the confusion matrices over iterations
+        conf_mat = np.sum(iter_results[:, 4], axis=0)
         
-last_loss = []
-mean_squared_errors = []
+        # mean results for loss/val loss/acc/val acc across iterations
+        mean_results = np.mean(iter_results[:, [0,1,2,3]], axis=0)
+            
+        # mean loss across iterations
+        loss = mean_results[3]
+        val_loss = mean_results[2]
+
+        # mean accuracy across iterations
+        acc = mean_results[1]
+        val_acc = mean_results[0]
+
+        last_val_acc = val_acc[-1]
+        last_val_loss = val_loss[-1]
+
+        max_vai = np.argmax(val_acc)
+        min_vli = np.argmin(val_loss)
+
+        all_fold_roc_aucs = np.concatenate(iter_results[:, 5])
+        all_y_test_pred = np.concatenate(iter_results[:, 6])
+        
+        all_y_test = np.array(np.concatenate([r[0] for r in all_y_test_pred]))
+        all_y_pred = np.array(np.concatenate([r[1] for r in all_y_test_pred]))
+        
+
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
+        accs = dict()
+        std_down = dict()
+        std_up = dict()
+        for i in range(n_classes):
+            true_probs = [r[i] for r in all_y_test]
+            pred_probs = [r[i] for r in all_y_pred]
+            fpr[i], tpr[i], _ = roc_curve(true_probs, pred_probs)
+            roc_auc[i] = auc(fpr[i], tpr[i])
+            accs[i] = accuracy_score(np.round(true_probs), np.equal(np.argmax(all_y_pred, axis=1), i))
+
+        fpr["micro"], tpr["micro"], _ = roc_curve(all_y_test.ravel(), all_y_pred.ravel())
+        roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+        # First aggregate all false positive rates
+        all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
+
+        # Then interpolate all ROC curves at these points
+        all_tpr = np.zeros_like(all_fpr)
+        for i in range(n_classes):
+            all_tpr += np.interp(all_fpr, fpr[i], tpr[i])
+        # Finally average it and compute AUC
+        all_tpr /= n_classes
+
+        fpr["macro"] = all_fpr
+        tpr["macro"] = all_tpr
+        roc_auc['macro'] = auc(all_fpr, all_tpr)
+
+        i_tpr = dict()
+        # use the per-fold ROCs to calculate the CI band around the overall ROC as done in Pasolli
+        for fprs, tprs, roc_aucs in all_fold_roc_aucs:
+            for i in list(range(n_classes)) + ['micro', 'macro']:
+                if not np.isnan(tprs[i][0]):
+                    try:
+                        i_tpr[i].append(np.interp(fpr[i], fprs[i], tprs[i]))
+                    except KeyError:
+                        i_tpr[i] = [np.interp(fpr[i], fprs[i], tprs[i])]
+
+        for i in list(range(n_classes)) + ['micro', 'macro']:
+            std_down[i] = np.maximum(tpr[i] - np.std(i_tpr[i], axis=0)*plot_factor/np.sqrt(get_config_val(use_kfold_key, exp_config)), 0)
+            std_up[i] = np.minimum(tpr[i] + np.std(i_tpr[i], axis=0)*plot_factor/np.sqrt(get_config_val(use_kfold_key, exp_config)), 1.0)
+
+        if plot_overall:
+            # plot the confusion matrix
+            plot_confusion_matrix(conf_mat, config=config)
+
+            # plot loss vs epochs
+            plot_loss_vs_epochs(loss, val_loss, config=config)
+        
+            # plot accuracy vs epochs
+            plot_acc_vs_epochs(acc, val_acc, config=config)
+
+            # plot the ROCs with AUCs/ACCs
+            plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config=config)
+
+        print('tkfold-overall-loss: ' + str(loss) + ' for ' + class_name + ':' + config)
+        print('tkfold-overall-val-loss: ' + str(val_loss) + ' for ' + class_name + ':' + config)
+        print('tkfold-overall-acc: ' + str(acc) + ' for ' + class_name + ':' + config)
+        print('tkfold-overall-val-acc: ' + str(val_acc) + ' for ' + class_name + ':' + config)
+        print('tkfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + class_name + ':' + config)
+        
+        perf_metrics = np.vstack(np.concatenate(iter_results[:, 7]))
+        perf_means = np.mean(perf_metrics, axis=0)
+        perf_stds = np.std(perf_metrics, axis=0)
+        
+        # log the results for offline analysis
+        print(('{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tkfold-overall-perf-metrics for ' + class_name + ':{}').
+              format(perf_means[0], perf_stds[0], perf_means[1], perf_stds[1], perf_means[2], perf_stds[2], perf_means[3], perf_stds[3], perf_means[4], perf_stds[4], perf_means[5], perf_stds[5], roc_auc[1], roc_auc['macro'], last_val_acc, last_val_loss, max_vai, min_vli, val_acc[max_vai], val_loss[min_vli], config))
+        '''
+        all_ae_results = np.vstack(np.concatenate(iter_results[:, 8]))
+        print(all_ae_results)
+        # mean autoencoder loss vs epochs across iterations times K folds
+        ae_loss = np.mean([ r[0]['loss'] for r in all_ae_results ], axis=0)
+        ae_val_loss = np.mean([ r[0]['val_loss'] for r in all_ae_results ], axis=0)
+        if plot_ae_overall:
+            # plot loss vs epochs
+            plot_loss_vs_epochs(ae_loss, ae_val_loss, config=config, name='ae_loss')
+        ae_means = np.mean([ [r[1], r[2]] for r in all_ae_results ], axis=0)
+        ae_stds = np.std([ [r[1], r[2]] for r in all_ae_results ], axis=0)
+        '''
+
+        #print(('{}({})\t{}({})\tkfold-overall-autoencoder-perf-metrics for ' + class_name + ':{}').
+              #format(ae_means[0], ae_stds[0], ae_means[1], ae_stds[1], config))
+
+        # dump the model results into a file for offline analysis and plotting, e.g., merging plots from
+        # different model instances (real and null)
+        aggr_results = [val_acc, acc, val_loss, loss, conf_mat, fpr, tpr, roc_auc, accs, std_down, std_up, perf_means, perf_stds]
+        #ae_aggr_results = [ae_loss, ae_val_loss, ae_means, ae_stds]
+
+        dataset_info = [source_ind, class_name, label_ind, classes, n_classes, class_to_ind, colors, markers]
+
+        with open(graph_dir + "/aggr_results" + config +".pickle", "wb") as f:
+            dump_dict = { "dataset_info": dataset_info, "results": [aggr_results, dataset_config_iter_fold_results[exp_config[dataset_key]][config]],
+                           }
+            '''"ae_results": ae_aggr_results'''
+            pickle.dump(dump_dict, f)
+    dataset_config_iter_fold_results = {}
 
 # loops over the list of the network layer structures
-def loop_over_layers():
-    for layers in exp_configs[layers_key][0]:
-        exp_config[layers_key] = layers
-            
-        # The last entry of the layers is for code layer dimension (middle layer of the autoencoder)
-        for enc_dim in exp_configs[enc_dim_key][0]:
-            exp_config[enc_dim_key] = enc_dim
-            # set the last entry in the layer dimension list to the code layer dimension being iterated thru
-            # - this is so we don't have to list too many network layer lists when we vary only the code layer
-            # dimension.
-            layers[-1] = enc_dim
+def normalize_train_test():
+    norm_func = norm_func_dict[exp_config[norm_sample_key]]
+    global x_train,  x_test
+    x_train = (norm_func)(x_train) 
+    x_test = (norm_func)(x_test)
 
-            # exp with # of epochs for autoencoder training
-            for auto_epochs in exp_configs[auto_epochs_key][0]:
-                exp_config[auto_epochs_key] = auto_epochs
-                # exp with # of epochs for supervised training
-                for super_epochs in exp_configs[super_epochs_key][0]:
-                    exp_config[super_epochs_key] = super_epochs
+    norm_input = exp_config[norm_input_key]
+    if norm_input:
+        sample_mean = x_train.mean(axis=0)
+        sample_std = x_train.std(axis=0)
 
-                    # Do the real work of training and testing
-                    build_train_test(layers)
+        # Normalize both training and test samples with the training mean and std
+        x_train = (x_train - sample_mean) / sample_std
+        # test samples are normalized using only the mean and std of the training samples
+        x_test = (x_test - sample_mean) / sample_std
+    
+    layers = exp_config[layers_key]
+    # exp with # of epochs for autoencoder training
+    build_train_test(layers)
 
 # Counts the number of layers of the autoencoder from output layer to the middle code layer
 # - used for popping off the decoding layers after autoencoder training and before 
@@ -821,16 +564,14 @@ def build_train_test(layers):
     """
 
     # This is to optionally make the weight initialization deterministic
-    setup_randomness()
-
-    # (optionally) use activation regulerization
-    exp_config[act_reg_key] = exp_configs[act_reg_key][0][0]
+    setup_randomness(exp_config[no_random_key])
 
     # the autoencoder
     autoencoder = Sequential()
 
     # layers before the middle code layer - they share the same activation function
     for i in range(1, len(layers)-1):
+        
         autoencoder.add(Dense(layers[i], input_dim=layers[i-1], kernel_regularizer=regularizers.l2(exp_config[act_reg_key]),
                               activity_regularizer=regularizers.l1(exp_config[act_reg_key])))
         add_layer_common(autoencoder, exp_config[enc_act_key])
@@ -844,14 +585,15 @@ def build_train_test(layers):
     # the model from input to the code layer - used for plotting 2D graphs
     code_layer_model = Model(inputs=autoencoder.layers[0].input,
                              outputs=autoencoder.layers[cnt_to_coding_layer() - 1].output)
-
+    '''
     print("Code layer model:")
     code_layer_model.summary()
+    '''
 
     # stats for the autoencoder - the 9s are for when autoencoder is (optionally) not used before supervised learning
     ae_val_loss, ae_loss, ae_mse = 999999, 999999, 999999
     ae_hist = []
-    if get_config_val(use_ae_key):
+    if get_config_val(use_ae_key, exp_config):
         # Use the autoencoder before supervised learning
         #
         # Add the decoding layers - from second to last layer to the second layer
@@ -879,7 +621,7 @@ def build_train_test(layers):
                         epochs=exp_config[auto_epochs_key],
                         batch_size=exp_config[batch_size_key],
                         # shuffle the training samples per epoch only if removing randomness is not specified
-                        shuffle=(not get_config_val(no_random_key)),
+                        shuffle=(not get_config_val(no_random_key, exp_config)),
                         verbose=0,
                         validation_data=(x_test, x_test),
                         callbacks=callbacks)
@@ -887,7 +629,7 @@ def build_train_test(layers):
         ae_hist = history.history
         # Plot training/test loss by epochs for the autoencoder
         if plot_ae_fold:
-            plot_loss_vs_epochs(ae_hist['loss'], ae_hist['val_loss'], name='ae_general_loss_vs_epochs')
+            plot_loss_vs_epochs(ae_hist['loss'], ae_hist['val_loss'], name='ae_loss')
 
         # Calculate the MSE on the test samples
         decoded_output = autoencoder.predict(x_test)
@@ -906,7 +648,7 @@ def build_train_test(layers):
         print('{},{},{}\t{},{},{}\t{}\t{}\t{}\tautoencoder-min-loss-general:{}'.
               format(ae_hist['val_loss'][min_vli], min_vli, ae_hist['loss'][min_vli],
                      ae_hist['loss'][min_li], min_li, ae_hist['val_loss'][min_li],
-                     ae_val_loss, ae_loss, ae_mse, config_info()))
+                     ae_val_loss, ae_loss, ae_mse, config_info(exp_config)))
 
         # if plot_fold and exp_config[enc_dim_key] > 1:
         #     fig = pylab.figure()
@@ -916,7 +658,7 @@ def build_train_test(layers):
 
         #     codes_pred = code_layer_model.predict(x_test)
         #     print("Autoencoder's test code shape for dimension {}: {}".format(exp_config[enc_dim_key], codes_pred.shape))
-        #     plot_2d_codes(codes_pred, fig, 'ae_general_two_codes',
+        #     plot_2d_codes(codes_pred, fig, 'ae_two_codes',
         #                   "This graph shows autoencoder's first 2 components of the encoding codes (the middle hidden layer output) with labels")
 
         # Pop the decoding layers before supervised learning
@@ -940,7 +682,7 @@ def build_train_test(layers):
     autoencoder.fit(x_train, y_train,
                     epochs=exp_config[super_epochs_key],
                     batch_size=exp_config[batch_size_key],
-                    shuffle=(not get_config_val(no_random_key)),
+                    shuffle=(not get_config_val(no_random_key, exp_config)),
                     verbose=0,
                     validation_data=(x_test, y_test),
                     callbacks=callbacks)
@@ -994,7 +736,6 @@ def build_train_test(layers):
         # index being this one (i), 0 otherwise
         acc[i] = accuracy_score(np.round(y_test[:, i]), np.equal(np.argmax(y_test_pred, axis=1), i))
         
-
     # Compute micro-average ROC curve and ROC area
     fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), y_test_pred.ravel())
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
@@ -1050,7 +791,7 @@ def build_train_test(layers):
                  hist['val_loss'][min_vli], min_vli, hist['val_acc'][min_vli], hist['acc'][min_vli], hist['loss'][min_vli],
                  hist['loss'][min_li], min_li, hist['val_acc'][min_li], hist['acc'][min_li], hist['val_loss'][min_li],
                  ae_super_val_acc, ae_super_acc, ae_super_val_loss, ae_super_loss,
-                 ae_val_loss, ae_loss, ae_mse, roc_auc[1], roc_auc['macro'], config_info()))
+                 ae_val_loss, ae_loss, ae_mse, roc_auc[1], roc_auc['macro'], config_info(exp_config)))
 
     # calculate the accuracy/f1/precision/recall for this test fold - same way as in Pasolli
     test_true_label_inds = np.argmax(y_test, axis=1)
@@ -1061,14 +802,15 @@ def build_train_test(layers):
     recall = recall_score(test_true_label_inds, test_pred_label_inds, pos_label=None, average='weighted')
 
     print(('{}\t{}\t{}\t{}\t{}\t{}\tfold-perf-metrics for ' + class_name + ':{}').
-          format(accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro'], config_info()))
+          format(accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro'], config_info(exp_config)))
 
     # the config info for this exp but no fold/iter indices because we need to aggregate stats over them
-    config_key = config_info(skip_keys=[kfold_key, iter_key])
+    config_key = name_file_from_config(exp_config, skip_keys=[kfold_key, iter_key])
+    global config_iter_fold_results
     config_iter_fold_results = dataset_config_iter_fold_results[exp_config[dataset_key]]
     if config_key not in config_iter_fold_results:
         config_iter_fold_results[config_key] = []
-
+        
     # the iteration and fold indices
     iter_ind = exp_config[iter_key]
     fold_ind = exp_config[kfold_key]
@@ -1082,9 +824,9 @@ def build_train_test(layers):
     config_iter_fold_results[config_key][iter_ind][fold_ind] = [hist, [codes_pred, info_test], conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred],
                                                                 [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']], [ae_hist, ae_val_loss, ae_mse]]
 
-        
+    
 # Plot the 2D codes in the layer right before the final classification layer
-def plot_2d_codes(codes, name='ae_super_general_two_codes', title='2D Codes Before Classfication Layer', 
+def plot_2d_codes(codes, name='two_codes', title='2D Codes Before Classfication Layer', 
                   xlabel='Code 1', ylabel='Code 2',  desc='', config=None, info=None):
     if info is None:
         info = info_test
@@ -1107,7 +849,7 @@ def plot_2d_codes(codes, name='ae_super_general_two_codes', title='2D Codes Befo
     add_figtexts_and_save(fig, name, desc, config=config)
 
 # plot loss vs epochs
-def plot_loss_vs_epochs(loss, val_loss, name='ae_super_general_loss_vs_epochs', title='Loss vs Epochs', 
+def plot_loss_vs_epochs(loss, val_loss, name='super_loss', title='Loss vs Epochs', 
                         xlabel='Epoch', ylabel='Loss', desc='', config=None):
     fig = pylab.figure()
     pylab.plot(loss)
@@ -1120,7 +862,7 @@ def plot_loss_vs_epochs(loss, val_loss, name='ae_super_general_loss_vs_epochs', 
     add_figtexts_and_save(fig, name, desc, config=config)
 
 # plot accuracy vs epochs
-def plot_acc_vs_epochs(acc, val_acc, name='ae_super_general_accu_vs_epochs', title='Accuracy vs Epochs',
+def plot_acc_vs_epochs(acc, val_acc, name='acc', title='Accuracy vs Epochs',
                        xlabel='Epoch', ylabel='Accuracy', desc='', config=None):
     fig = pylab.figure()
     pylab.plot(acc)
@@ -1196,9 +938,9 @@ def plot_confusion_matrix(cm, config=None, cmap=pylab.cm.Reds):
         sub_plt.set_xlabel('Predicted Label', size=plot_text_size)
     pylab.tight_layout()
     pylab.gca().set_position((.1, 10, 0.8, .8))
-    add_figtexts_and_save(fig, 'ae_super_general_confusion_mat', "Confusion matrix for predicting sample's " + class_name + " status using 5mers", y_off=1.3, config=config)
+    add_figtexts_and_save(fig, 'cm', "Confusion matrix for predicting sample's " + class_name + " status using 5mers", y_off=1.3, config=config)
 
-def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config=None, name='ae_super_general_roc_auc', title='ROC Curves with AUCs/ACCs', 
+def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config=None, name='roc_auc', title='ROC Curves with AUCs/ACCs', 
                   desc="ROC/AUC plots using 5mers", xlabel='False Positive Rate', ylabel='True Positive Rate'):
     fig = pylab.figure()
     lw = 2
@@ -1243,42 +985,11 @@ def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config=No
     pylab.gca().set_position((.1, .7, .8, .8))
     add_figtexts_and_save(fig, name, desc, config=config)
 
-# Get the config value for the given config key - used in identifying model in grid search
-# as well as unquiely naming the plots for the models
-def get_config_val(config_key):
-    if config_key in exp_config:
-        config = exp_config[config_key]
-    else:
-        config = exp_configs[config_key][0][0]
-
-    if type(config) is list:
-        config = '-'.join([ str(c) for c in config])
-    return config
-
-# Get the config description for the given config key - used in figure descriptions
-def get_config_desc(config_key):
-    return exp_configs[config_key][1].format(get_config_val(config_key))
-
-# Get the config info for the current active experiment - for identifying model in grid search
-# as well as uniquely naming plots for the models - has the option to skip the fold and iteration keys
-# for aggregating results across them.
-config_keys = [ dataset_key, layers_key, enc_dim_key, enc_act_key, code_act_key, dec_act_key, out_act_key, loss_func_key,
-                auto_epochs_key, super_epochs_key, norm_sample_key, norm_input_key, batch_size_key, batch_norm_key,
-                # Thes two are not used yet, so skip them to save file name length
-                # early_stop_key, patience_key,
-                dropout_key, act_reg_key, backend_key, version_key, use_ae_key, no_random_key,
-                # kfold_key should be the last and iter_key second to last
-                use_kfold_key, num_iters_key, shuffle_labels_key, shuffle_abunds_key, iter_key, kfold_key ]
-def config_info(skip_keys=[]):        
-    config_info = ''
-    for k in config_keys:
-        # skip the specified keys, used for skipping the fold and iteration indices (for aggregating results across them)
-        if not k in skip_keys:
-            config_info += '_' + k + ':' + str(get_config_val(k))
-    return config_info
 
 # parse config info string back into exp configs - for evaluating models after grid search
-def setup_exp_configs_from_config_info(config):
+def setup_exp_config_from_config_info(config):
+    global exp_config
+    exp_config = {}
     config_s = re.sub(r'LF:mean_squared_error', 'LF:kullback_leibler_divergence', config)
     changed = (config_s != config)
     cnt1 = 0
@@ -1299,14 +1010,16 @@ def setup_exp_configs_from_config_info(config):
                     v[i] = int(v[i])
 
             # Network layer dimension specs are list of list of integers
-            exp_configs[k][0] = v if cnt2 <= 1 else [v]
+            exp_config[k] = v[0] if cnt2 <= 1 else v
     # The loss function name 'kullback_leibler_divergence' mixes up with the key/value separation char '_', so handle
     # it here separately
     if cnt1 > 1:
         if changed:
-            exp_configs['LF'][0] = ['mean_squared_error']
+            exp_config['LF'] = 'mean_squared_error'
         else:
-            exp_configs['LF'][0] = ['kullback_leibler_divergence']
+            exp_config['LF'] = 'kullback_leibler_divergence'
+
+
 # Add figure texts to plots that describe configs of the experiment that produced the plot
 def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, config=None):
     if add_fig_desc:
@@ -1347,7 +1060,7 @@ def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, co
                       + ' --- ' + get_config_desc(version_key) + ' --- ' + get_config_desc(num_iters_key) + ' --- ' + get_config_desc(iter_key))
 
 
-    filename = graph_dir + '/' + name + (config_info() if config is None else config) + '.svg'
+    filename = graph_dir + '/' + name + (name_file_from_config(exp_config) if config is None else config) + '.svg'
     pylab.savefig(filename , bbox_inches='tight')
     pylab.close(fig)
 
@@ -1365,78 +1078,116 @@ if __name__ == '__main__':
 
         # Overall plotting - aggregate results across both folds and iteration
         plot_overall = True
-
-        # For testing supervised models - normalization across samples needs to be on
-        set_config(norm_input_key, [1])
-
-        set_config(dataset_key, ['AllHealth'])
-
                                  #'SingleDiseaseMetaHIT', 'SingleDiseaseQin', 'SingleDiseaseKarlsson',
                                  #'SingleDiseaseFeng', 'SingleDiseaseZeller', 'SingleDiseaseLiverCirrhosis', 'SingleDiseaseRA', 'All-T2D'])
+        '''
+        dataset_configs['SingleDiseaseKarlsson'] = [
+            'LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
+            ]
+        '''
+        
+        '''
+        dataset_configs['SingleDiseaseQin'] = [
+                                                #"LS:8192-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                #"LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2-4_EA:linear_CA:sigmoid_DA:relu_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-8_EA:linear_CA:linear_DA:relu_OA:relu_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                #"LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"
+                                                ]
+        '''                                                       
+        '''
+        dataset_configs['SingleDiseaseRA'] = [#"LS:512-2_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                #"LS:512-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                #"LS:512-2-16_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:512-2-2_EA:tanh_CA:tanh_DA:softmax_OA:sigmoid_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:8192-2-8_EA:tanh_CA:softmax_DA:sigmoid_OA:linear_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:2080-4_EA:tanh_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-2_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:8192-2-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:512-256-128-8_EA:tanh_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:2080-1040-520-16_EA:linear_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_"]
+        '''
+        '''
+        dataset_configs['SingleDiseaseFeng'] = [#"LS:8192-16_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                #"LS:8192-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:512-256-128-16_EA:linear_CA:softmax_DA:tanh_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:8192-4096-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:softmax_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2-16_EA:linear_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2_EA:linear_CA:linear_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2_EA:linear_CA:linear_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2-16_EA:linear_CA:linear_DA:relu_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"
+                                                ]
+        '''
+        '''
+        dataset_configs['SingleDiseaseZeller'] = [#"LS:512-256-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                #"LS:2080-16_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                #"LS:2080-8_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:8_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:2080-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-256-16_EA:linear_CA:sigmoid_DA:linear_OA:tanh_ED:16_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:2080-16_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-2-2_EA:linear_CA:linear_DA:relu_OA:softmax_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:2080-16_EA:linear_CA:linear_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-8_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_"]
+        '''
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = [#"LS:2080-2-2_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            #"LS:2080-2-2_EA:sigmoid_CA:sigmoid_DA:softmax_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            #"LS:2080-2-4_EA:sigmoid_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:2080-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:2080-2-2_EA:tanh_CA:linear_DA:softmax_OA:softmax_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:2080-4_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:4_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:8192-2-4_EA:softmax_CA:softmax_DA:tanh_OA:relu_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                            "LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:relu_OA:linear_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                            "LS:2080-8_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:2080-1040-520-8_EA:sigmoid_CA:softmax_DA:softmax_OA:tanh_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_"]
+        '''
+        #'''
+        dataset_configs['SingleDiseaseKarlsson'] = [#"LS:8192-16_EA:relu_CA:relu_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2_EA:sigmoid_CA:tanh_DA:tanh_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-8_EA:tanh_CA:sigmoid_DA:sigmoid_OA:relu_ED:8_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-8_EA:relu_CA:relu_DA:sigmoid_OA:linear_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-1024-2_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-1024-16_EA:sigmoid_CA:linear_DA:sigmoid_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-1024-2_EA:tanh_CA:linear_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-1024-4_EA:relu_CA:sigmoid_DA:softmax_OA:relu_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-2-2_EA:linear_CA:linear_DA:sigmoid_OA:relu_ED:2_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"]
+        #'''
 
-        dataset_config['AllHealth'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:2_SEP:3_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1']
-
-        # This produced 0.947 AUC and 0.914 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-        # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-        dataset_config['SingleDiseaseMetaHIT'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1']
-
+        #dataset_configs['SingleDiseaseMetaHIT'] = ['LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7']
+        '''
+        dataset_configs['SingleDiseaseQin'] = ['LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
+                                               'LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
+                                               ]
         # This produced 0.759 AUC and 0.693 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
         # - a drop from the previous model as a result of avoiding overfitting.
         # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-        dataset_config['SingleDiseaseQin'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1']
+        
+        dataset_configs['SingleDiseaseQin'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:0_UK:10_ITS:20_IT:0_NR:1_SL:0_ES:0_SA:0_PA:2_KS:5',
+                                               #'LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:3_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:0_UK:3_ITS:20_IT:0_NR:1_SL:1_ES:0_SA:0_PA:2_KS:5',
+                                               #'LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:3_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:0_UK:3_ITS:20_IT:0_NR:1_SL:0_ES:0_SA:0_PA:2_KS:5',
 
-        dataset_config['SingleDiseaseKarlsson'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1']
-
-        dataset_config['SingleDiseaseFeng'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1']
-
-        dataset_config['SingleDiseaseZeller'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1']
-
-        dataset_config['SingleDiseaseLiverCirrhosis'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1']
+                                              ]
+        
+        dataset_configs['SingleDiseaseKarlsson'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:10__NR:1',# 'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:10__NR:1_SL:1'
+                                              ]
 
         # This produced 0.604 AUC and 0.601 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
         # but the std is too big (around 0.1 for both), suggesting again that the RA data is not amenable to this technique.
-        dataset_config['SingleDiseaseRA'] = ['LS:512-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1']
-
-        dataset_config['All-T2D'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1']
-
-        
-        '''
-        # Models chosen after supervised grid search whose performance stats wre reported in the Siemens paper.
-        # These come in pairs - one for the real model, the other for the null/shuffled one
-        #
-        # You can add any specific models to be tested by add ing them to their respective dataset_config list
-
-
-        # This produced 0.998 AUC and 0.987 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-        # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-        dataset_config['AllContinent'] = ['LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1',
-                                          'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1'
-        ]
-
-        # This produced 0.989 AUC and 0.939 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-        # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-        dataset_config['AllCountry'] = ['LS:1024-2-2_ED:2_EA:tanh_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1', 'LS:1024-2-2_ED:2_EA:tanh_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:200_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1']
-        
-        # This produced 0.947 AUC and 0.914 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-        # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-        dataset_config['SingleDiseaseMetaHIT'] = ['LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:__NR:1',
-                                              'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1'
-        ]
-
-        # This produced 0.759 AUC and 0.693 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-        # - a drop from the previous model as a result of avoiding overfitting.
-        # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
-        dataset_config['SingleDiseaseT2D'] = ['LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1', 'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1']
-
-        # This produced 0.604 AUC and 0.601 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
-        # but the std is too big (around 0.1 for both), suggesting again that the RA data is not amenable to this technique.
-        dataset_config['SingleDiseaseRA'] = ['LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1',
-                                             'LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:5__NR:1_SL:1'
-        ]
+        dataset_configs['SingleDiseaseRA'] = ['LS:512-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:10__NR:1']
+        #'LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:10__NR:1_SL:1'
+        #]
         '''
         
-
-        loop_over_datasets()
+        loop_over_dataset_configs()
+        
     elif exp_mode == "AUTO_MODELS":
         plot_ae_fold = False
         plot_ae_overall = True
@@ -1449,41 +1200,12 @@ if __name__ == '__main__':
         # These come in pairs - one for the real model, the other for the null/shuffled one
         #
         # You can add any specific models to be tested by adding them to their respective dataset_config list
-
-        # For testing autoencoder - normalization across samples is turned off
-        # make your your config string has NI:0
-        exp_configs[norm_input_key] = [0]
-        # set the supervised epochs to be 1 to make the ROC calculations happy and to avoid wasting time on supervised
-        # learning. We have to use the supervised part only because the K-fold cross-validation code was tangled with
-        # supervised learning. Make sure your config string has SEP:1 to avoid wasting computing time
-        set_config(super_epochs_key, [1])
         
-        set_config(dataset_key, ['HMP', 'SingleDiseaseMetaHIT', 'SingleDiseaseT2D', 'SingleDiseaseRA'])
+        set_config(exp_config, dataset_key, ['HMP', 'SingleDiseaseMetaHIT', 'SingleDiseaseT2D', 'SingleDiseaseRA'])
 
-        dataset_config['AllHealth'] = ['DS:AllHealth_LS:512-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:2_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:0_ITS:2_SL:0_SA:0']
-        
-        '''# MSE=1.625*10^(-8) after 20 runs of 10-fold CV
-        dataset_config['SingleDiseaseT2D'] = ['DS:SingleDiseaseT2D_LS:1024-2-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:10_SL:0_SA:0',
-                                              'DS:SingleDiseaseT2D_LS:1024-2-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:10_SL:0_SA:1',                                          
-                                          ]
+        dataset_configs['AllHealth'] = ['DS:AllHealth_LS:512-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:2_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:0_ITS:2_SL:0_SA:1_PA:2']
 
-        # MSE=1.577*10^(-8) after 20 runs of 10-fold CV
-        dataset_config['SingleDiseaseRA'] = ['DS:SingleDiseaseRA_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:0',
-                                             'DS:SingleDiseaseRA_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:1',
-                                         ]
-
-        # MSE=2.176*10^(-8) after 20 runs of 10-fold CV
-        dataset_config['SingleDiseaseMetaHIT'] = ['DS:SingleDiseaseMetaHIT_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:0',
-                                              'DS:SingleDiseaseMetaHIT_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:1',
-                                          ]
-
-        # MSE=2.617*10^(-8) after 20 runs of 10-fold CV
-        dataset_config['HMP'] = ['DS:HMP_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:0',
-                                 'DS:HMP_LS:1024-2-2_ED:2_EA:softmax_CA:softmax_DA:softmax_OA:softmax_LF:kullback_leibler_divergence_AEP:200_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:10_ITS:1_SL:0_SA:1',
-                             ]
-        '''
-
-        loop_over_datasets()
+        loop_over_dataset_configs()
     elif exp_mode == "SEARCH_SUPER_MODELS":
         plot_ae_fold = False
         plot_ae_overall = False
@@ -1492,11 +1214,11 @@ if __name__ == '__main__':
         plot_iter = False
         plot_overall = True
 
-        # For searching supervised models - normalization across samples needs to be on
-        set_config(norm_input_key, [1])
+        exp_configs[shuffle_labels_key][0] = [0]
 
         # edit exp_configs to your needs
-        loop_over_datasets()
+        loop_over_configs(random=True)
+        
     elif exp_mode == "SEARCH_AUTO_MODELS":
         plot_ae_fold = False
         plot_ae_overall = True
@@ -1504,18 +1226,19 @@ if __name__ == '__main__':
         plot_fold = False
         plot_iter = False
         plot_overall = False
+        
 
         # For searching unsupervised models - normalization across samples needs to be off
-        set_config(norm_input_key, [0])
+        exp_configs[norm_input_key][0] = [0]
         # set the supervised epochs to be 1 to make the ROC calculations happy and to avoid wasting time on supervised
         # learning. We have to use the supervised part only because the K-fold cross-validation code was tangled with
         # supervised learning
-        set_config(super_epochs_key, [1])
-
+        exp_configs[super_epochs_key][0] = [1]
         # edit exp_configs to your needs
-        loop_over_datasets()
+        loop_over_configs(random=True)
+        
     else:
         # anything goes, just edit exp_configs to your needs - it can be for a single specific model, or for
         # arbitrary grid search
-        loop_over_datasets()
+        loop_over_configs()
 

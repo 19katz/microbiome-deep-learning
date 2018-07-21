@@ -1,0 +1,260 @@
+import random as rn
+from keras import backend as K
+import itertools
+
+
+auto_epochs_key = 'AEP'
+super_epochs_key = 'SEP'
+batch_size_key = 'BS'
+loss_func_key = 'LF'
+enc_dim_key = 'ED'
+enc_act_key = 'EA'
+code_act_key = 'CA'
+dec_act_key = 'DA'
+out_act_key = 'OA'
+layers_key = 'LS'
+batch_norm_key = 'BN'
+dropout_key = 'DO'
+act_reg_key = 'AR'
+norm_input_key = 'NI'
+early_stop_key = 'ES'
+patience_key = 'PA'
+dataset_key = 'DS'
+norm_sample_key = 'NO'
+backend_key = 'BE'
+version_key = 'V'
+use_ae_key = 'AE'
+use_kfold_key = 'UK'
+kfold_key = 'KF'
+no_random_key = 'NR'
+iter_key = 'IT'
+shuffle_labels_key = 'SL'
+num_iters_key = 'ITS'
+shuffle_abunds_key = 'SA'
+kmer_size_key = 'KS'
+
+config_keys = [dataset_key, layers_key, enc_act_key,
+               code_act_key, dec_act_key, out_act_key, enc_dim_key, auto_epochs_key, super_epochs_key,
+               batch_size_key, loss_func_key,  batch_norm_key, dropout_key, act_reg_key,
+               norm_input_key, early_stop_key, patience_key, norm_sample_key, backend_key,
+               version_key, use_ae_key, no_random_key, shuffle_labels_key, shuffle_abunds_key,
+               use_kfold_key, num_iters_key, kmer_size_key, iter_key, kfold_key]
+
+config_info_filename = [ dataset_key, kmer_size_key, layers_key, enc_act_key, code_act_key, dec_act_key, out_act_key,
+                #loss_func_key, auto_epochs_key,
+                super_epochs_key, norm_sample_key, norm_input_key, batch_size_key,
+                # Thes two are not used yet, so skip them to save file name length
+                # early_stop_key, patience_key,
+                dropout_key,
+                #backend_key, version_key,
+                use_ae_key, no_random_key,
+                # kfold_key should be the last and iter_key second to last
+                use_kfold_key, num_iters_key, shuffle_labels_key, shuffle_abunds_key, iter_key, kfold_key ]
+
+SAME_AS_ENC = "asenc"
+
+epsilon = 0.5
+
+
+exp_configs = {
+                # Datasets to use
+                dataset_key:       [ [
+                                       # 'AllContinent',
+                                       # 'AllCountry',
+                                       'SingleDiseaseMetaHIT',
+                                       #'SingleDiseaseQin',
+                                       #'SingleDiseaseRA',
+                                       #'SingleDiseaseFeng',
+                                       #'SingleDiseaseZeller',
+                                       #'SingleDiseaseKarlsson',
+                                       #'SingleDiseaseLiverCirrhosis',
+                                       #'AllHealth',
+                                       #'All-T2D',
+                                       #'All-CRC'
+                                       #'HMP',
+                                     ], 'Dataset: {}'],
+                norm_sample_key:   [ [
+                                       'L1',
+                                       # 'L2'
+                                     ], 'Normalize each sample with: {}' ],
+                # 1 for supervised and 0 for autoencoder only -- CHANGE IT BACK TO 1 FOR ANY SUPERVISED LEARNING!!!
+                norm_input_key:    [ [1], 'Normalize across samples (each component with zero mean/unit std across training samples): {}' ],
+
+                kmer_size_key:     [ [5, 6, 7], 'Kmer Size used: {}'],
+
+                # Deep net structure
+                # The last entry (-1 is the placeholder) of the layer list is for code layer dimensions - this is so we don't
+                # have to list too many network layer lists when we vary only the code layer dimension.
+                layers_key:        [ [
+                                       [1, -1],
+                                       [1, 1/2, -1],
+                                       [1, 2, -1],
+                                       [1, 1/2, 1/4, -1],
+                                       [1, 1/2, 1/4, 1/8, -1],
+                                       #[1, 1/2, 1/4, 1/8, 1/16, -1],
+                                     ], "Layers for autoencoder's first half : {}" ],
+                enc_dim_key:       [ [2, 4, 8, 16],  'Encoding dimensions: {}' ],
+
+                enc_act_key:       [ [
+                                         'sigmoid',
+                                         'relu',
+                                         'linear',
+                                         'softmax',
+                                         'tanh',
+                                     ], 'Encoding activation: {}' ],
+                code_act_key:      [ [
+                                         #SAME_AS_ENC,
+                                         'linear',
+                                         'softmax',
+                                         'sigmoid',
+                                         'relu',
+                                         'tanh',
+
+                                     ], 'Code (last encoding) layer activation: {}' ],
+    
+                # Decoding activations are fixed as linear as they are popped off anyway
+                # after autoencoder training
+                dec_act_key:       [ [
+                                         #SAME_AS_ENC,
+                                         'linear',
+                                         'sigmoid',
+                                         'relu',
+                                         'softmax',
+                                         'tanh',
+                                     ], 'Decoding layer activation: {}' ],
+                out_act_key:       [ [
+
+                                         # SAME_AS_ENC,
+                                         'linear',
+                                         'sigmoid',
+                                         'relu',
+                                         'softmax',
+                                         'tanh',
+                                     ], 'Last decoding layer activation: {}' ],
+                loss_func_key :    [ [
+                                         'mean_squared_error',
+                                         #'kullback_leibler_divergence'
+                                     ], 'Autoencoder loss function: {}' ],
+                # boolean for whether to use autoencoder for pretraining before supervised learning
+                use_ae_key:    [ [0], 'Use autoencoder pretraining for supervised learning: {}' ],
+
+
+                # Training options
+                auto_epochs_key :  [ [1], 'Max number of epochs for autoencoder training: {}' ],
+                super_epochs_key : [ [200, 400], 'Max number of epochs for supervised training: {}' ],
+                batch_size_key:    [ [8, 16, 32], 'Batch size used during training: {}' ],
+                # two booleans
+                batch_norm_key:    [ [0], 'Use batch normalization: {}' ],
+                dropout_key:       [ [0], 'Use dropout: {}' ],
+                act_reg_key:       [ [0], 'Activation regularization (for sparsity): {}' ],
+                # boolean
+                early_stop_key:    [ [0],  'Use early stopping: {}' ],
+                patience_key:      [ [2], 'Early stopping patience (consecutive degradations): {}' ],
+                use_kfold_key:    [ [5], 'Stratified K folds (0 means one random shuffle with stratified 80/20 split): {}' ],
+                kfold_key:    [ [0], 'K fold index for the current fold: {}' ],
+                # boolean for whether no randomness should be used
+                no_random_key:    [ [0], "Eliminate randomness in training: {}" ],
+                # number of iterations
+                num_iters_key:    [ [1], "Number of iterations: {}" ],
+                # the current iteration index
+                iter_key:    [ [0], "Iteration: {}" ],
+                # boolean
+                shuffle_labels_key:    [ [0],  'Shuffle labels (for supervised null): {}' ],
+                # boolean
+                shuffle_abunds_key:    [ [0],  'Shuffle abundances (for unsupervised null): {}' ],
+
+                # misc
+                backend_key:   [ [K.backend()], 'Backend: {}' ],
+                version_key:   [ ['5'], 'Version (catching all other unnamed configs): {}' ],
+                         
+            }
+
+class ConfigIterator:
+    
+    def __init__(self, random=False, count=None):
+        self.random = random
+        self.max = count
+        self.used = 0
+        self.cache = {}
+
+    def __iter__(self):
+        if not self.random:
+            iterator = itertools.product(*[exp_configs[key][0] for key in config_keys])
+            for it in iterator:
+                if self.max is not None and self.used >= self.max:
+                    raise StopIteration
+                self.used += 1
+                next_config_dict = {}
+                for i in range(len(it)):
+                    next_config_dict[config_keys[i]] = it[i]
+                change_layers(next_config_dict)
+                config_inf = config_info(next_config_dict)
+                if config_inf in self.cache:
+                    continue
+                else:
+                    self.cache[config_inf] = 1
+                yield next_config_dict
+        else:
+            while self.max is None or self.used < self.max:
+                next_config = [exp_configs[key][0][rn.randint(0, len(exp_configs[key][0]) - 1)] for key in config_keys]
+                next_config_dict = {}
+                for i in range(len(next_config)):
+                    next_config_dict[config_keys[i]] = next_config[i]
+                change_layers(next_config_dict)
+                self.used += 1
+                config_inf = config_info(next_config_dict)
+                if config_inf in self.cache:
+                    continue
+                else:
+                    self.cache[config_inf] = 1
+                yield next_config_dict
+
+def name_file_from_config(config, skip_keys=[]):
+    filename = ''
+    for k in config_info_filename:
+        # skip the specified keys, used for skipping the fold and iteration indices (for aggregating results across them)
+        if not k in skip_keys:
+           filename += '_' + k + ':' + str(get_config_val(k, config))
+    return filename
+
+def config_info(config, skip_keys=[]):
+    config_info = ''
+    if len(config[layers_key]) <= 2:
+        config[enc_act_key] = config[code_act_key]
+        config[dec_act_key] = config[out_act_key]
+    for k in config_keys:              
+        # skip the specified keys, used for skipping the fold and iteration indices (for aggregating results across them)
+        if not k in skip_keys:
+            config_info += '_' + k + ':' +str(get_config_val(k, config))
+    return config_info
+
+# Get the config value for the given config key - used in identifying model in grid search
+# as well as unquiely naming the plots for the models
+def get_config_val(config_key, config):
+    val = config[config_key]
+    if type(val) is list:
+        val = '-'.join([ str(c) for c in val])
+    return val
+
+# Get the config description for the given config key - used in figure descriptions
+def get_config_desc(config_key, config):
+    return exp_configs[config_key][1].format(get_config_val(config_key, config))
+        
+def change_layers(next_config_dict):
+    input_dimensions = 4 ** next_config_dict[kmer_size_key] // 2
+    if next_config_dict[kmer_size_key] == 6:
+        input_dimensions = 2080
+    layers = list(next_config_dict[layers_key])
+    for i in range(len(layers) - 1):
+        if (layers[i] <= 1 and layers[i] > -1):
+            layers[i] = int(input_dimensions * layers[i] + epsilon)
+    layers[-1] = next_config_dict[enc_dim_key]
+    next_config_dict[layers_key] = layers
+            
+if __name__ == "__main__":
+    for config in ConfigIterator(random=True, count=20):
+        print(config)
+    
+        
+            
+            
