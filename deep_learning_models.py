@@ -24,7 +24,7 @@ from sklearn.metrics import mean_squared_error, confusion_matrix
 from sklearn.metrics import roc_curve, auc, accuracy_score, f1_score, precision_score, recall_score
 import itertools
 from itertools import cycle, product
-import flipGradientTF
+#import flipGradientTF
 
 backend = K.backend()
 
