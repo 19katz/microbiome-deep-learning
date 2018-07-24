@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 import random as rn
 from keras import backend as K
+from keras.constraints import max_norm
 from sklearn.utils import shuffle
 
 import matplotlib
@@ -28,6 +29,11 @@ import pickle
 import re
 from load_kmer_cnts_Katherine_jf import load_kmers
 from exp_configs import *
+import matplotlib.pyplot as plt
+
+
+from sklearn.metrics import precision_recall_curve
+
 
 
 
@@ -85,7 +91,6 @@ plot_text_size = 10
 plot_title_size = plot_text_size + 2
 
 test_pct = 0.2
-drop_pct = 0.5
 input_drop_pct = 0
 
 
@@ -247,8 +252,8 @@ def add_layer_common(autoencoder, activation):
     if exp_config[batch_norm_key]:
         autoencoder.add(BatchNormalization())
     autoencoder.add(Activation(activation))
-    if exp_config[dropout_key]:
-        autoencoder.add(Dropout(drop_pct))
+    if not exp_config[dropout_pct_key] == 0:
+        autoencoder.add(Dropout(float(exp_config[dropout_pct_key])))
 
 # Maps class name to target vector, which is zero everywhere except 1 at the index of the true label
 def class_to_target(cls):
@@ -423,7 +428,6 @@ def exec_config(k_folds):
         
         all_y_test = np.array(np.concatenate([r[0] for r in all_y_test_pred]))
         all_y_pred = np.array(np.concatenate([r[1] for r in all_y_test_pred]))
-        
 
         fpr = dict()
         tpr = dict()
@@ -469,6 +473,8 @@ def exec_config(k_folds):
             std_down[i] = np.maximum(tpr[i] - np.std(i_tpr[i], axis=0)*plot_factor/np.sqrt(get_config_val(use_kfold_key, exp_config)), 0)
             std_up[i] = np.minimum(tpr[i] + np.std(i_tpr[i], axis=0)*plot_factor/np.sqrt(get_config_val(use_kfold_key, exp_config)), 1.0)
 
+        precision_graph, recall_graph, _ = precision_recall_curve(all_y_test[:,1], all_y_pred[:, 1])
+
         if plot_overall:
             # plot the confusion matrix
             plot_confusion_matrix(conf_mat, config=config)
@@ -482,15 +488,20 @@ def exec_config(k_folds):
             # plot the ROCs with AUCs/ACCs
             plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config=config)
 
+
         print('tkfold-overall-loss: ' + str(loss) + ' for ' + class_name + ':' + config)
         print('tkfold-overall-val-loss: ' + str(val_loss) + ' for ' + class_name + ':' + config)
         print('tkfold-overall-acc: ' + str(acc) + ' for ' + class_name + ':' + config)
         print('tkfold-overall-val-acc: ' + str(val_acc) + ' for ' + class_name + ':' + config)
         print('tkfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + class_name + ':' + config)
+
         
         perf_metrics = np.vstack(np.concatenate(iter_results[:, 7]))
         perf_means = np.mean(perf_metrics, axis=0)
         perf_stds = np.std(perf_metrics, axis=0)
+
+        if plot_overall:
+            plot_precision_recall(precision_graph, recall_graph, perf_means[2], perf_means[1], config = config)
         
         # log the results for offline analysis
         print(('{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tkfold-overall-perf-metrics for ' + class_name + ':{}').
@@ -550,12 +561,15 @@ def normalize_train_test():
 # - used for popping off the decoding layers after autoencoder training and before 
 # supervised training
 def cnt_to_coding_layer():
-    mult = 2
+    num_layers = 2 * (len(exp_config[layers_key]) - 1) 
     if exp_config[batch_norm_key]:
-        mult += 1
-    if exp_config[dropout_key]:
-        mult += 1
-    return mult * (len(exp_config[layers_key]) - 2) + 2
+        num_layers += len(exp_config[layers_key]) - 1
+    if not exp_config[dropout_pct_key] == 0:
+        num_layers += len(exp_config[layers_key]) - 1
+        if not exp_config[input_dropout_pct_key] == 0:
+            num_layers += 1
+    return num_layers
+    
 
 def build_train_test(layers):
     """
@@ -568,19 +582,31 @@ def build_train_test(layers):
 
     # the autoencoder
     autoencoder = Sequential()
+    if (not exp_config[input_dropout_pct_key] == 0) and (not exp_config[dropout_pct_key] == 0):
+        autoencoder.add(Dropout(float(exp_config[input_dropout_pct_key]), input_shape=(layers[0],)))
 
     # layers before the middle code layer - they share the same activation function
     for i in range(1, len(layers)-1):
-        
-        autoencoder.add(Dense(layers[i], input_dim=layers[i-1], kernel_regularizer=regularizers.l2(exp_config[act_reg_key]),
-                              activity_regularizer=regularizers.l1(exp_config[act_reg_key])))
+        if not exp_config[max_norm_key] == 0:
+            autoencoder.add(Dense(layers[i], input_dim=layers[i-1], kernel_constraint=max_norm(exp_config[max_norm_key]), kernel_regularizer=regularizers.l2(exp_config[act_reg_key]),
+                                  activity_regularizer=regularizers.l1(exp_config[act_reg_key])))
+        else:
+            autoencoder.add(Dense(layers[i], input_dim=layers[i-1], kernel_regularizer=regularizers.l2(exp_config[act_reg_key]),
+                                  activity_regularizer=regularizers.l1(exp_config[act_reg_key])))
         add_layer_common(autoencoder, exp_config[enc_act_key])
+
 
     # the middle code layer - it has an activation function independent of other encoding layers
     i = len(layers) - 1
-    autoencoder.add(Dense(layers[i], input_dim=layers[i-1], kernel_regularizer=regularizers.l2(exp_config[act_reg_key]),
-                          activity_regularizer=regularizers.l1(exp_config[act_reg_key])))
-    autoencoder.add(Activation(exp_config[enc_act_key if exp_config[code_act_key] == SAME_AS_ENC else code_act_key]))
+
+    if not exp_config[max_norm_key] == 0:
+        autoencoder.add(Dense(layers[i], input_dim=layers[i-1], kernel_constraint=max_norm(exp_config[max_norm_key]), kernel_regularizer=regularizers.l2(exp_config[act_reg_key]),
+                                activity_regularizer=regularizers.l1(exp_config[act_reg_key])))
+    else:
+        autoencoder.add(Dense(layers[i], input_dim=layers[i-1], kernel_regularizer=regularizers.l2(exp_config[act_reg_key]),
+                              activity_regularizer=regularizers.l1(exp_config[act_reg_key])))
+    add_layer_common(autoencoder, exp_config[enc_act_key if exp_config[code_act_key] == SAME_AS_ENC else code_act_key])
+
 
     # the model from input to the code layer - used for plotting 2D graphs
     code_layer_model = Model(inputs=autoencoder.layers[0].input,
@@ -634,11 +660,9 @@ def build_train_test(layers):
         # Calculate the MSE on the test samples
         decoded_output = autoencoder.predict(x_test)
         ae_mse = mean_squared_error(decoded_output, x_test)
-        mean_squared_errors.append(ae_mse)
 
         ae_val_loss = ae_hist['val_loss'][-1]
         ae_loss = ae_hist['loss'][-1]
-        last_loss.append(ae_val_loss)
 
         # Which epoch achieved min loss - useful for manual early stopping
         min_vli = np.argmin(ae_hist['val_loss'])
@@ -876,38 +900,6 @@ def plot_acc_vs_epochs(acc, val_acc, name='acc', title='Accuracy vs Epochs',
     add_figtexts_and_save(fig, name, desc, config=config)
 
     
-# Plot individual test sample's predicted probabilities - not tested
-def plot_probs(probs_pred, fig, name, desc):
-    handles = {}
-    sample_info = {'HMP': {}, 'IBD': {}, 'T2D': {}, 'RA': {}, 'Obese': {}}
-    for i in range(len(probs_pred)):
-        ind = (1 if info_test[i][0] == '1' else 0)
-        src = info_test[i][2]
-        stat = ('Yes' if ind == 1 else 'Healthy')
-        info = [ [probs_pred[i][0]], markers[src], colors[ind] ]
-        if stat in sample_info[src]:
-            sample_info[src][stat].append(info)
-        else:
-            sample_info[src][stat] = [info]
-            
-    keys = [ k for k in sample_info.keys() ]
-    keys.sort()
-
-    i = 1
-    for k in keys:
-        for stat in ['Yes', 'No']:
-            if not stat in sample_info[k]:
-                continue
-            for info in sample_info[k][stat]:
-                h = pylab.scatter([i], info[0], marker=info[1], color=info[2], facecolor='none')
-                handles[k + ' - ' + stat] = h
-                i += 1
-
-    keys = [ k for k in handles.keys() ]
-    keys.sort()
-    pylab.legend([handles[k] for k in keys], keys, prop={'size': plot_text_size})
-    pylab.gca().set_position((.1, .7, 2.4, 1.8))
-    add_figtexts_and_save(fig, name, desc)
 
 def plot_confusion_matrix(cm, config=None, cmap=pylab.cm.Reds):
     """
@@ -985,6 +977,21 @@ def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config=No
     pylab.gca().set_position((.1, .7, .8, .8))
     add_figtexts_and_save(fig, name, desc, config=config)
 
+def plot_precision_recall(precision, recall, average_precision, f1_score, name ='precision_recall', config = None):
+    fig = pylab.figure()
+
+    plt.step(recall, precision, color='b', alpha=0.2,
+         where='post')
+    plt.fill_between(recall, precision, step='post', alpha=0.2,
+         color='b')
+
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.ylim([0.0, 1.05])
+    plt.xlim([0.0, 1.0])
+    pylab.gca().set_position((.1, .7, 0.8, .8))
+    add_figtexts_and_save(fig, name, '2-class Precision-Recall curve: AP={0:0.4f}, F1={1:0.4f}'.format(
+              average_precision, f1_score), config=config)
 
 # parse config info string back into exp configs - for evaluating models after grid search
 def setup_exp_config_from_config_info(config):
@@ -1056,7 +1063,7 @@ def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, co
                       ' --- Number of test samples: {}'.format(x_test.shape[0]) + " --- " + get_config_desc(act_reg_key))
 
         y_off -= step
-        pylab.figtext(x_off, y_off,  get_config_desc(dropout_key) + " --- " + get_config_desc(backend_key)
+        pylab.figtext(x_off, y_off,  get_config_desc(dropout_pct_key) + " --- " + get_config_desc(backend_key)
                       + ' --- ' + get_config_desc(version_key) + ' --- ' + get_config_desc(num_iters_key) + ' --- ' + get_config_desc(iter_key))
 
 
@@ -1075,17 +1082,87 @@ if __name__ == '__main__':
 
         plot_fold = False
         plot_iter = False
+        
 
         # Overall plotting - aggregate results across both folds and iteration
         plot_overall = True
                                  #'SingleDiseaseMetaHIT', 'SingleDiseaseQin', 'SingleDiseaseKarlsson',
                                  #'SingleDiseaseFeng', 'SingleDiseaseZeller', 'SingleDiseaseLiverCirrhosis', 'SingleDiseaseRA', 'All-T2D'])
+                                                          
+
+        #'''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = [#'LS:8192-4096-2048-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:relu_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.5_IDP:0_MN:4_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
+                                                          #'LS:8192-4096-2048-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:relu_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.25_IDP:0_MN:4_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
+                                                          'LS:8192-4096-2048-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:relu_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.35_IDP:0_MN:4_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
+                                                          
+                                                          ]
+        #'''
         '''
         dataset_configs['SingleDiseaseKarlsson'] = [
             'LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
             ]
         '''
         
+        '''
+        dataset_configs['SingleDiseaseQin'] = [
+                                                "LS:32896-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+                                                "LS:32896-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+                                                "LS:32896-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+                                                "LS:32896-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+                                                "LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+
+                                                ]
+        '''                                                       
+        '''
+        dataset_configs['SingleDiseaseRA'] = [
+                                                "LS:32896-2-16_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+                                                "LS:32896-2_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+                                                "LS:32896-16448-4_EA:linear_CA:sigmoid_DA:relu_OA:linear_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+                                                "LS:32896-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+                                                "LS:32896-2-2_EA:tanh_CA:tanh_DA:softmax_OA:sigmoid_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_"
+                                                ]
+        '''
+        '''
+        dataset_configs['SingleDiseaseFeng'] = [
+                                                      "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+"LS:32896-16_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+                                                 "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__"
+                                               
+]
+        '''
+        '''
+        dataset_configs['SingleDiseaseZeller'] = [
+                                                "LS:32896-16_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+"LS:32896-8_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:8_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+"LS:32896-16448-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_"
+                                                ]
+        '''
+        
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = [
+                                                        "LS:32896-2-8_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_"
+                                                        "LS:32896-2-4_EA:sigmoid_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+                                                        "LS:32896-2-2_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+                                                        "LS:32896-2-2_EA:sigmoid_CA:sigmoid_DA:softmax_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_"
+                                                         ]
+        '''
+        '''
+        dataset_configs['SingleDiseaseKarlsson'] = [
+                                                    "LS:32896-16_EA:relu_CA:relu_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+                                                    "LS:32896-2-8_EA:relu_CA:linear_DA:linear_OA:sigmoid_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+                                                    "LS:32896-16448-2_EA:sigmoid_CA:tanh_DA:tanh_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+                                                    "LS:32896-2-16_EA:softmax_CA:linear_DA:tanh_OA:linear_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
+                                                    "LS:32896-16448-16_EA:linear_CA:sigmoid_DA:sigmoid_OA:linear_ED:16_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__"
+                                                    ]
+
+        '''
+
         '''
         dataset_configs['SingleDiseaseQin'] = [
                                                 #"LS:8192-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
@@ -1148,7 +1225,7 @@ if __name__ == '__main__':
                                                             "LS:2080-8_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
                                                             "LS:2080-1040-520-8_EA:sigmoid_CA:softmax_DA:softmax_OA:tanh_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_"]
         '''
-        #'''
+        '''
         dataset_configs['SingleDiseaseKarlsson'] = [#"LS:8192-16_EA:relu_CA:relu_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
                                                     "LS:8192-4096-2_EA:sigmoid_CA:tanh_DA:tanh_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
                                                     "LS:8192-4096-2048-8_EA:tanh_CA:sigmoid_DA:sigmoid_OA:relu_ED:8_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
@@ -1159,7 +1236,7 @@ if __name__ == '__main__':
                                                     "LS:8192-4096-2048-1024-2_EA:tanh_CA:linear_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
                                                     "LS:8192-4096-2048-1024-4_EA:relu_CA:sigmoid_DA:softmax_OA:relu_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
                                                     "LS:8192-2-2_EA:linear_CA:linear_DA:sigmoid_OA:relu_ED:2_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"]
-        #'''
+        '''
 
         #dataset_configs['SingleDiseaseMetaHIT'] = ['LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7']
         '''
@@ -1185,6 +1262,7 @@ if __name__ == '__main__':
         #'LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:10__NR:1_SL:1'
         #]
         '''
+       
         
         loop_over_dataset_configs()
         

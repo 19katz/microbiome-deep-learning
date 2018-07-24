@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 #~/miniconda3/bin/python3
+'''
+    This file was originally written by Annamarie. I copied it and modified it to load the data in a format that is compatible with my deep learning code.
+'''
+
 
 import gzip
 import pandas as pd
 import numpy as np
 from numpy import array
 import ntpath
-
+ 
 from Bio import SeqIO
 from glob import glob
 from itertools import product
@@ -20,7 +24,6 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 def load_kmers(kmer_size, data_sets):
-
     kmer_cnts=[]
     accessions=[]
     labels=[]
@@ -108,6 +111,7 @@ def load_metadata():
     # MetaHIT IBD data:
     
     MetaHIT_inFN='%s/MetaHIT_ids.txt' %directory
+    exclude=['ERR011293', 'ERR011236', 'ERR011182']
     MetaHIT_file=open(MetaHIT_inFN, 'r')
     for line in MetaHIT_file:
         items=line.strip('\n').split('\t')
@@ -117,18 +121,19 @@ def load_metadata():
             disease = "IBD"
         else:
             disease = "Healthy"
-        metadata[run_accession] = [disease_status, 'IBD', 'MetaHIT', disease]
+        if run_accession not in exclude:
+            metadata[run_accession] = [disease_status, 'IBD', 'MetaHIT', disease]
     
 
     # HMP data (everyone is healthy):
     
     HMP_inFN='%s/HMP_samples_314.txt' %directory
     HMP_file=open(HMP_inFN, 'r')
-    exclude=['SRR2822459', '700034024', '700109173', '700107759', '700119226']
+    exclude=['SRR2822459', '700034024', '700109173', '700107759', '700119226', '700171341', '700035237', '700123959', '700123827', '700171390', '700164641']
     for line in HMP_file:
         items=line.strip('\n').split('\t')
         run_accession=items[0]
-        disease_status = np.random.randint(0, 2)
+        disease_status = str(np.random.randint(0, 2))
         if disease_status =='1':
             disease = "IBD"
         else:
@@ -155,6 +160,7 @@ def load_metadata():
         sample_id = items[6]
         run_acc_dict[sample_id]=run_accession
 
+    exclude=['ERR260135']
     for line in Karlsson_file:
         items=line.strip('\n').split('\t')
         sample_id=items[0]
@@ -228,3 +234,8 @@ def load_metadata():
         if sample_id not in exclude and disease_status != 'NA':
             metadata[sample_id] = [disease_status,  'CRC', 'Zeller', disease]
     return metadata
+
+if __name__ == "__main__":
+    for kmer_size in [5, 6, 7]:
+        kmers, labels = load_kmers(kmer_size, ['HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al'])
+        print(kmers.shape)
