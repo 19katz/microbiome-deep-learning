@@ -80,6 +80,13 @@ def onehot_encode(labels):
 def load_metadata():
     metadata={} # run_accession -> disease_status
     directory=os.path.expanduser('~/deep_learning_microbiome/data/metadata')
+    
+    exclude = []
+    with open(os.path.expanduser("~/deep_learning_microbiome/scripts/exclude.txt")) as text:
+        for line in text:
+            line = line.rstrip("\n")
+            line = line.strip("'")
+            exclude.append(line)
 
     # Qin et al. T2D data:
 
@@ -105,7 +112,6 @@ def load_metadata():
     
     MetaHIT_inFN='%s/MetaHIT_ids.txt' %directory
     MetaHIT_file=open(MetaHIT_inFN, 'r')
-    exclude=['ERR011293', 'ERR011236', 'ERR011182']
     for line in MetaHIT_file:
         items=line.strip('\n').split('\t')
         run_accession=items[2]
@@ -118,7 +124,6 @@ def load_metadata():
     
     HMP_inFN='%s/HMP_samples_314.txt' %directory
     HMP_file=open(HMP_inFN, 'r')
-    exclude=['SRR2822459', '700034024', '700109173', '700107759', '700119226', '700171341', '700035237', '700123959', '700123827', '700171390', '700164641']
     for line in HMP_file:
         items=line.strip('\n').split('\t')
         run_accession=items[0]
@@ -145,7 +150,6 @@ def load_metadata():
         sample_id = items[6]
         run_acc_dict[sample_id]=run_accession
     
-    exclude=['ERR260135']
     for line in Karlsson_file:
         items=line.strip('\n').split('\t')
         sample_id=items[0]
