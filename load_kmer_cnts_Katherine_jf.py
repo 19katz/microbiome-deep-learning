@@ -240,6 +240,10 @@ def load_metadata():
     return metadata
 
 if __name__ == "__main__":
-    for kmer_size in [5, 6, 7]:
-        kmers, labels = load_kmers(kmer_size, ['HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al'])
-        print(kmers.shape)
+    for kmer_size in [5,]:
+        #kmers, labels = load_kmers(kmer_size, ['HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al'])
+        for dataset in ['Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al']:
+            kmers, labels = load_kmers(kmer_size, [ dataset, ])
+            total = kmers.shape[0]
+            diseased = [labels[i][0] for i in range(len(labels))].count('1')
+            print(dataset + ": " + str(total) + " samples, " + str(total - diseased) + " control, " + str(diseased) + " diseased")
