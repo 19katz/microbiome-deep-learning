@@ -74,103 +74,110 @@ dataset_config_iter_fold_results = {}
 # Values based on the values used in the
 # Pasolli paper 
 dataset_model_grid = {
-    "Qin": "svm1_norm",
-    "MetaHIT": "svm2_norm",
-    "Feng": "rf3_norm",
-    "RA": "svm4_norm",
-    "Zeller": "svm5_norm",
-    "LiverCirrhosis": "svm6_norm",
-    "Karlsson": "rf7_norm",
-    "All-CRC": "svm9_norm",
-    "All-T2D": "svm8_norm",
+    #"Qin": "rf1-norm",
+    #"MetaHIT": "rf2-norm",
+    #"Feng": "rf3-norm",
+    #"RA": "rf4-norm",
+    #"Zeller": "rf5-norm",
+    #"LiverCirrhosis": "rf6-norm",
+    "Karlsson": "rf7-norm",
+    #"All-CRC": "rf9_norm",
+    #"All-T2D": "rf8_norm",
     }
+
+
 model_param_grid = {
-    "rf1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': 1},
-    "rf2": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 200, 'n_jobs': 1},
-    "rf3": {'data': [["Feng"],["Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': 1},
-    "rf4": {'data': [["RA"],["RA"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': 1},
-    "rf5": {'data': [["Zeller_2014"],["Zeller_2014"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 500, 'n_jobs': 1},
-    "rf6": {'data': [["LiverCirrhosis"],["LiverCirrhosis"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': 1},
-    "rf7": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 100, 'n_jobs': 1},
-    "svm1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5, 'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
-    "svm2": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
-    "svm3": {'data': [["Feng"],["Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
-    "svm4": {'data': [["RA"],["RA"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 1, 'gamma': 0.001, 'kernel': 'rbf'},
-    "svm5": {'data': [["Zeller_2014"],["Zeller_2014"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
-    "svm6": {'data': [["LiverCirrhosis"],["LiverCirrhosis"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 1, 'kernel': 'linear', 'gamma': 'auto'},
-    "svm7": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 1, 'gamma': 0.001, 'kernel': 'rbf'},
-    "svm1_norm": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5, 'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 10, 'kernel': 'rbf', 'gamma': 0.001},
-    "svm2_norm": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 1000, 'kernel': 'rbf', 'gamma': 0.0001},
-    "svm3_norm": {'data': [["Feng"],["Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 1, 'kernel': 'rbf', 'gamma': 0.001},
-    "svm4_norm": {'data': [["RA"],["RA"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 100, 'gamma': 0.0001, 'kernel': 'rbf'},
-    "svm5_norm": {'data': [["Zeller_2014"],["Zeller_2014"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 100, 'kernel': 'rbf', 'gamma': 0.0001},
-    "svm6_norm": {'data': [["LiverCirrhosis"],["LiverCirrhosis"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 10, 'kernel': 'rbf', 'gamma': 0.001},
-    "svm7_norm": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 100, 'gamma': 0.0001, 'kernel': 'rbf'},
-    "svm8_norm": {'data': [["Karlsson_2013", "Qin_et_al"],["Karlsson_2013", "Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 10, 'gamma': 0.001, 'kernel': 'rbf'},
-    "svm9_norm": {'data': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "svm",'classes': [0, 1],
-             'C': 10, 'kernel': 'rbf', 'gamma': 0.001},
-    "rf1_norm": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 500, 'n_jobs': -1},
-    "rf2_norm": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 100, 'n_jobs': -1},
-    "rf3_norm": {'data': [["Feng"],["Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 200, 'n_jobs': -1},
-    "rf4_norm": {'data': [["RA"],["RA"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
-    "rf5_norm": {'data': [["Zeller_2014"],["Zeller_2014"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
-    "rf6_norm": {'data': [["LiverCirrhosis"],["LiverCirrhosis"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
-    "rf7_norm": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 400, 'n_jobs': -1},
-    "rf8_norm": {'data': [["Karlsson_2013", "Qin_et_al"],["Karlsson_2013", "Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 200, 'n_jobs': -1},
-    "rf9_norm": {'data': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "rf",'classes': [0, 1],
-            'criterion': 'gini', 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2, 'n_estimators': 500, 'n_jobs': -1},
-    "gb1": {'data': [["Qin_et_al"],["Qin_et_al"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
-             'learning_rate': 0.1, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 5, 'min_samples_split': 2, 'n_estimators': 500, 'subsample': 0.8},
-    "gb2": {'data': [["MetaHIT"],["MetaHIT"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
-            'learning_rate': 0.1, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 5, 'min_samples_split': 2, 'n_estimators': 400, 'subsample': 0.8},
-    "gb3": {'data': [["Feng"],["Feng"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
-            'learning_rate': 0.01, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 500, 'subsample': 0.8},
-    "gb4": {'data': [["RA"],["RA"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
-            'learning_rate': 0.05, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 2, 'n_estimators': 100, 'subsample': 0.8},
-    "gb5": {'data': [["Zeller_2014"],["Zeller_2014"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
-            'learning_rate': 0.01, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 2, 'n_estimators': 500, 'subsample': 0.8},
-    "gb6": {'data': [["LiverCirrhosis"],["LiverCirrhosis"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
-            'learning_rate': 0.05, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 4, 'min_samples_split': 2, 'n_estimators': 500, 'subsample': 0.8},
-    "gb7": {'data': [["Karlsson_2013"],["Karlsson_2013"]],'k': 5,'cvt': 10,'n': 20,'m': "gb",'classes': [0, 1],
-            'learning_rate': 0.01, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 4, 'min_samples_split': 2, 'n_estimators': 200, 'subsample': 0.8}
+    "rf1-norm": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1},
+    "rf2-norm": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 1},
+    "rf3-norm": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 7, 'NR': 1},
+    "rf4-norm": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 1},
+    "rf5-norm": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1},
+    "rf6-norm": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 100, 'NJ': 1, 'KS': 8, 'NR': 1},
+    "rf7-norm": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 100, 'NJ': 1, 'KS': 10, 'NR': 1},
+    "rf8-norm": {'DS': [["Karlsson_2013", "Qin_et_al"],["Karlsson_2013", "Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': -1, 'KS': 5, 'NR': 1},
+    "rf9-norm": {'DS': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': -1, 'KS': 5, 'NR': 1},
+    
+    "svm1": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 100, 'KN': 'linear', 'GM': 'auto', 'KS': 7},
+    "svm2": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'KN': 'linear', 'GM': 'auto', 'KS': 7},
+    "svm3": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 6},
+    "svm4": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'GM': 0.0001, 'KN': 'rbf', 'KS': 7},
+    "svm5": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5},
+    "svm6": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'KN': 'linear', 'GM': 'auto', 'KS': 6},
+    "svm7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'GM': 0.0001, 'KN':'rbf', 'KS': 5},
+    
+    "svm1_norm": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
+    "svm2_norm": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 1000, 'KN': 'rbf', 'GM': 0.0001, 'KS': 5},
+    "svm3_norm": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 1, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
+    "svm4_norm": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5},
+    "svm5_norm": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 100, 'KN': 'rbf', 'GM': 0.0001, 'KS': 5},
+    "svm6_norm": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
+    "svm7_norm": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5},
+    "svm8_norm": {'DS': [["Karlsson_2013", "Qin_et_al"],["Karlsson_2013", "Qin_et_al"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'GM': 0.001, 'KN': 'rbf', 'KS': 5},
+    "svm9_norm": {'DS': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
+    
+    "rf1": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 8, 'NR': 0},
+    "rf2": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 0},
+    "rf3": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 7, 'NR': 0},
+    "rf4": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
+    "rf5": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
+    "rf6": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 0},
+    "rf7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
+
+    "gb1": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
+             'LR': 0.1, 'MD': None, 'MF': 'sqrt', 'ML': 5, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
+    "gb2": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
+            'LR': 0.1, 'MD': None, 'MF': 'sqrt', 'ML': 5, 'MS': 2, 'NE': 400, 'SS': 0.8, 'KS': 5},
+    "gb3": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
+            'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 1, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
+    "gb4": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
+            'LR': 0.05, 'MD': None, 'MF': 'sqrt', 'ML': 2, 'MS': 2, 'NE': 100, 'SS': 0.8, 'KS': 5},
+    "gb5": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
+            'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 2, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
+    "gb6": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
+            'LR': 0.05, 'MD': None, 'MF': 'sqrt', 'ML': 4, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
+    "gb7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
+            'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 4, 'MS': 2, 'NE': 200, 'SS': 0.8, 'KS':5}
     }
+
 
 def class_to_target(cls):
     target = np.zeros((n_classes,))
     target[class_to_ind[cls]] = 1.0
     return target
 
-def plot_precision_recall(precision, recall,  average_precision, f1_score, name ='', config = ''):
+def plot_precision_recall(precision, recall,  average_precision, f1_score, name ='precision_recall', config = ''):
     fig = pylab.figure()
 
     plt.step(recall, precision, color='b', alpha=0.2,
@@ -183,11 +190,11 @@ def plot_precision_recall(precision, recall,  average_precision, f1_score, name 
     plt.ylim([0.0, 1.05])
     plt.xlim([0.0, 1.0])
     pylab.gca().set_position((.1, .7, 0.8, .8))
-    add_figtexts_and_save(fig, name + '_precision_recall', '2-class Precision-Recall curve: AP={0:0.4f}, F1={1:0.4f}'.format(
+    add_figtexts_and_save(fig, name, '2-class Precision-Recall curve: AP={0:0.4f}, F1={1:0.4f}'.format(
               average_precision, f1_score), config=config)
 
     
-def plot_confusion_matrix(cm, name = '', config='', cmap=pylab.cm.Reds):
+def plot_confusion_matrix(cm, name = 'confusion_mat', config='', cmap=pylab.cm.Reds):
     """
     This function plots the confusion matrix.
     http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html#sphx-glr-auto-examples-model-selection-plot-confusion-matrix-py
@@ -215,7 +222,7 @@ def plot_confusion_matrix(cm, name = '', config='', cmap=pylab.cm.Reds):
         sub_plt.set_xlabel('Predicted Label', size=plot_text_size)
     pylab.tight_layout()
     pylab.gca().set_position((.1, 10, 0.8, .8))
-    add_figtexts_and_save(fig, name + '_confusion_mat', "Confusion matrix for predicting sample's " + class_name + " status using 5mers", y_off=1.3, config=config)
+    add_figtexts_and_save(fig, name , "Confusion matrix for predicting sample's " + config + " status ", y_off=1.3, config=config)
 
 def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config='', name= '', title='ROC Curves with AUCs/ACCs', 
                   desc="ROC/AUC plots using 5mers", xlabel='False Positive Rate', ylabel='True Positive Rate'):
@@ -259,7 +266,7 @@ def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config=''
     pylab.title(title, size=plot_title_size)
     pylab.legend(loc="lower right", prop={'size': plot_text_size})
     pylab.gca().set_position((.1, .7, .8, .8))
-    add_figtexts_and_save(fig, name + "_roc_auc", desc, config=config)
+    add_figtexts_and_save(fig, name + "roc_auc", desc, config=config)
     
 def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, config=None):
     filename = graph_dir + '/' + name + '_' + config + '.png'
@@ -267,27 +274,39 @@ def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, co
     pylab.savefig(filename , bbox_inches='tight')
     pylab.close(fig)
 
+def config_info(dataset_name, model_name, config,  kmer_size, skip_keys=['DS', 'CL']):
+    config_info = "DS:" + dataset_name
+    for k in config:              
+        # skip the specified keys, used for skipping the fold and iteration indices (for aggregating results across them)
+        if not k in skip_keys:
+            config_info += '_' + k + ':' +str(get_config_val(k, config))
+    return config_info
+
+def get_config_val(config_key, config):
+    val = config[config_key]
+    if type(val) is list:
+        val = '-'.join([ str(c) for c in val])
+    return val
+
 # This reference explains some of the things I'm doing here
 # http://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html
 if __name__ == '__main__':
-    # User passes the model to be used as a command-line argument, which is parsed here.
-    # The default model is Random Forest 
-    
+
     # Loop over all data sets
     for dataset in dataset_model_grid.keys():
         dataset_config_iter_fold_results[dataset] = {}
         config_results = {}
         model = dataset_model_grid[dataset]
         param_grid = model_param_grid[model]
-        kmer_size = param_grid["k"]
-        classes = param_grid["classes"]
+        classes = param_grid["CL"]
         n_classes = len(classes)
         global class_to_ind
         class_to_ind = { classes[i]: i for i in range(n_classes)}
 
-        data_sets = param_grid["data"]
+        data_sets = param_grid["DS"]
         data_sets_healthy=data_sets[0]
         data_sets_diseased=data_sets[1]
+        kmer_size = param_grid["KS"]
         
         # Retrieve healthy data and labels
         allowed_labels=['0']
@@ -311,10 +330,11 @@ if __name__ == '__main__':
         # Set up data and labels
         x = data_normalized
         y = labels
-        n_iter = param_grid["n"]
-        learn_type = param_grid["m"]
-        cv_testfolds = param_grid["cvt"]
+        n_iter = param_grid['N']
+        learn_type = param_grid['M']
+        cv_testfolds = param_grid['CVT']
 
+        config_string = config_info(data_sets[0][0], learn_type, param_grid, kmer_size)
         
         for i in range(n_iter):
             # Set the estimator based on the model type
@@ -326,24 +346,24 @@ if __name__ == '__main__':
                 estimator = Lasso(alphas = param_grid["alpha"], cv = cv_gridsearch)
             elif (learn_type == "svm"):
                 C = param_grid["C"]
-                gamma = param_grid["gamma"]
-                kernel = param_grid["kernel"]
+                gamma = param_grid["GM"]
+                kernel = param_grid["KN"]
                 estimator = SVC(C = C, gamma = gamma, kernel = kernel, probability = True)
             elif (learn_type == "gb"):
-                learning_rate = param_grid["learning_rate"]
-                n_estimators = param_grid["n_estimators"]
-                subsample = param_grid["subsample"]
-                max_depth = param_grid["max_depth"]
-                max_features = param_grid["max_features"]
-                min_samples_split = param_grid["min_samples_split"]
-                min_samples_leaf = param_grid["min_samples_leaf"]
+                learning_rate = param_grid["LR"]
+                n_estimators = param_grid["NE"]
+                subsample = param_grid["SS"]
+                max_depth = param_grid["MD"]
+                max_features = param_grid["MF"]
+                min_samples_split = param_grid["MS"]
+                min_samples_leaf = param_grid["ML"]
                 estimator = GradientBoostingClassifier(learning_rate=0.1, n_estimators=400, max_depth=9, max_features='sqrt', subsample=0.8)
             else:
-                criterion = param_grid["criterion"]
-                max_depth = param_grid["max_depth"]
-                max_features = param_grid["max_features"]
-                min_samples_split = param_grid["min_samples_split"]
-                n_estimators = param_grid["n_estimators"]
+                criterion = param_grid["CR"]
+                max_depth = param_grid["MD"]
+                max_features = param_grid["MF"]
+                min_samples_split = param_grid["MS"]
+                n_estimators = param_grid["NE"]
                 n_jobs = -1
                 estimator = RandomForestClassifier(criterion=criterion, max_depth=max_depth, max_features=max_features,
                                                    min_samples_split=min_samples_split, n_estimators=n_estimators, n_jobs=n_jobs)
@@ -352,14 +372,18 @@ if __name__ == '__main__':
             for train_i, test_i in skf.split(x, y):
                 x_train, y_train = x[train_i], y[train_i]
                 x_test, y_test = x[test_i], y[test_i]
+                use_norm = True
+                if learn_type == 'rf':
+                    use_norm = not not param_grid["NR"]
 
-                sample_mean = x_train.mean(axis=0)
-                sample_std = x_train.std(axis=0)
+                if use_norm:
+                    sample_mean = x_train.mean(axis=0)
+                    sample_std = x_train.std(axis=0)
 
-                # Normalize both training and test samples with the training mean and std
-                x_train = (x_train - sample_mean) / sample_std
-                # test samples are normalized using only the mean and std of the training samples
-                x_test = (x_test - sample_mean) / sample_std
+                    # Normalize both training and test samples with the training mean and std
+                    x_train = (x_train - sample_mean) / sample_std
+                    # test samples are normalized using only the mean and std of the training samples
+                    x_test = (x_test - sample_mean) / sample_std
                 
                 y_train = np.array(y_train)
                 y_test = np.array(y_test)
@@ -380,7 +404,7 @@ if __name__ == '__main__':
 
                 conf_mat = confusion_matrix(y_test, np.argmax(y_test_pred, axis=1), labels=range(n_classes))
                 if plot_fold:
-                    plot_confusion_matrix(conf_mat, name = dataset + "_" + model, config = "IT_" + str(i) + "_FO_" + str(kfold))
+                    plot_confusion_matrix(conf_mat, config = config_string + "_IT_" + str(i) + "_FO_" + str(kfold))
 
                 # printing the accuracy rates for diagnostics
                 print("Total accuracy for " + str(len(y_test_pred)) + " test samples: " +
@@ -434,7 +458,7 @@ if __name__ == '__main__':
                 # Plot all ROC curves
                 if plot_fold:
                     # plot the ROCs with AUCs
-                    plot_roc_aucs(fpr, tpr, roc_auc, acc, name = dataset + "_" + model, config = "IT_" + str(i) + "_FO_" + str(kfold))
+                    plot_roc_aucs(fpr, tpr, roc_auc, acc, config = config_string + "_IT:" + str(i) + "_FO:" + str(kfold))
 
                 # calculate the accuracy/f1/precision/recall for this test fold - same way as in Pasolli
                 test_true_label_inds = y_test
@@ -444,26 +468,26 @@ if __name__ == '__main__':
                 precision = precision_score(test_true_label_inds, test_pred_label_inds, pos_label=None, average='weighted')
                 recall = recall_score(test_true_label_inds, test_pred_label_inds, pos_label=None, average='weighted')
 
-                print(('{}\t{}\t{}\t{}\t{}\t{}\tfold-perf-metrics for ' + class_name).
+                print(('{}\t{}\t{}\t{}\t{}\t{}\tfold-perf-metrics for ' + config_string).
                       format(accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']))
                 # the config info for this exp but no fold/iter indices because we need to aggregate stats over them
         
                 config_iter_fold_results = dataset_config_iter_fold_results[dataset]
-                if model not in config_iter_fold_results:
-                    config_iter_fold_results[model] = []
+                if config_string not in config_iter_fold_results:
+                    config_iter_fold_results[config_string] = []
 
                 # the iteration and fold indices
                 # extend the list for the iteration if necessary
 
-                if len(config_iter_fold_results[model]) <= i:
-                    config_iter_fold_results[model].append([])
+                if len(config_iter_fold_results[config_string]) <= i:
+                    config_iter_fold_results[config_string].append([])
 
                 # extend the list for the fold if necessary
-                if len(config_iter_fold_results[model][i]) <= kfold:
-                    config_iter_fold_results[model][i].append([])
+                if len(config_iter_fold_results[config_string][i]) <= kfold:
+                    config_iter_fold_results[config_string][i].append([])
 
-                config_iter_fold_results[model][i][kfold] = [conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred], [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']]]
-                fold_results = np.array(config_iter_fold_results[model][i])
+                config_iter_fold_results[config_string][i][kfold] = [conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred], [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']]]
+                fold_results = np.array(config_iter_fold_results[config_string][i])
                 kfold += 1
                 
             for config in config_iter_fold_results:
@@ -471,7 +495,7 @@ if __name__ == '__main__':
                 fold_results = np.array(config_iter_fold_results[config][i])
 
                 # the config for this iteration
-                config_iter = dataset + '_' + 'iter:' + str(i)
+                config_iter = config + '_' + 'IT:' + str(i)
 
                 # sum the confusion matrices over the folds
                 conf_mat = np.sum(fold_results[:, 0], axis=0)
@@ -489,7 +513,7 @@ if __name__ == '__main__':
                 # Per-iteration plots across K folds
                 if plot_iter:
                     # plot the confusion matrix
-                    plot_confusion_matrix(conf_mat, name = dataset + "_" + model + "_cvt_ " + str(cv_testfolds) + "_n_" + str(n_iter), config = "IT_" + str(i))
+                    plot_confusion_matrix(conf_mat, config = config_iter)
         
         for config in config_results:
             # per iteration results
@@ -558,21 +582,18 @@ if __name__ == '__main__':
 
             if plot_overall:
                 # plot the confusion matrix
-                plot_confusion_matrix(conf_mat, name = dataset + "_" + model + "_cvt_ " + str(cv_testfolds)
-                                          + "_n_" + str(n_iter))
+                plot_confusion_matrix(conf_mat, config = config)
 
                 # plot the ROCs with AUCs/ACCs
-                plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, name = dataset + "_" + model + "_cvt_ " + str(cv_testfolds)
-                                          + "_n_" + str(n_iter))
+                plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config = config)
 
-                plot_precision_recall(precision_graph, recall_graph, perf_means[2], perf_means[1], name = dataset + "_" + model + "_cvt_ " + str(cv_testfolds)
-                                          + "_n_" + str(n_iter))
+                plot_precision_recall(precision_graph, recall_graph, perf_means[2], perf_means[1], config = config)
 
-            print('tkfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + class_name + ':' + dataset + "_" + model)
+            print('tkfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + config)
 
             # log the results for offline analysis
-            print(('{}({})\t{}({})\t{}({})\t{}({})\t{}\t{}\tkfold-overall-perf-metrics for ' + class_name + ':{}').
-                  format(perf_means[0], perf_stds[0], perf_means[1], perf_stds[1], perf_means[2], perf_stds[2], perf_means[3], perf_stds[3], roc_auc[1], roc_auc['macro'], config))
+            print(('{}({})\t{}({})\t{}({})\t{}({})\t{}\t{}\tkfold-overall-perf-metrics for ' + config).
+                  format(perf_means[0], perf_stds[0], perf_means[1], perf_stds[1], perf_means[2], perf_stds[2], perf_means[3], perf_stds[3], roc_auc[1], roc_auc['macro']))
 
             # dump the model results into a file for offline analysis and plotting, e.g., merging plots from
             # different model instances (real and null)
@@ -581,6 +602,5 @@ if __name__ == '__main__':
             with open("aggr_results" + config +".pickle", "wb") as f:
                 dump_dict = { "dataset_info": dataset, "results": [aggr_results, dataset_config_iter_fold_results[dataset][config]]}
                 pickle.dump(dump_dict, f)
-                
-
+                    
 

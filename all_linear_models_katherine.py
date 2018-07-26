@@ -13,6 +13,8 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.model_selection import train_test_split
 
+from sklearn import cross_validation, metrics
+
 import argparse
 
 import load_kmer_cnts_jf
@@ -20,6 +22,7 @@ import warnings
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils import shuffle
 import _search
+import _validation
 
 
 # filter out warnings about convergence 
@@ -46,6 +49,8 @@ data_sets_to_use = [
     [['Zeller_2014'], ['Zeller_2014']],
     [['LiverCirrhosis'], ['LiverCirrhosis']],
     [['Karlsson_2013'], ['Karlsson_2013']]
+    #[['Karlsson_2013', 'Qin_et_al'], ['Karlsson_2013', 'Qin_et_al']],
+    #[['Feng', 'Zeller_2014'],['Feng', 'Zeller_2014']]
     ]
 
 
@@ -56,7 +61,8 @@ param_dict = {
     "svm": [ {'C': [1, 10, 100, 1000], 'kernel': ['linear']},
              {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}],
     
-    "rf": {"n_estimators": [100, 200, 400, 500],
+    "rf": {
+           "n_estimators": [100, 200, 400, 500],
             "criterion": ["gini"],
             # "max_features": ["auto", "sqrt", "log2", None],
             "max_features": ["sqrt"],
@@ -70,6 +76,7 @@ param_dict = {
     "enet": {"alpha": [np.logspace(-4, -0.5, 50)],
              "l1": [0.1, 0.5, 0.7, 0.9, 0.95, 0.99, 1.0]}                              
     }
+
 # Uses the model to predict labels given the test features
 # and compares them to the labels by calculating accuracy and error
 # This is used by Lasso and Elastic Net
@@ -99,11 +106,13 @@ if __name__ == '__main__':
     # The default model is Random Forest 
     parser = argparse.ArgumentParser(description= "Program to run linear machine learning models on kmer datasets")
     parser.add_argument('-m', type = str, default = 'rf', help = "Model type")
-    parser.add_argument('-k', type = int, default = 5, help = "Kmer size")
+    parser.add_argument('-k', type = int, default = 5, help = "Kmer Size")
     parser.add_argument('-cvg', type = int, default = 9, help = "Number of CV folds for grid search")
     parser.add_argument('-cvt', type = int, default = 10, help = "Number of CV folds for testing")
     parser.add_argument('-ng', type = int, default = 10, help = "Number of iterations of k-fold cross validation for grid search")
     parser.add_argument('-nt', type = int, default = 20, help = "Number of iterations of k-fold cross validation for testing")
+    parser.add_argument('-nrf', type = bool, default = True, help = "Whether to use normalization on the random forest")
+
 
 
     arg_vals = parser.parse_args()
@@ -113,7 +122,10 @@ if __name__ == '__main__':
     cv_testfolds = arg_vals.cvt
     n_iter_grid = arg_vals.ng
     n_iter_test = arg_vals.nt
+    norm_for_rf = arg_vals.nrf
     # Loop over all data sets
+
+    
     for data_set in data_sets_to_use:
         data_sets_healthy=data_set[0]
         data_sets_diseased=data_set[1]
@@ -156,24 +168,60 @@ if __name__ == '__main__':
             else:
                 estimator = RandomForestClassifier(n_estimators=500, max_depth=None, min_samples_split=2, n_jobs=-1)
             k_fold = RepeatedStratifiedKFold(n_splits=cv_gridsearch, n_repeats=n_iter_grid)
-            grid_search = _search.GridSearchCV(estimator, param_grid, cv = k_fold, n_jobs = -1)
+            if learn_type == "rf" and not norm_for_rf:
+                grid_search = GridSearchCV(estimator, param_grid, cv = k_fold, n_jobs = -1)
+            else:
+                grid_search = _search.GridSearchCV(estimator, param_grid, cv = k_fold, n_jobs = 1)
+                
             grid_search.fit(x, y)
-            
-            best_grid = grid_search.best_estimator_
-            
-            print("Best params for healthy samples from " + str(data_sets_healthy) +
+
+            grid_search_results = grid_search.cv_results_
+            rank = np.array(grid_search_results['rank_test_score'])
+            accuracies = np.array(grid_search_results['mean_test_score'])
+            all_params = np.array(grid_search_results['params'])
+
+            sort_idx = np.argsort(rank)
+            rank = rank[sort_idx]
+            accuracies = accuracies[sort_idx]
+            all_params = all_params[sort_idx]
+
+            for i in range(len(rank)):
+                param_grid = all_params[i]
+                current_estimator = None
+                if (learn_type == "svm"):
+                    C = param_grid["C"]
+                    kernel = param_grid["kernel"]
+                    if not kernel == "linear":
+                        gamma = param_grid["gamma"]
+                        current_estimator = SVC(C = C, gamma = gamma, kernel = kernel, probability = True)
+                    else:
+                        current_estimator = SVC(C = C, kernel = kernel, probability = True)
+                else:
+                    criterion = param_grid["criterion"]
+                    max_depth = param_grid["max_depth"]
+                    max_features = param_grid["max_features"]
+                    min_samples_split = param_grid["min_samples_split"]
+                    n_estimators = param_grid["n_estimators"]
+                    n_jobs = -1
+                    current_estimator = RandomForestClassifier(criterion=criterion, max_depth=max_depth, max_features=max_features,
+                                                       min_samples_split=min_samples_split, n_estimators=n_estimators, n_jobs=n_jobs)
+                    
+                print("Params for healthy samples from " + str(data_sets_healthy) +
                   " and diseased samples from " + str(data_sets_diseased) + 
-                  " with model " + learn_type 
-                  + ": " + str(grid_search.best_params_) + " produces "
-                  + " best score of " + str(grid_search.best_score_))
-            cross_val = cross_val_score(best_grid, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
-             
-            print("Aggregated cross validation accuracies for healthy samples from " + str(data_sets_healthy) +
-                      " and diseased samples from " + str(data_sets_diseased) + 
-                      " with model " + learn_type + ": " + str(np.mean(cross_val)))
+                  " with model " + learn_type + " and kmer size " + str(kmer_size)
+                  + ": " + str(all_params[i]) + " produces "
+                  + " score of " + str(accuracies[i]))
+
+                if learn_type == "rf" and not norm_for_rf:
+                    cross_val = cross_val_score(current_estimator, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
+                else:
+                    cross_val = _validation.cross_val_score(current_estimator, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
+                print("Aggregated cross validation accuracies for healthy samples from " + str(data_sets_healthy) +
+                          " and diseased samples from " + str(data_sets_diseased) + 
+                          " with model " + learn_type + " and kmer size " + str(kmer_size) + ": " + str(np.mean(cross_val)))
+
 
         
-
         # For Elastic Net and Lasso, do a stratified k-fold cross validation
         # For each test fold, fit the estimator to the training data
         # and evaluate on the test data
@@ -203,11 +251,12 @@ if __name__ == '__main__':
 
                 print("Best params for healthy samples from " + str(data_sets_healthy) +
                   " and diseased samples from " + str(data_sets_diseased) + 
-                  " with model " + learn_type 
+                  " with model " + learn_type + " and kmer size " + str(kmer_size)
                   + ": " + str(estimator.get_params()) + " produces "
                   + " accuracy of " + str(accuracy))
             print("Aggregated cross validation accuracies for healthy samples from " + str(data_sets_healthy) +
                       " and diseased samples from " + str(data_sets_diseased) + 
-                      " with model " + learn_type + ": " + str(np.mean(accuracies)) + 
+                      " with model " + learn_type + " and kmer size " + str(kmer_size) + ": " + str(np.mean(accuracies)) + 
                       " with standard deviation " +  str(np.std(accuracies)))
+
             

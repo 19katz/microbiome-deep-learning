@@ -66,10 +66,10 @@ exp_configs = {
                                        #'SingleDiseaseMetaHIT',
                                        #'SingleDiseaseQin',
                                        #'SingleDiseaseRA',
-                                       #'SingleDiseaseFeng',
+                                       'SingleDiseaseFeng',
                                        #'SingleDiseaseZeller',
                                        #'SingleDiseaseKarlsson',
-                                       'SingleDiseaseLiverCirrhosis',
+                                       #'SingleDiseaseLiverCirrhosis',
                                        #'AllHealth',
                                        #'All-T2D',
                                        #'All-CRC'
@@ -82,24 +82,24 @@ exp_configs = {
                 # 1 for supervised and 0 for autoencoder only -- CHANGE IT BACK TO 1 FOR ANY SUPERVISED LEARNING!!!
                 norm_input_key:    [ [1], 'Normalize across samples (each component with zero mean/unit std across training samples): {}' ],
 
-                kmer_size_key:     [ [8, 10]
+                kmer_size_key:     [ [5, 6, 7]
                                      , 'Kmer Size used: {}'],
 
                 # Deep net structure
                 # The last entry (-1 is the placeholder) of the layer list is for code layer dimensions - this is so we don't
                 # have to list too many network layer lists when we vary only the code layer dimension.
                 layers_key:        [ [
-                                       [1, -1],
-                                       [1, 2, -1],
-                                       [1, 4, -1],
-                                       [1, 8, -1]
-                                       #[1, 1/2, -1],
+                                       [1, "random"],
                                        #[1, 2, -1],
-                                       #[1, 1/2, 1/4, -1],
-                                       #[1, 1/2, 1/4, 1/8, -1],
-                                       #[1, 1/2, 1/4, 1/8, 1/16, -1],
+                                       #[1, 4, -1],
+                                       #[1, 8, -1]
+                                       #[1, 2, -1],
+                                       [1, 1/2, "random"],
+                                       [1, 1/2, 1/4, "random"],
+                                       [1, 1/2, 1/4, 1/8, "random"],
+                                       [1, 1/2, 1/4, 1/8, 1/16, "random"],
                                      ], "Layers for autoencoder's first half : {}" ],
-                enc_dim_key:       [ [2, 4, 8],  'Encoding dimensions: {}' ],
+                enc_dim_key:       [ [100],  'Encoding dimensions: {}' ],
 
                 enc_act_key:       [ [
                                          'sigmoid',
@@ -262,7 +262,15 @@ def change_layers(next_config_dict):
     for i in range(len(layers) - 1):
         if (layers[i] <= 1 and layers[i] > -1):
             layers[i] = int(input_dimensions * layers[i] + epsilon)
-    layers[-1] = next_config_dict[enc_dim_key]
+    if layers[-1] == -1:
+        layers[-1] = next_config_dict[enc_dim_key]
+    else:
+        if layers[-1] == "random":
+            layers[-1] = rn.randint(2, layers[-2] - 1)
+        elif layers[-1] <= 1:
+            layers[-1] = int(input_dimensions * layers[-1] + epsilon)
+        next_config_dict[enc_dim_key] = layers[-1]
+
     next_config_dict[layers_key] = layers
             
 if __name__ == "__main__":

@@ -213,7 +213,7 @@ def load_metadata():
             disease_status ='0'
             disease = 'Healthy'
         else:
-            disease_status =='1'
+            disease_status ='1'
             disease = 'CRC'
         if sample_id not in exclude:
             metadata[sample_id] = [disease_status,  'CRC', 'Feng', disease]
@@ -242,7 +242,7 @@ def load_metadata():
 if __name__ == "__main__":
     for kmer_size in [5,]:
         #kmers, labels = load_kmers(kmer_size, ['HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al'])
-        for dataset in ['Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al']:
+        for dataset in ['Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al', 'HMP']:
             kmers, labels = load_kmers(kmer_size, [ dataset, ])
             total = kmers.shape[0]
             diseased = [labels[i][0] for i in range(len(labels))].count('1')
