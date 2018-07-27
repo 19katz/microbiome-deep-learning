@@ -43,7 +43,7 @@ config_keys = [dataset_key, layers_key, enc_act_key,
                use_kfold_key, num_iters_key, kmer_size_key, max_norm_key, iter_key, kfold_key]
 
 config_info_filename = [ dataset_key, kmer_size_key, layers_key, enc_act_key, code_act_key, dec_act_key, out_act_key,
-                #loss_func_key, auto_epochs_key,
+                loss_func_key, #auto_epochs_key,
                 super_epochs_key, norm_sample_key, norm_input_key, batch_size_key,
                 # Thes two are not used yet, so skip them to save file name length
                 # early_stop_key, patience_key,
@@ -66,10 +66,10 @@ exp_configs = {
                                        #'SingleDiseaseMetaHIT',
                                        #'SingleDiseaseQin',
                                        #'SingleDiseaseRA',
-                                       'SingleDiseaseFeng',
+                                       #'SingleDiseaseFeng',
                                        #'SingleDiseaseZeller',
                                        #'SingleDiseaseKarlsson',
-                                       #'SingleDiseaseLiverCirrhosis',
+                                       'SingleDiseaseLiverCirrhosis',
                                        #'AllHealth',
                                        #'All-T2D',
                                        #'All-CRC'
@@ -109,50 +109,50 @@ exp_configs = {
                                          'tanh',
                                      ], 'Encoding activation: {}' ],
                 code_act_key:      [ [
-                                         #SAME_AS_ENC,
-                                         'linear',
-                                         'softmax',
-                                         'sigmoid',
-                                         'relu',
-                                         'tanh',
+                                         SAME_AS_ENC,
+                                         #'linear',
+                                         #'softmax',
+                                         #'sigmoid',
+                                         #'relu',
+                                         #'tanh',
 
                                      ], 'Code (last encoding) layer activation: {}' ],
     
                 # Decoding activations are fixed as linear as they are popped off anyway
                 # after autoencoder training
                 dec_act_key:       [ [
-                                         #SAME_AS_ENC,
-                                         'linear',
-                                         'sigmoid',
-                                         'relu',
-                                         'softmax',
-                                         'tanh',
+                                         SAME_AS_ENC,
+                                         #'linear',
+                                         #'sigmoid',
+                                         #'relu',
+                                         #'softmax',
+                                         #'tanh',
                                      ], 'Decoding layer activation: {}' ],
                 out_act_key:       [ [
 
-                                         # SAME_AS_ENC,
-                                         'linear',
-                                         'sigmoid',
-                                         'relu',
-                                         'softmax',
-                                         'tanh',
+                                         SAME_AS_ENC,
+                                         #'linear',
+                                         #'sigmoid',
+                                         #'relu',
+                                         #'softmax',
+                                         #'tanh',
                                      ], 'Last decoding layer activation: {}' ],
                 loss_func_key :    [ [
                                          'mean_squared_error',
-                                         #'kullback_leibler_divergence'
+                                         'kullback_leibler_divergence'
                                      ], 'Autoencoder loss function: {}' ],
                 # boolean for whether to use autoencoder for pretraining before supervised learning
-                use_ae_key:    [ [0], 'Use autoencoder pretraining for supervised learning: {}' ],
+                use_ae_key:    [ [0, 1], 'Use autoencoder pretraining for supervised learning: {}' ],
 
 
                 # Training options
-                auto_epochs_key :  [ [1], 'Max number of epochs for autoencoder training: {}' ],
+                auto_epochs_key :  [ [50], 'Max number of epochs for autoencoder training: {}' ],
                 super_epochs_key : [ [200, 400], 'Max number of epochs for supervised training: {}' ],
                 batch_size_key:    [ [8, 16, 32], 'Batch size used during training: {}' ],
                 # two booleans
                 batch_norm_key:    [ [0], 'Use batch normalization: {}' ],
-                dropout_pct_key:   [ [0], 'Dropout percent: {}'],
-                input_dropout_pct_key: [ [0], 'Dropout percent on input layer: {}'],
+                dropout_pct_key:   [ [0, 0.25, 0.35, 0.5, 0.75], 'Dropout percent: {}'],
+                input_dropout_pct_key: [ [0, 0.25, 0.35, 0.5, 0.75], 'Dropout percent on input layer: {}'],
                 act_reg_key:       [ [0], 'Activation regularization (for sparsity): {}' ],
                 # boolean
                 early_stop_key:    [ [0],  'Use early stopping: {}' ],
@@ -227,6 +227,12 @@ def name_file_from_config(config, skip_keys=[]):
 
 def config_info(config, skip_keys=[]):
     config_info = ''
+    if config[code_act_key] == SAME_AS_ENC:
+        config[code_act_key] = config[enc_act_key]
+    if config[out_act_key] == SAME_AS_ENC:
+        config[out_act_key] = config[enc_act_key]
+    if config[dec_act_key] == SAME_AS_ENC:
+        config[dec_act_key] = config[enc_act_key]
     if len(config[layers_key]) <= 2:
         config[enc_act_key] = config[code_act_key]
         config[dec_act_key] = config[out_act_key]
