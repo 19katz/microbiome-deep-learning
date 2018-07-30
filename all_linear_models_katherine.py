@@ -42,12 +42,12 @@ random_state = None
 # From the second, diseased samples will be extracted.
 # The two sets will then be combined. 
 data_sets_to_use = [
-    [['Qin_et_al'], ['Qin_et_al']],
-    [['MetaHIT'], ['MetaHIT']],
-    [['RA'], ['RA']],
-    [['Feng'], ['Feng']],
-    [['Zeller_2014'], ['Zeller_2014']],
-    [['LiverCirrhosis'], ['LiverCirrhosis']],
+    #[['Qin_et_al'], ['Qin_et_al']],
+    #[['MetaHIT'], ['MetaHIT']],
+    #[['RA'], ['RA']],
+    #[['Feng'], ['Feng']],
+    #[['Zeller_2014'], ['Zeller_2014']],
+    #[['LiverCirrhosis'], ['LiverCirrhosis']],
     [['Karlsson_2013'], ['Karlsson_2013']]
     #[['Karlsson_2013', 'Qin_et_al'], ['Karlsson_2013', 'Qin_et_al']],
     #[['Feng', 'Zeller_2014'],['Feng', 'Zeller_2014']]
@@ -216,9 +216,9 @@ if __name__ == '__main__':
                     cross_val = cross_val_score(current_estimator, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
                 else:
                     cross_val = _validation.cross_val_score(current_estimator, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
-                print("Aggregated cross validation accuracies for healthy samples from " + str(data_sets_healthy) +
+                print(str(np.mean(cross_val)) + "\tAggregated cross validation accuracy for healthy samples from " + str(data_sets_healthy) +
                           " and diseased samples from " + str(data_sets_diseased) + 
-                          " with model " + learn_type + " and kmer size " + str(kmer_size) + ": " + str(np.mean(cross_val)))
+                          " with model " + learn_type + " and kmer size " + str(kmer_size) + " with params " + str(all_params[i]))
 
 
         
