@@ -6,7 +6,6 @@
 
 
 import gzip
-import pandas as pd
 import numpy as np
 from numpy import array
 import ntpath
@@ -73,7 +72,7 @@ def onehot_encode(labels):
 
     return onehot_encoded
 
-    
+
 
 def load_metadata():
     metadata={} # run_accession -> disease_status
@@ -175,9 +174,11 @@ def load_metadata():
             if disease_status == 'NGT':
                 disease_status ='0'
                 disease = 'Healthy'
-            else:
+            elif disease_status == 'T2D':
                 disease_status ='1' # note that I'm collapsing T2D and Impaired Glucose Toleraance (IGT) into one group
                 disease = 'T2D'
+            else:
+                exclude.append(run_accession)
             if run_accession not in exclude:
                 metadata[run_accession] = [disease_status,  'T2D', 'Karlsson_2013', disease]
 

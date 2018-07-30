@@ -30,6 +30,8 @@ import re
 from load_kmer_cnts_Katherine_jf import load_kmers
 from exp_configs import *
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
 
 
 from sklearn.metrics import precision_recall_curve
@@ -142,7 +144,7 @@ dataset_dict = {
     'SingleDiseaseLiverCirrhosis': ('LC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'LiverCirrhosis']), 3, [ 'Healthy', 'LC', ],
                         ['green', 'fucshia', ], datasource_marker),
 
-    'SingleDiseaseKarlsson': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013']), 3, [ 'Healthy', 'T2D', ],
+    'KarlssonReduced': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013']), 3, [ 'Healthy', 'T2D', ],
                         ['green', 'brown', ], datasource_marker),
 
     'T2D-HMP': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al', 'Karlsson_2013', 'HMP']), 3, [ 'Healthy', 'T2D', ],
@@ -185,6 +187,8 @@ def set_config(exp_config, config_key, val):
 def set_dataset_exp_config(exp_config, dataset):
     exp_config[dataset_key] = dataset
 
+# set global variables at the beginning of the file, for use in loading the data and creating one-hot
+# encoding vectors
 def set_config_global_vars(dataset):
     global source_ind, class_name, label_ind, classes, n_classes, class_to_ind, colors, markers, data_loader
     cls_name, data_load, lbl_ind, lbls, clrs, mkrs = dataset_dict[dataset]
@@ -260,7 +264,9 @@ def class_to_target(cls):
     target = np.zeros(n_classes)
     target[class_to_ind[cls]] = 1.0
     return target
-    
+
+# Returns and stores the indices of train and test data for k-fold cross-validation given dataset, number of iterations/folds,
+# kmer size, use of randomness, and whether to use nulls
 def get_k_folds(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_labels, shuffle_abunds):
     if (dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_labels, shuffle_abunds) in dataset_k_fold.keys():
         return dataset_k_fold[(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_labels, shuffle_abunds)]
@@ -310,6 +316,8 @@ def get_k_folds(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_lab
     return x_y_info_train_test
 
 
+# Loops over all configs in grid search and executes each
+# Stores each config in exp_config
 def loop_over_configs(random=False):
     for config in ConfigIterator(random=random):
         global exp_config
@@ -320,6 +328,8 @@ def loop_over_configs(random=False):
         
         exec_config(k_folds)
 
+# Loops over certain supervised models in dataset_configs and executes each
+# Stores each config in exp_config
 def loop_over_dataset_configs():
     for dataset_name in dataset_configs:
         for config in dataset_configs[dataset_name]:
@@ -329,7 +339,8 @@ def loop_over_dataset_configs():
                                   exp_config[no_random_key], exp_config[kmer_size_key], exp_config[shuffle_labels_key],
                                   exp_config[shuffle_abunds_key])
             exec_config(k_folds)
-            
+
+# Executes the config given training/test splits            
 def exec_config(k_folds):
     global dataset_config_iter_fold_results
     config_results = {}
@@ -536,12 +547,18 @@ def exec_config(k_folds):
             pickle.dump(dump_dict, f)
     dataset_config_iter_fold_results = {}
 
-# loops over the list of the network layer structures
+# Performs data normalization before creation, training, and testing of model
 def normalize_train_test():
     norm_func = norm_func_dict[exp_config[norm_sample_key]]
     global x_train,  x_test
     x_train = (norm_func)(x_train) 
     x_test = (norm_func)(x_test)
+
+    if exp_config[pca_dim_key] > 0:
+        pca = PCA(n_components=exp_config[pca_dim_key])
+        x_train = pca.fit_transform(x_train)
+        x_test = pca.transform(x_test)
+        pca = None
 
     norm_input = exp_config[norm_input_key]
     if norm_input:
@@ -569,8 +586,8 @@ def cnt_to_coding_layer():
         if not exp_config[input_dropout_pct_key] == 0:
             num_layers += 1
     return num_layers
-    
 
+# Creates the supervised learning model based on information in exp_config
 def build_train_test(layers):
     """
     This uses the current active exp config (set up by the loops above) to first build and train the autoencoder,
@@ -900,7 +917,7 @@ def plot_acc_vs_epochs(acc, val_acc, name='acc', title='Accuracy vs Epochs',
     add_figtexts_and_save(fig, name, desc, config=config)
 
     
-
+# plot confusion matrix
 def plot_confusion_matrix(cm, config=None, cmap=pylab.cm.Reds):
     """
     This function plots the confusion matrix.
@@ -932,6 +949,7 @@ def plot_confusion_matrix(cm, config=None, cmap=pylab.cm.Reds):
     pylab.gca().set_position((.1, 10, 0.8, .8))
     add_figtexts_and_save(fig, 'cm', "Confusion matrix for predicting sample's " + class_name + " status using 5mers", y_off=1.3, config=config)
 
+# plot roc-auc curves
 def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config=None, name='roc_auc', title='ROC Curves with AUCs/ACCs', 
                   desc="ROC/AUC plots using 5mers", xlabel='False Positive Rate', ylabel='True Positive Rate'):
     fig = pylab.figure()
@@ -977,6 +995,7 @@ def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down=None, std_up=None, config=No
     pylab.gca().set_position((.1, .7, .8, .8))
     add_figtexts_and_save(fig, name, desc, config=config)
 
+# plot precision-recall curves
 def plot_precision_recall(precision, recall, average_precision, f1_score, name ='precision_recall', config = None):
     fig = pylab.figure()
 
@@ -1088,15 +1107,101 @@ if __name__ == '__main__':
         plot_overall = True
                                  #'SingleDiseaseMetaHIT', 'SingleDiseaseQin', 'SingleDiseaseKarlsson',
                                  #'SingleDiseaseFeng', 'SingleDiseaseZeller', 'SingleDiseaseLiverCirrhosis', 'SingleDiseaseRA', 'All-T2D'])
-                                                          
 
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:8192-2-2_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0",
+"LS:8192-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:32896-8-2_EA:sigmoid_CA:softmax_DA:linear_OA:linear_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_",
+"LS:8192-2_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:2_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:8192-2-8_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:2080-1040-520-260-130-61_EA:linear_CA:sigmoid_DA:NA_OA:NA_ED:61_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
+"LS:8192-2-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_PC:0_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:8192-2-16_EA:tanh_CA:relu_DA:tanh_OA:sigmoid_ED:16_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:32896-8-4_EA:linear_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:8192-2_EA:softmax_CA:softmax_DA:tanh_OA:tanh_ED:2_PC:0_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_"
+]
+        
+        '''
+        '''
+        dataset_configs['KarlssonReduced'] = ["LS:50-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:50_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:50_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:40-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-64_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:64_PC:50_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:50_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:50_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-8_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-8_EA:linear_CA:linear_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-4_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:4_PC:50_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:40-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_"
+                                             ]
+        '''
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = ["LS:524800-100_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:100_PC:0_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0.75_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:524800-100_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:100_PC:0_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.35_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:8192-4_EA:tanh_CA:tanh_DA:relu_OA:relu_ED:4_PC:0_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:70-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:8192-8_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:8_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:8192-2-16_EA:linear_CA:linear_DA:linear_OA:softmax_ED:16_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:70-4_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_"
+                                                   ]
+        
+        '''
+        '''
+        dataset_configs['SingleDiseaseQin'] = ["LS:8192-16_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:16_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:2080-1040-996_EA:relu_CA:linear_DA:NA_OA:NA_ED:996_PC:0_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
+"LS:8192-2-2_EA:softmax_CA:sigmoid_DA:linear_OA:relu_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:8192-2-2_EA:softmax_CA:tanh_DA:softmax_OA:softmax_ED:2_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:2080-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:6_"
+                                               ]
+        '''
+        '''
+        dataset_configs['SingleDiseaseZeller'] = ["LS:70-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:70_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_"
+"LS:40-64_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-4_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:4_PC:40_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-16_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:50-8_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-64_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-64_EA:linear_CA:linear_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-16_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-32_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:32_PC:40_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_"]
+        '''
+        '''
+        dataset_configs['SingleDiseaseFeng'] = ["LS:40-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:40_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_",
+"LS:70-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:70_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-8_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:8_PC:70_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:70-4_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-8_EA:relu_CA:relu_DA:NA_OA:NA_ED:8_PC:70_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-4_EA:relu_CA:relu_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-16_EA:linear_CA:linear_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:70_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-16_EA:linear_CA:linear_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:50_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_"
+                                                ]
+        '''
         #'''
-        dataset_configs['SingleDiseaseLiverCirrhosis'] = [#'LS:8192-4096-2048-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:relu_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.5_IDP:0_MN:4_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
-                                                          #'LS:8192-4096-2048-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:relu_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.25_IDP:0_MN:4_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
-                                                          'LS:8192-4096-2048-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:relu_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.35_IDP:0_MN:4_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
-                                                          
+        dataset_configs['SingleDiseaseRA'] = [
+"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:512-2-4_EA:relu_CA:sigmoid_DA:tanh_OA:linear_ED:4_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:5_",
+"LS:524800-4_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.5_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:2080-4_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:4_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:6_",
+"LS:50-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:50_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:2080-2-4_EA:sigmoid_CA:sigmoid_DA:relu_OA:tanh_ED:4_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:6_",
+"LS:512-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:5_"
+                                              ]
+        #'''
+
+        
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ['LS:8192-50_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:50_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0.5_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0',
+                                                          'LS:8192-50_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:50_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0',
                                                           ]
-        #'''
+        '''
         '''
         dataset_configs['SingleDiseaseKarlsson'] = [
             'LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
@@ -1105,60 +1210,60 @@ if __name__ == '__main__':
         
         '''
         dataset_configs['SingleDiseaseQin'] = [
-                                                "LS:32896-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-                                                "LS:32896-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-                                                "LS:32896-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-                                                "LS:32896-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-                                                "LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
+                                                "LS:32896-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                "LS:32896-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                "LS:32896-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                "LS:32896-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                "LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
 
                                                 ]
         '''                                                       
         '''
         dataset_configs['SingleDiseaseRA'] = [
-                                                "LS:32896-2-16_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-                                                "LS:32896-2_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-                                                "LS:32896-16448-4_EA:linear_CA:sigmoid_DA:relu_OA:linear_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-                                                "LS:32896-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-                                                "LS:32896-2-2_EA:tanh_CA:tanh_DA:softmax_OA:sigmoid_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_"
+                                                "LS:32896-2-16_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                "LS:32896-2_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                "LS:32896-16448-4_EA:linear_CA:sigmoid_DA:relu_OA:linear_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                "LS:32896-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                "LS:32896-2-2_EA:tanh_CA:tanh_DA:softmax_OA:sigmoid_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
                                                 ]
         '''
         '''
         dataset_configs['SingleDiseaseFeng'] = [
-                                                      "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-"LS:32896-16_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-                                                 "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__"
+                                                      "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+"LS:32896-16_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                 "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__"
                                                
 ]
         '''
         '''
         dataset_configs['SingleDiseaseZeller'] = [
-                                                "LS:32896-16_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-"LS:32896-8_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:8_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-"LS:32896-16448-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_"
+                                                "LS:32896-16_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+"LS:32896-8_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:8_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+"LS:32896-16448-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
                                                 ]
         '''
         
         '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = [
-                                                        "LS:32896-2-8_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_"
-                                                        "LS:32896-2-4_EA:sigmoid_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-                                                        "LS:32896-2-2_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-                                                        "LS:32896-2-2_EA:sigmoid_CA:sigmoid_DA:softmax_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_",
-                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8_"
+                                                        "LS:32896-2-8_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
+                                                        "LS:32896-2-4_EA:sigmoid_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                        "LS:32896-2-2_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                        "LS:32896-2-2_EA:sigmoid_CA:sigmoid_DA:softmax_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
                                                          ]
         '''
         '''
         dataset_configs['SingleDiseaseKarlsson'] = [
-                                                    "LS:32896-16_EA:relu_CA:relu_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-                                                    "LS:32896-2-8_EA:relu_CA:linear_DA:linear_OA:sigmoid_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-                                                    "LS:32896-16448-2_EA:sigmoid_CA:tanh_DA:tanh_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:5_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-                                                    "LS:32896-2-16_EA:softmax_CA:linear_DA:tanh_OA:linear_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__",
-                                                    "LS:32896-16448-16_EA:linear_CA:sigmoid_DA:sigmoid_OA:linear_ED:16_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:5_ITS:1_KS:8__"
+                                                    "LS:32896-16_EA:relu_CA:relu_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                    "LS:32896-2-8_EA:relu_CA:linear_DA:linear_OA:sigmoid_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                    "LS:32896-16448-2_EA:sigmoid_CA:tanh_DA:tanh_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                    "LS:32896-2-16_EA:softmax_CA:linear_DA:tanh_OA:linear_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                    "LS:32896-16448-16_EA:linear_CA:sigmoid_DA:sigmoid_OA:linear_ED:16_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__"
                                                     ]
 
         '''
@@ -1175,7 +1280,8 @@ if __name__ == '__main__':
                                                 "LS:8192-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
                                                 #"LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"
                                                 ]
-        '''                                                       
+        '''
+
         '''
         dataset_configs['SingleDiseaseRA'] = [#"LS:512-2_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
                                                 #"LS:512-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
@@ -1188,6 +1294,7 @@ if __name__ == '__main__':
                                                 "LS:512-256-128-8_EA:tanh_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
                                                 "LS:2080-1040-520-16_EA:linear_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_"]
         '''
+
         '''
         dataset_configs['SingleDiseaseFeng'] = [#"LS:8192-16_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
                                                 #"LS:8192-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
@@ -1237,6 +1344,7 @@ if __name__ == '__main__':
                                                     "LS:8192-4096-2048-1024-4_EA:relu_CA:sigmoid_DA:softmax_OA:relu_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
                                                     "LS:8192-2-2_EA:linear_CA:linear_DA:sigmoid_OA:relu_ED:2_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"]
         '''
+
 
         #dataset_configs['SingleDiseaseMetaHIT'] = ['LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7']
         '''

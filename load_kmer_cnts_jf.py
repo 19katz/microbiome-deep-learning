@@ -159,8 +159,11 @@ def load_metadata():
             
             if disease_status == 'NGT':
                 disease_status ='0'
-            else:
+            elif disease_status == 'T2D':
                 disease_status ='1' # note that I'm collapsing T2D and Impaired Glucose Toleraance (IGT) into one group
+                disease = 'T2D'
+            else:
+                exclude.append(run_accession)
             if run_accession not in exclude:
                 metadata[run_accession] = disease_status
     

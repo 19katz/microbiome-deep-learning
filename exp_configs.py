@@ -34,9 +34,10 @@ kmer_size_key = 'KS'
 dropout_pct_key = 'DP'
 input_dropout_pct_key = 'IDP'
 max_norm_key = 'MN'
+pca_dim_key = 'PC'
 
 config_keys = [dataset_key, layers_key, enc_act_key,
-               code_act_key, dec_act_key, out_act_key, enc_dim_key, auto_epochs_key, super_epochs_key,
+               code_act_key, dec_act_key, out_act_key, enc_dim_key, pca_dim_key, auto_epochs_key, super_epochs_key,
                batch_size_key, loss_func_key,  batch_norm_key, dropout_pct_key, input_dropout_pct_key, act_reg_key,
                norm_input_key, early_stop_key, patience_key, norm_sample_key, backend_key,
                version_key, use_ae_key, no_random_key, shuffle_labels_key, shuffle_abunds_key,
@@ -44,7 +45,7 @@ config_keys = [dataset_key, layers_key, enc_act_key,
 
 config_info_filename = [ dataset_key, kmer_size_key, layers_key, enc_act_key, code_act_key, dec_act_key, out_act_key,
                 loss_func_key, #auto_epochs_key,
-                super_epochs_key, norm_sample_key, norm_input_key, batch_size_key,
+                pca_dim_key, super_epochs_key, norm_sample_key, norm_input_key, batch_size_key,
                 # Thes two are not used yet, so skip them to save file name length
                 # early_stop_key, patience_key,
                 dropout_pct_key, input_dropout_pct_key,
@@ -52,12 +53,10 @@ config_info_filename = [ dataset_key, kmer_size_key, layers_key, enc_act_key, co
                 use_ae_key, no_random_key,
                 # kfold_key should be the last and iter_key second to last
                 use_kfold_key, num_iters_key, shuffle_labels_key, shuffle_abunds_key, max_norm_key, iter_key, kfold_key]
-
+ 
 SAME_AS_ENC = "asenc"
 
 epsilon = 0.5
-
-
 exp_configs = {
                 # Datasets to use
                 dataset_key:       [ [
@@ -69,6 +68,7 @@ exp_configs = {
                                        #'SingleDiseaseFeng',
                                        #'SingleDiseaseZeller',
                                        #'SingleDiseaseKarlsson',
+                                       #'KarlssonReduced',
                                        'SingleDiseaseLiverCirrhosis',
                                        #'AllHealth',
                                        #'All-T2D',
@@ -80,27 +80,27 @@ exp_configs = {
                                        # 'L2'
                                      ], 'Normalize each sample with: {}' ],
                 # 1 for supervised and 0 for autoencoder only -- CHANGE IT BACK TO 1 FOR ANY SUPERVISED LEARNING!!!
-                norm_input_key:    [ [1], 'Normalize across samples (each component with zero mean/unit std across training samples): {}' ],
+                norm_input_key:    [ [0, 1], 'Normalize across samples (each component with zero mean/unit std across training samples): {}' ],
 
-                kmer_size_key:     [ [5, 6, 7]
+                kmer_size_key:     [ [7, 8, 10]
                                      , 'Kmer Size used: {}'],
-
                 # Deep net structure
                 # The last entry (-1 is the placeholder) of the layer list is for code layer dimensions - this is so we don't
                 # have to list too many network layer lists when we vary only the code layer dimension.
                 layers_key:        [ [
-                                       [1, "random"],
+                                        [1, -1],
+                                       #[1, 1/2, -1]
+                                       #[1, "random"],
                                        #[1, 2, -1],
                                        #[1, 4, -1],
                                        #[1, 8, -1]
                                        #[1, 2, -1],
-                                       [1, 1/2, "random"],
-                                       [1, 1/2, 1/4, "random"],
-                                       [1, 1/2, 1/4, 1/8, "random"],
-                                       [1, 1/2, 1/4, 1/8, 1/16, "random"],
+                                       #[1, 1/2, "random"],
+                                       #[1, 1/2, 1/4, "random"],
+                                       #[1, 1/2, 1/4, 1/8, "random"],
+                                       #[1, 1/2, 1/4, 1/8, 1/16, "random"],
                                      ], "Layers for autoencoder's first half : {}" ],
-                enc_dim_key:       [ [100],  'Encoding dimensions: {}' ],
-
+                enc_dim_key:       [ [32, 50, 64],  'Encoding dimensions: {}' ],
                 enc_act_key:       [ [
                                          'sigmoid',
                                          'relu',
@@ -109,41 +109,42 @@ exp_configs = {
                                          'tanh',
                                      ], 'Encoding activation: {}' ],
                 code_act_key:      [ [
-                                         SAME_AS_ENC,
-                                         #'linear',
-                                         #'softmax',
-                                         #'sigmoid',
-                                         #'relu',
-                                         #'tanh',
+                                         #SAME_AS_ENC,
+                                         'linear',
+                                         'softmax',
+                                         'sigmoid',
+                                         'relu',
+                                         'tanh',
 
                                      ], 'Code (last encoding) layer activation: {}' ],
     
                 # Decoding activations are fixed as linear as they are popped off anyway
                 # after autoencoder training
                 dec_act_key:       [ [
-                                         SAME_AS_ENC,
-                                         #'linear',
-                                         #'sigmoid',
-                                         #'relu',
-                                         #'softmax',
-                                         #'tanh',
+                                         #SAME_AS_ENC,
+                                         'linear',
+                                         'sigmoid',
+                                         'relu',
+                                         'softmax',
+                                         'tanh',
                                      ], 'Decoding layer activation: {}' ],
                 out_act_key:       [ [
 
-                                         SAME_AS_ENC,
-                                         #'linear',
-                                         #'sigmoid',
-                                         #'relu',
-                                         #'softmax',
-                                         #'tanh',
+                                         #SAME_AS_ENC,
+                                         'linear',
+                                         'sigmoid',
+                                         'relu',
+                                         'softmax',
+                                         'tanh',
                                      ], 'Last decoding layer activation: {}' ],
                 loss_func_key :    [ [
                                          'mean_squared_error',
                                          'kullback_leibler_divergence'
                                      ], 'Autoencoder loss function: {}' ],
+                pca_dim_key:       [ [0, 40, 50, 70],
+                                     'Number of principal components for PCA, if 0 no PCA should be used'],
                 # boolean for whether to use autoencoder for pretraining before supervised learning
                 use_ae_key:    [ [0, 1], 'Use autoencoder pretraining for supervised learning: {}' ],
-
 
                 # Training options
                 auto_epochs_key :  [ [50], 'Max number of epochs for autoencoder training: {}' ],
@@ -151,8 +152,10 @@ exp_configs = {
                 batch_size_key:    [ [8, 16, 32], 'Batch size used during training: {}' ],
                 # two booleans
                 batch_norm_key:    [ [0], 'Use batch normalization: {}' ],
-                dropout_pct_key:   [ [0, 0.25, 0.35, 0.5, 0.75], 'Dropout percent: {}'],
-                input_dropout_pct_key: [ [0, 0.25, 0.35, 0.5, 0.75], 'Dropout percent on input layer: {}'],
+                dropout_pct_key:   [ [0, 0.25, 0.35, 0.5, 0.75
+                                      ], 'Dropout percent: {}'],
+                input_dropout_pct_key: [ [0, 0.25, 0.35, 0.5, 0.75
+                                          ], 'Dropout percent on input layer: {}'],
                 act_reg_key:       [ [0], 'Activation regularization (for sparsity): {}' ],
                 # boolean
                 early_stop_key:    [ [0],  'Use early stopping: {}' ],
@@ -256,7 +259,7 @@ def get_config_val(config_key, config):
 # Get the config description for the given config key - used in figure descriptions
 def get_config_desc(config_key, config):
     return exp_configs[config_key][1].format(get_config_val(config_key, config))
-        
+
 def change_layers(next_config_dict):
     input_dimensions = 4 ** next_config_dict[kmer_size_key]
     if next_config_dict[kmer_size_key] % 2 == 0:
@@ -264,6 +267,14 @@ def change_layers(next_config_dict):
         input_dimensions = (input_dimensions - 4 ** half_kmer_size) // 2 + 4 ** half_kmer_size
     else:
         input_dimensions = input_dimensions // 2
+    if next_config_dict[pca_dim_key] > 0:
+        if next_config_dict[pca_dim_key] < 1:
+            input_dimensions = int(next_config_dict[pca_dim_key] * input_dimensions + epsilon)
+        else:
+            input_dimensions = next_config_dict[pca_dim_key]
+        next_config_dict[pca_dim_key] = input_dimensions
+        next_config_dict[use_ae_key] = 0
+
     layers = list(next_config_dict[layers_key])
     for i in range(len(layers) - 1):
         if (layers[i] <= 1 and layers[i] > -1):
@@ -276,7 +287,7 @@ def change_layers(next_config_dict):
         elif layers[-1] <= 1:
             layers[-1] = int(input_dimensions * layers[-1] + epsilon)
         next_config_dict[enc_dim_key] = layers[-1]
-
+    
     next_config_dict[layers_key] = layers
             
 if __name__ == "__main__":
