@@ -191,8 +191,14 @@ plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(km
 # How does changing t-SNE parameters change the output visualization? #                                                                                                                                
 #######################################################################
 
+# Notes
+#perplexity should be between 5 and 50; not super critical
+#learning_rate should be between 10 and 1000
+#n_ter should be at least 250
+#init can be 'pca' or 'random'
+
 # Function
-def draw_tsne(n_components=2, perplexity=30, learning_rate=200, title=''):
+def draw_tsne(n_components=2, perplexity=30, learning_rate=200, init='random', n_iter=1000, title=''):
     fit = TSNE(
         n_components=n_components,
         perplexity=perplexity,
@@ -260,8 +266,8 @@ for encoding_dim in encoding_dims:
 
 # t-SNE tuning
 
-#encoding_dims = []
-encoding_dims=[8,300,4000]                                                                                                                                                                                 
+encoding_dims = []
+#encoding_dims=[300]                                                                                                                                                                                 
 
 for encoding_dim in encoding_dims:
     input_dim=len(data_normalized[0]) # this is the number of input kmers                                                                                                                                  
@@ -289,10 +295,59 @@ for encoding_dim in encoding_dims:
     y = np.array(labels)
 
     #perplexity                                                                                                                                                                                            
-    for p in (2, 5, 10, 20, 30, 40, 50):
+    for p in (10,30,50,100):
         draw_tsne(perplexity=p, title=str(encoding_dim) + 'perplexity = {}'.format(p))
 
-    #learning_rate                                                                                                                                                                                         
-    for l in (10, 50, 100, 200, 500):
+    #learning_rate                                                                                                                                                                                        
+    for l in (10, 100, 500, 1000):
         draw_tsne(learning_rate=l, title=str(encoding_dim) + 'learning_rate = {}'.format(l))
 
+    #n_iter
+    for n in (250, 1000, 5000):
+        draw_tsne(n_iter=n, title=str(encoding_dim) + 'n_iter = {}'.format(n))
+
+    #init
+    #draw_tsne(init='pca', title=str(encoding_dim) + 'pca_init')
+
+# some PCA
+
+#encoding_dims = []
+encoding_dims=[8,300,4000]                                                                                                                                                                                 
+
+for encoding_dim in encoding_dims:
+    input_dim=len(data_normalized[0]) # this is the number of input kmers                                                                                                                                   
+
+    encoded_activation = 'relu'
+    #encoded_activation = 'sigmoid'                                                                                                                                                                         
+    #encoded_activation = 'linear'                                                                                                                                                                          
+    #decoded_activation = 'softmax'                                                                                                                                                                         
+    decoded_activation = 'sigmoid'
+
+    loss='binary_crossentropy'
+
+    model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded_activation)
+
+    # Fit the model #                                                                                                                                                                                       
+    numEpochs = 1000
+    batchSize = 32
+    history = History()
+    model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
+
+    #final_output = model.predict(data_normalized)                                                                                                                                                          
+    final_layer_model = Model(inputs=model.input,outputs=model.layers[-1].output)
+    final_output = final_layer_model.predict(data_normalized)
+
+    X = final_output
+    y = np.array(labels)
+
+    X_pca = PCA(n_components=2, random_state=0).fit_transform(X)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_pca[indices,0], X_pca[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('TsNE Plot final layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/TsNE_finallayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
