@@ -22,6 +22,7 @@ from itertools import cycle, product
 from sklearn.utils import shuffle
 from sklearn.metrics import precision_recall_curve
 
+import operator
 
 import pickle
 import matplotlib.pyplot as plt
@@ -67,6 +68,7 @@ plot_title_size = 12
 plot_text_size = 10
 
 
+
 dataset_config_iter_fold_results = {}
 
 
@@ -74,19 +76,24 @@ dataset_config_iter_fold_results = {}
 # Values based on the values used in the
 # Pasolli paper 
 dataset_model_grid = {
-    #"Qin": "rf1-norm",
+    #"Qin": "rf0-norm",
     #"MetaHIT": "rf2-norm",
     #"Feng": "rf3-norm",
     #"RA": "rf4-norm",
     #"Zeller": "rf5-norm",
     #"LiverCirrhosis": "rf6-norm",
-    "Karlsson": "rf7-norm",
+    "Karlsson": "rf_karlsson",
     #"All-CRC": "rf9_norm",
     #"All-T2D": "rf8_norm",
     }
 
 
 model_param_grid = {
+    "rf_karlsson": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0},
+    
+    "rf0-norm": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 3,'N': 1,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 10, 'NJ': 1, 'KS': 5, 'NR': 1},
     "rf1-norm": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1},
     "rf2-norm": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
@@ -120,6 +127,8 @@ model_param_grid = {
              'C': 10, 'KN': 'linear', 'GM': 'auto', 'KS': 6},
     "svm7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
              'C': 10, 'GM': 0.0001, 'KN':'rbf', 'KS': 5},
+    "svm8": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+        'C': 1, 'GM': 0.001, 'KN':'rbf', 'KS': 5},
     
     "svm1_norm": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
              'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
@@ -154,6 +163,8 @@ model_param_grid = {
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 0},
     "rf7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
+    "rf8": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0},
 
     "gb1": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
              'LR': 0.1, 'MD': None, 'MF': 'sqrt', 'ML': 5, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
@@ -170,7 +181,6 @@ model_param_grid = {
     "gb7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
             'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 4, 'MS': 2, 'NE': 200, 'SS': 0.8, 'KS':5}
     }
-
 
 def class_to_target(cls):
     target = np.zeros((n_classes,))
@@ -288,12 +298,43 @@ def get_config_val(config_key, config):
         val = '-'.join([ str(c) for c in val])
     return val
 
+def get_reverse_complement(kmer):
+    kmer_rev = ''
+    for c in kmer:
+        if c == 'A':
+            kmer_rev += 'T'
+        elif c == 'T':
+            kmer_rev += 'A'
+        elif c == 'C':
+            kmer_rev += 'G'
+        else:
+            kmer_rev += 'C'
+
+    return kmer_rev[::-1]
+    
+
+def get_feature_importances(clf, kmer_imps):
+    print("GETTING FEATURE IMPORTANCES")
+    importances = clf.feature_importances_
+    #std = np.std([tree.feature_importances_ for tree in clf.estimators_],
+    #             axis=0)
+    for i in range(len(importances)):
+        kmer_imps[i] += importances[i]
+    print("FINISHED ADDING IMPORTANCES")
+    
+
 # This reference explains some of the things I'm doing here
 # http://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description= "Program to run linear machine learning models on kmer datasets")
+    parser.add_argument('-features', type = int, default = 100, help = "Number of feature importances")
 
+    arg_vals = parser.parse_args()
+    num_features = arg_vals.features
+    
     # Loop over all data sets
     for dataset in dataset_model_grid.keys():
+        
         dataset_config_iter_fold_results[dataset] = {}
         config_results = {}
         model = dataset_model_grid[dataset]
@@ -302,7 +343,7 @@ if __name__ == '__main__':
         n_classes = len(classes)
         global class_to_ind
         class_to_ind = { classes[i]: i for i in range(n_classes)}
-
+        print("GETTING DATA")
         data_sets = param_grid["DS"]
         data_sets_healthy=data_sets[0]
         data_sets_diseased=data_sets[1]
@@ -335,6 +376,17 @@ if __name__ == '__main__':
         cv_testfolds = param_grid['CVT']
 
         config_string = config_info(data_sets[0][0], learn_type, param_grid, kmer_size)
+
+        kmers_no_comp = []
+        print("GENERATING ALL KMERS CAPS")
+        all_kmers_caps = [''.join(_) for _ in product(['A', 'C', 'G', 'T'], repeat = kmer_size)]
+        print("GENERATED ALL KMERS CAPS")
+        for kmer in all_kmers_caps:
+            if get_reverse_complement(kmer) not in kmers_no_comp:
+                kmers_no_comp.append(kmer)
+        kmer_imps = np.zeros(len(kmers_no_comp))
+
+        print("GENERATED KMERS NO COMP")
         
         for i in range(n_iter):
             # Set the estimator based on the model type
@@ -373,6 +425,7 @@ if __name__ == '__main__':
                 x_train, y_train = x[train_i], y[train_i]
                 x_test, y_test = x[test_i], y[test_i]
                 use_norm = True
+                print("KFOLD CROSS")
                 if learn_type == 'rf':
                     use_norm = not not param_grid["NR"]
 
@@ -387,9 +440,13 @@ if __name__ == '__main__':
                 
                 y_train = np.array(y_train)
                 y_test = np.array(y_test)
-
+                
                 estimator.fit(x_train, y_train)
                 y_test_pred= np.array(estimator.predict_proba(x_test))
+                print("FIT TO ESTIMATOR")
+
+                if learn_type == 'rf':
+                    get_feature_importances(estimator, kmer_imps)
 
                 if learn_type == 'enet' or learn_type == 'lasso':
                     # Convert the predicted values to 0 or 1
@@ -580,6 +637,16 @@ if __name__ == '__main__':
             perf_means = np.mean(perf_metrics, axis=0)
             perf_stds = np.std(perf_metrics, axis=0)
 
+            if learn_type == 'rf':
+                print("SORTING FEATURE IMPORTANCES")
+                indices = np.argsort(kmer_imps)[::-1][0:num_features]
+                kmer_imps = kmer_imps[indices]
+                kmers_no_comp = [kmers_no_comp[i] for i in indices]
+                print("Importances\tfor\t" + str(dataset) + "\t" + config)
+                for i in range(len(kmer_imps)):
+                    print(kmers_no_comp[i] + "\t" + str(kmer_imps[i] / (n_iter * cv_testfolds)))
+                print("END FEATURE IMPORTANCE DUMP")
+
             if plot_overall:
                 # plot the confusion matrix
                 plot_confusion_matrix(conf_mat, config = config)
@@ -602,5 +669,5 @@ if __name__ == '__main__':
             with open("aggr_results" + config +".pickle", "wb") as f:
                 dump_dict = { "dataset_info": dataset, "results": [aggr_results, dataset_config_iter_fold_results[dataset][config]]}
                 pickle.dump(dump_dict, f)
-                    
+                   
 
