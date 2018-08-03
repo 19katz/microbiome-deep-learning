@@ -85,6 +85,14 @@ def load_metadata():
             line = line.strip("'")
             exclude.append(line)
 
+    with open(os.path.expanduser("~/deep_learning_microbiome/scripts/Zeller_metadata.incPasolli.txt")) as text:
+        for line in text:
+            line = line.rstrip("\n")
+            line = line.strip("'")
+            fields = line.split('\t')
+            if fields[13] == "FALSE":
+                exclude.append(fields[1])
+
     # Qin et al. T2D data:
 
     qin_et_al_inFN='%s/Qin_2012_ids_all.txt' %directory

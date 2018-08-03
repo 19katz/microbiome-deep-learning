@@ -77,12 +77,12 @@ dataset_config_iter_fold_results = {}
 # Pasolli paper 
 dataset_model_grid = {
     #"Qin": "rf0-norm",
-    #"MetaHIT": "rf2-norm",
+    "MetaHIT": "rf2",
     #"Feng": "rf3-norm",
     #"RA": "rf4-norm",
     #"Zeller": "rf5-norm",
     #"LiverCirrhosis": "rf6-norm",
-    "Karlsson": "rf_karlsson",
+    #"Karlsson": "rf_karlsson",
     #"All-CRC": "rf9_norm",
     #"All-T2D": "rf8_norm",
     }

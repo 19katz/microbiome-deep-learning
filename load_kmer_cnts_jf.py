@@ -29,7 +29,6 @@ def load_kmers(kmer_size,data_sets, allowed_labels=['0','1']):
 
     domain_label=1
     for data_set in data_sets:
-        print(data_set)
         input_dir = os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s') %(kmer_size, data_set)
         file_pattern='*.gz'
         files=glob(input_dir + '/' + file_pattern)
@@ -87,6 +86,15 @@ def load_metadata():
             line = line.rstrip("\n")
             line = line.strip("'")
             exclude.append(line)
+
+    with open(os.path.expanduser("~/deep_learning_microbiome/scripts/Zeller_metadata.incPasolli.txt")) as text:
+        for line in text:
+            line = line.rstrip("\n")
+            line = line.strip("'")
+            fields = line.split('\t')
+            if fields[13] == "FALSE":
+                exclude.append(fields[1])
+            
 
     # Qin et al. T2D data:
 

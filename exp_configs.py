@@ -22,7 +22,7 @@ dataset_key = 'DS'
 norm_sample_key = 'NO'
 backend_key = 'BE'
 version_key = 'V'
-use_ae_key = 'AE'
+use_ae_key = 'AU'
 use_kfold_key = 'UK'
 kfold_key = 'KF'
 no_random_key = 'NR'
@@ -35,13 +35,14 @@ dropout_pct_key = 'DP'
 input_dropout_pct_key = 'IDP'
 max_norm_key = 'MN'
 pca_dim_key = 'PC'
+ae_datasets_key = 'AD'
 
 config_keys = [dataset_key, layers_key, enc_act_key,
                code_act_key, dec_act_key, out_act_key, enc_dim_key, pca_dim_key, auto_epochs_key, super_epochs_key,
                batch_size_key, loss_func_key,  batch_norm_key, dropout_pct_key, input_dropout_pct_key, act_reg_key,
                norm_input_key, early_stop_key, patience_key, norm_sample_key, backend_key,
                version_key, use_ae_key, no_random_key, shuffle_labels_key, shuffle_abunds_key,
-               use_kfold_key, num_iters_key, kmer_size_key, max_norm_key, iter_key, kfold_key]
+               use_kfold_key, num_iters_key, kmer_size_key, max_norm_key, ae_datasets_key, iter_key, kfold_key]
 
 config_info_filename = [ dataset_key, kmer_size_key, layers_key, enc_act_key, code_act_key, dec_act_key, out_act_key,
                 loss_func_key, #auto_epochs_key,
@@ -52,7 +53,7 @@ config_info_filename = [ dataset_key, kmer_size_key, layers_key, enc_act_key, co
                 #backend_key, version_key,
                 use_ae_key, no_random_key,
                 # kfold_key should be the last and iter_key second to last
-                use_kfold_key, num_iters_key, shuffle_labels_key, shuffle_abunds_key, max_norm_key, iter_key, kfold_key]
+                use_kfold_key, num_iters_key, shuffle_labels_key, shuffle_abunds_key, max_norm_key,  ae_datasets_key, iter_key, kfold_key]
  
 SAME_AS_ENC = "asenc"
 
@@ -60,36 +61,33 @@ epsilon = 0.5
 exp_configs = {
                 # Datasets to use
                 dataset_key:       [ [
-                                       # 'AllContinent',
-                                       # 'AllCountry',
                                        #'SingleDiseaseMetaHIT',
                                        #'SingleDiseaseQin',
                                        #'SingleDiseaseRA',
                                        #'SingleDiseaseFeng',
-                                       #'SingleDiseaseZeller',
-                                       #'SingleDiseaseKarlsson',
+                                       #'ZellerReduced',
                                        #'KarlssonReduced',
                                        'SingleDiseaseLiverCirrhosis',
-                                       #'AllHealth',
-                                       #'All-T2D',
-                                       #'All-CRC'
-                                       #'HMP',
                                      ], 'Dataset: {}'],
+                
                 norm_sample_key:   [ [
                                        'L1',
                                        # 'L2'
                                      ], 'Normalize each sample with: {}' ],
                 # 1 for supervised and 0 for autoencoder only -- CHANGE IT BACK TO 1 FOR ANY SUPERVISED LEARNING!!!
-                norm_input_key:    [ [0, 1], 'Normalize across samples (each component with zero mean/unit std across training samples): {}' ],
+                norm_input_key:    [ [1], 'Normalize across samples (each component with zero mean/unit std across training samples): {}' ],
 
-                kmer_size_key:     [ [7, 8, 10]
+                kmer_size_key:     [ [5,
+                                      #6, 7,
+                                      #8, 10
+                                      ]
                                      , 'Kmer Size used: {}'],
                 # Deep net structure
                 # The last entry (-1 is the placeholder) of the layer list is for code layer dimensions - this is so we don't
                 # have to list too many network layer lists when we vary only the code layer dimension.
                 layers_key:        [ [
                                         [1, -1],
-                                       #[1, 1/2, -1]
+                                        [1, 1/2, -1],
                                        #[1, "random"],
                                        #[1, 2, -1],
                                        #[1, 4, -1],
@@ -117,7 +115,6 @@ exp_configs = {
                                          'tanh',
 
                                      ], 'Code (last encoding) layer activation: {}' ],
-    
                 # Decoding activations are fixed as linear as they are popped off anyway
                 # after autoencoder training
                 dec_act_key:       [ [
@@ -141,20 +138,39 @@ exp_configs = {
                                          'mean_squared_error',
                                          'kullback_leibler_divergence'
                                      ], 'Autoencoder loss function: {}' ],
-                pca_dim_key:       [ [0, 40, 50, 70],
-                                     'Number of principal components for PCA, if 0 no PCA should be used'],
+                pca_dim_key:       [ [0,],
+                                      #40, 50, 70],
+                                      
+                                     'Number of principal components for PCA, if 0 no PCA should be used: {}'],
                 # boolean for whether to use autoencoder for pretraining before supervised learning
-                use_ae_key:    [ [0, 1], 'Use autoencoder pretraining for supervised learning: {}' ],
+                use_ae_key:    [ [1], 'Use autoencoder pretraining for supervised learning: {}' ],
 
+                ae_datasets_key: [ [
+                                        ['H',
+                                         'Q',
+                                         'R',
+                                         'F',
+                                         #'L',
+                                         'Z',
+                                         'M',
+                                         'K'
+                                         ],
+                                        ],
+                                      'Other datasets to train the autoencoder on: {}',
+                                       []
+                                      ],
+                
                 # Training options
                 auto_epochs_key :  [ [50], 'Max number of epochs for autoencoder training: {}' ],
                 super_epochs_key : [ [200, 400], 'Max number of epochs for supervised training: {}' ],
                 batch_size_key:    [ [8, 16, 32], 'Batch size used during training: {}' ],
                 # two booleans
                 batch_norm_key:    [ [0], 'Use batch normalization: {}' ],
-                dropout_pct_key:   [ [0, 0.25, 0.35, 0.5, 0.75
+                dropout_pct_key:   [ [0,
+                                      #0.25, 0.35, 0.5, 0.75
                                       ], 'Dropout percent: {}'],
-                input_dropout_pct_key: [ [0, 0.25, 0.35, 0.5, 0.75
+                input_dropout_pct_key: [ [0,
+                                          #0.25, 0.35, 0.5, 0.75
                                           ], 'Dropout percent on input layer: {}'],
                 act_reg_key:       [ [0], 'Activation regularization (for sparsity): {}' ],
                 # boolean
@@ -273,7 +289,7 @@ def change_layers(next_config_dict):
         else:
             input_dimensions = next_config_dict[pca_dim_key]
         next_config_dict[pca_dim_key] = input_dimensions
-        next_config_dict[use_ae_key] = 0
+        next_config_dict[use_ae_key] = 0 
 
     layers = list(next_config_dict[layers_key])
     for i in range(len(layers) - 1):

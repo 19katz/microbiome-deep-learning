@@ -12,7 +12,6 @@ import pickle
 #from loadkmers import sparse_kmers_df
 
 
-
 ################
 # reading in data with for loop
 ################

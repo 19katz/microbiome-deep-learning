@@ -95,11 +95,15 @@ plot_title_size = plot_text_size + 2
 test_pct = 0.2
 input_drop_pct = 0
 
+dataset_load_name = None
+
 
 # map of <dataset_name, iteration index, K fold index> to list of <history>, <2d-codes-predicted>, etc,
 # for storing per-fold results
 global dataset_config_iter_fold_results
 dataset_config_iter_fold_results = {}
+
+dataset_name_dict = {'H': 'HMP', 'F': 'Feng', 'Z': 'Zeller_2014', 'R': 'RA', 'M': 'MetaHIT','L': 'LiverCirrhosis', 'K': 'Karlsson_2013', 'Q': 'Qin_et_al'}
 
 # datasource name to marker map for plotting
 datasource_marker = {'HMP': 'o', 'MetaHIT': '*', 'Qin_et_al': 'D', 'RA': '^', 'Feng': 'P', 'LiverCirrhosis': 'X', 'Zeller_2014':'s', 'Karlsson_2013': 'h'}
@@ -109,59 +113,42 @@ datasource_marker = {'HMP': 'o', 'MetaHIT': '*', 'Qin_et_al': 'D', 'RA': '^', 'F
 dataset_dict = {
     # <dataset_name>: (<classification_name>, <function for loading the data(wrapped in lambda if it takes arguments)>, 
     # <index of the label in the list of labels>, <class name list>, <color list for plotting (in order of class names)>, <data source marker dict>)
-    
-    'AllHealth': ('Disease', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al']),
-                   3 , [ 'Healthy', 'IBD', 'RA', 'T2D', 'LC', 'CRC'], ['green', 'red', 'darkorange', 'purple', 'fucshia', 'blue', ], datasource_marker),
-
-    'AllHealthBinary': ('Diseased', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al'])
-                       , 0 , [ '0', '1', ], ['green', 'red'], datasource_marker),
 
     # For testing the autoencoder - because the K-fold cross validation code is shared with supervised learning
     # , it needs some positive labels to work, so we randomly generate some positives, which do not affect the
     # autoencoder experiment results.
-    'HMP': ('HMP', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'HMP']), 3, [ 'Healthy', 'IBD', ],
-            ['green', 'red', ], datasource_marker),
     
     'SingleDiseaseMetaHIT': ('IBD', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'MetaHIT']), 3, [ 'Healthy', 'IBD', ],
-                          ['green', 'red', ], datasource_marker),
-    'SingleDiseaseMetaHITLabelShuffled': ('IBD-LabelShuffled', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'MetaHIT']),3, [ 'Healthy', 'IBD', ],
-                                      ['green', 'red', ], datasource_marker),
+                          ['green', 'red', ], datasource_marker, 'MetaHIT'),
     'SingleDiseaseQin': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al']), 3, [ 'Healthy', 'T2D', ],
-                         ['green', 'purple', ], datasource_marker),
-    
-    'SingleDiseaseQinLabelShuffled': ('T2D-LabelShuffled', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al']), 3, [ 'Healthy', 'T2D', ],
-                                      ['green', 'purple', ], datasource_marker),
+                         ['green', 'purple', ], datasource_marker, 'Qin_et_al'),
     
     'SingleDiseaseRA': ('RA', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'RA']), 3, [ 'Healthy', 'RA', ],
-                        ['green', 'darkorange', ], datasource_marker),
+                        ['green', 'darkorange', ], datasource_marker, 'RA'),
 
     'SingleDiseaseFeng': ('CRC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng']), 3, [ 'Healthy', 'CRC', ],
-                        ['green', 'blue', ], datasource_marker),
+                        ['green', 'blue', ], datasource_marker, 'Feng'),
     
-    'SingleDiseaseZeller': ('CRC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng']), 3, [ 'Healthy', 'CRC', ],
-                        ['green', 'turquoise', ], datasource_marker),
+
+    'ZellerReduced': ('CRC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Zeller_2014']), 3, [ 'Healthy', 'CRC', ],
+                        ['green', 'turquoise', ], datasource_marker, 'Zeller_2014'),
     
     'SingleDiseaseLiverCirrhosis': ('LC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'LiverCirrhosis']), 3, [ 'Healthy', 'LC', ],
-                        ['green', 'fucshia', ], datasource_marker),
+                        ['green', 'fucshia', ], datasource_marker, 'LiverCirrhosis'),
 
     'KarlssonReduced': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013']), 3, [ 'Healthy', 'T2D', ],
-                        ['green', 'brown', ], datasource_marker),
+                        ['green', 'brown', ], datasource_marker, 'Karlsson_2013'),
 
     'T2D-HMP': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al', 'Karlsson_2013', 'HMP']), 3, [ 'Healthy', 'T2D', ],
                 ['green', 'purple', ], datasource_marker),
 
     'RA-HMP': ('RA', lambda kmer_size:  load_kmers(kmer_size = kmer_size, data_sets = [ 'RA', 'HMP']), 3, [ 'Healthy', 'RA', ],
-                ['green', 'darkorange', ], datasource_marker),
+                ['green', 'darkorange', ], datasource_marker, None),
     'All-T2D': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013', 'Qin_et_al']), 3, [ 'Healthy', 'T2D', ],
-            ['green', 'purple', ], datasource_marker),
-    'All-CRC': ('CRC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng', 'Zeller']), 3, [ 'Healthy', 'CRC', ],
-            ['green', 'blue', ], datasource_marker)
+            ['green', 'purple', ], datasource_marker, None),
+    'All-CRC': ('CRC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng', 'Zeller_2014']), 3, [ 'Healthy', 'CRC', ],
+            ['green', 'blue', ], datasource_marker, None)
     
-    #'AllHealthObese': ('Disease (with obesity replacing IBD for MetaHIT)', lambda: load_all_kmer_cnts_with_labels(metahit_obesity=True), 6, [ 'Healthy', 'Obese', 'RA', 'T2D', ],
-    #                      ['green', 'red', 'darkorange', 'purple'], datasource_marker),
-
-    #'MetaHIT-BMI': ('BMI', load_metahit_with_bmi_labels, 7, [ 'obese', 'over_weight', 'normal_weight', 'under_weight', ],
-    #                   ['green', 'red', 'purple', 'darkorange', ], datasource_marker),
 }
 
 # Specific model configs per dataset - used to evaluate individual exp configs after grid search
@@ -190,8 +177,8 @@ def set_dataset_exp_config(exp_config, dataset):
 # set global variables at the beginning of the file, for use in loading the data and creating one-hot
 # encoding vectors
 def set_config_global_vars(dataset):
-    global source_ind, class_name, label_ind, classes, n_classes, class_to_ind, colors, markers, data_loader
-    cls_name, data_load, lbl_ind, lbls, clrs, mkrs = dataset_dict[dataset]
+    global source_ind, class_name, label_ind, classes, n_classes, class_to_ind, colors, markers, data_loader, dataset_load_name
+    cls_name, data_load, lbl_ind, lbls, clrs, mkrs, d_name = dataset_dict[dataset]
     class_name = cls_name
     label_ind = lbl_ind
     classes = lbls
@@ -200,6 +187,7 @@ def set_config_global_vars(dataset):
     colors = clrs
     markers = mkrs
     data_loader = data_load
+    dataset_load_name = d_name
 
 # The experiment config currently being trained/evaluated
 global exp_config
@@ -273,8 +261,11 @@ def get_k_folds(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_lab
 
     set_config_global_vars(dataset)
     x_y_info_train_test = []
-    
-    data, orig_target = data_loader(kmer_size)
+
+    if dataset_load_name == None:
+        data, orig_target = data_loader(kmer_size)
+    else:
+        data, orig_target = get_dataset(dataset_load_name, kmer_size)
     orig_target = np.array(orig_target)
 
     for i in range(num_iters):
@@ -339,6 +330,14 @@ def loop_over_dataset_configs():
                                   exp_config[no_random_key], exp_config[kmer_size_key], exp_config[shuffle_labels_key],
                                   exp_config[shuffle_abunds_key])
             exec_config(k_folds)
+
+dataset_kmer_labels = {}
+
+def get_dataset(dataset_name, kmer_size):
+    if (dataset_name, kmer_size) in dataset_kmer_labels:
+        return dataset_kmer_labels[(dataset_name, kmer_size)]
+    dataset_kmer_labels[(dataset_name, kmer_size)] = load_kmers(kmer_size, [dataset_name])
+    return dataset_kmer_labels[(dataset_name, kmer_size)]
 
 # Executes the config given training/test splits            
 def exec_config(k_folds):
@@ -499,13 +498,13 @@ def exec_config(k_folds):
             # plot the ROCs with AUCs/ACCs
             plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config=config)
 
-
+        '''
         print('tkfold-overall-loss: ' + str(loss) + ' for ' + class_name + ':' + config)
         print('tkfold-overall-val-loss: ' + str(val_loss) + ' for ' + class_name + ':' + config)
         print('tkfold-overall-acc: ' + str(acc) + ' for ' + class_name + ':' + config)
         print('tkfold-overall-val-acc: ' + str(val_acc) + ' for ' + class_name + ':' + config)
         print('tkfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + class_name + ':' + config)
-
+        '''
         
         perf_metrics = np.vstack(np.concatenate(iter_results[:, 7]))
         perf_means = np.mean(perf_metrics, axis=0)
@@ -559,16 +558,6 @@ def normalize_train_test():
         x_train = pca.fit_transform(x_train)
         x_test = pca.transform(x_test)
         pca = None
-
-    norm_input = exp_config[norm_input_key]
-    if norm_input:
-        sample_mean = x_train.mean(axis=0)
-        sample_std = x_train.std(axis=0)
-
-        # Normalize both training and test samples with the training mean and std
-        x_train = (x_train - sample_mean) / sample_std
-        # test samples are normalized using only the mean and std of the training samples
-        x_test = (x_test - sample_mean) / sample_std
     
     layers = exp_config[layers_key]
     # exp with # of epochs for autoencoder training
@@ -587,8 +576,17 @@ def cnt_to_coding_layer():
             num_layers += 1
     return num_layers
 
+def cnt_from_decoding():
+    num_layers = 2 * (len(exp_config[layers_key]) - 1)
+    if exp_config[batch_norm_key]:
+        num_layers += len(exp_config[layers_key]) - 2
+    if not exp_config[dropout_pct_key] == 0:
+        num_layers += len(exp_config[layers_key]) - 2
+    return num_layers
+
 # Creates the supervised learning model based on information in exp_config
 def build_train_test(layers):
+    global x_train,  x_test
     """
     This uses the current active exp config (set up by the loops above) to first build and train the autoencoder,
     and then build and train/test the supervised model
@@ -628,15 +626,17 @@ def build_train_test(layers):
     # the model from input to the code layer - used for plotting 2D graphs
     code_layer_model = Model(inputs=autoencoder.layers[0].input,
                              outputs=autoencoder.layers[cnt_to_coding_layer() - 1].output)
-    '''
-    print("Code layer model:")
-    code_layer_model.summary()
-    '''
+    
+    #print("Code layer model:")
+    #code_layer_model.summary()
+
 
     # stats for the autoencoder - the 9s are for when autoencoder is (optionally) not used before supervised learning
     ae_val_loss, ae_loss, ae_mse = 999999, 999999, 999999
     ae_hist = []
     if get_config_val(use_ae_key, exp_config):
+        ae_datasets = exp_config[ae_datasets_key]
+
         # Use the autoencoder before supervised learning
         #
         # Add the decoding layers - from second to last layer to the second layer
@@ -649,10 +649,32 @@ def build_train_test(layers):
         i = 0
         autoencoder.add(Dense(layers[i], input_dim=layers[i+1]))
         autoencoder.add(Activation(exp_config[enc_act_key if exp_config[out_act_key] == SAME_AS_ENC else out_act_key]))
-
-        # Compile the autoencoder model
         autoencoder.compile(optimizer='adadelta', loss=exp_config[loss_func_key])
-    
+        autoencoder.summary()
+        
+        datasets = list(ae_datasets)
+        for i in range(len(ae_datasets)):
+            datasets[i] = dataset_name_dict[ae_datasets[i]]
+
+        kmers_train = None
+        for i in range(len(datasets)):
+            kmer_train, labels = get_dataset(datasets[i], exp_config[kmer_size_key])
+            norm_func = norm_func_dict[exp_config[norm_sample_key]]
+            kmer_train = (norm_func)(kmer_train)
+            if i == 0:
+                kmers_train = kmer_train
+            else:
+                kmers_train = np.concatenate((kmer_train, kmers_train))
+
+        if not kmers_train == None:
+            autoencoder.fit(kmers_train, kmers_train,
+                            epochs=exp_config[auto_epochs_key],
+                            batch_size=exp_config[batch_size_key],
+                            # shuffle the training samples per epoch only if removing randomness is not specified
+                            shuffle=(not get_config_val(no_random_key, exp_config)),
+                            validation_data=None,
+                            verbose=0)        
+
         history = History()
         callbacks = [history]
         # Support for early stopping - not used because Keras is too sensitive.
@@ -665,11 +687,12 @@ def build_train_test(layers):
                         batch_size=exp_config[batch_size_key],
                         # shuffle the training samples per epoch only if removing randomness is not specified
                         shuffle=(not get_config_val(no_random_key, exp_config)),
-                        verbose=0,
                         validation_data=(x_test, x_test),
+                        verbose=0,
                         callbacks=callbacks)
 
         ae_hist = history.history
+        
         # Plot training/test loss by epochs for the autoencoder
         if plot_ae_fold:
             plot_loss_vs_epochs(ae_hist['loss'], ae_hist['val_loss'], name='ae_loss')
@@ -703,15 +726,27 @@ def build_train_test(layers):
         #                   "This graph shows autoencoder's first 2 components of the encoding codes (the middle hidden layer output) with labels")
 
         # Pop the decoding layers before supervised learning
+        print("Current autoencoder")
         autoencoder.summary()
-        for n in range(cnt_to_coding_layer()):
+        for n in range(cnt_from_decoding()):
             autoencoder.pop()
 
+    norm_input = exp_config[norm_input_key]
+    if norm_input:
+        sample_mean = x_train.mean(axis=0)
+        sample_std = x_train.std(axis=0)
+
+        # Normalize both training and test samples with the training mean and std
+        x_train = (x_train - sample_mean) / sample_std
+        # test samples are normalized using only the mean and std of the training samples
+        x_test = (x_test - sample_mean) / sample_std
+        
     # Add the classification layer for supervised learning - note that the loss function is always
     # categorical cross entropy - not what's in exp_configs, which is only used for the autoencoder.
     autoencoder.add(Dense(n_classes, input_dim=layers[-1]))
     autoencoder.add(Activation('softmax'))
     autoencoder.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
+    print("With classification layer")
     autoencoder.summary()
 
     history = History()
@@ -1044,6 +1079,9 @@ def setup_exp_config_from_config_info(config):
             exp_config['LF'] = 'mean_squared_error'
         else:
             exp_config['LF'] = 'kullback_leibler_divergence'
+    if ae_datasets_key not in exp_config:
+        exp_config[ae_datasets_key] = exp_configs[ae_datasets_key][2]
+            
 
 
 # Add figure texts to plots that describe configs of the experiment that produced the plot
@@ -1086,7 +1124,7 @@ def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, co
                       + ' --- ' + get_config_desc(version_key) + ' --- ' + get_config_desc(num_iters_key) + ' --- ' + get_config_desc(iter_key))
 
 
-    filename = graph_dir + '/' + name + (name_file_from_config(exp_config) if config is None else config) + '.svg'
+    filename = graph_dir + '/' + name + (name_file_from_config(exp_config) if config is None else config) + '.png'
     pylab.savefig(filename , bbox_inches='tight')
     pylab.close(fig)
 
@@ -1109,265 +1147,292 @@ if __name__ == '__main__':
                                  #'SingleDiseaseFeng', 'SingleDiseaseZeller', 'SingleDiseaseLiverCirrhosis', 'SingleDiseaseRA', 'All-T2D'])
 
         '''
-        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:8192-2-2_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0",
-"LS:8192-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:32896-8-2_EA:sigmoid_CA:softmax_DA:linear_OA:linear_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_",
-"LS:8192-2_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:2_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:8192-2-8_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:2080-1040-520-260-130-61_EA:linear_CA:sigmoid_DA:NA_OA:NA_ED:61_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
-"LS:8192-2-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_PC:0_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:8192-2-16_EA:tanh_CA:relu_DA:tanh_OA:sigmoid_ED:16_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:32896-8-4_EA:linear_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:8192-2_EA:softmax_CA:softmax_DA:tanh_OA:tanh_ED:2_PC:0_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_"
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:8192-2-2_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0",
+"LS:8192-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:32896-8-2_EA:sigmoid_CA:softmax_DA:linear_OA:linear_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_",
+"LS:8192-2_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:2_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:8192-2-8_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:2080-1040-520-260-130-61_EA:linear_CA:sigmoid_DA:NA_OA:NA_ED:61_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
+"LS:8192-2-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_PC:0_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:8192-2-16_EA:tanh_CA:relu_DA:tanh_OA:sigmoid_ED:16_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:32896-8-4_EA:linear_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:8192-2_EA:softmax_CA:softmax_DA:tanh_OA:tanh_ED:2_PC:0_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_"
 ]
         
         '''
         '''
-        dataset_configs['KarlssonReduced'] = ["LS:50-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:50_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:50-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:50_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:40-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:50-64_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:64_PC:50_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:50-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:50_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:50-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:50_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:50-8_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:50-8_EA:linear_CA:linear_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:50-4_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:4_PC:50_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:40-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_"
+        dataset_configs['KarlssonReduced'] = ["LS:50-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:50_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:50_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:40-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-64_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:64_PC:50_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:50_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:50_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-8_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-8_EA:linear_CA:linear_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-4_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:4_PC:50_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:40-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_"
                                              ]
         '''
         '''
-        dataset_configs['SingleDiseaseMetaHIT'] = ["LS:524800-100_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:100_PC:0_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0.75_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:524800-100_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:100_PC:0_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.35_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:8192-4_EA:tanh_CA:tanh_DA:relu_OA:relu_ED:4_PC:0_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:70-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:8192-8_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:8_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:8192-2-16_EA:linear_CA:linear_DA:linear_OA:softmax_ED:16_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:70-4_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_"
+        dataset_configs['SingleDiseaseMetaHIT'] = ["LS:524800-100_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:100_PC:0_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0.75_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:524800-100_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:100_PC:0_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.35_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:8192-4_EA:tanh_CA:tanh_DA:relu_OA:relu_ED:4_PC:0_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:70-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:8192-8_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:8_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:8192-2-16_EA:linear_CA:linear_DA:linear_OA:softmax_ED:16_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:70-4_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_"
                                                    ]
         
         '''
         '''
-        dataset_configs['SingleDiseaseQin'] = ["LS:8192-16_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:16_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:2080-1040-996_EA:relu_CA:linear_DA:NA_OA:NA_ED:996_PC:0_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
-"LS:8192-2-2_EA:softmax_CA:sigmoid_DA:linear_OA:relu_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:8192-2-2_EA:softmax_CA:tanh_DA:softmax_OA:softmax_ED:2_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
-"LS:2080-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:6_"
+        dataset_configs['SingleDiseaseQin'] = ["LS:8192-16_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:16_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:2080-1040-996_EA:relu_CA:linear_DA:NA_OA:NA_ED:996_PC:0_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
+"LS:8192-2-2_EA:softmax_CA:sigmoid_DA:linear_OA:relu_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:8192-2-2_EA:softmax_CA:tanh_DA:softmax_OA:softmax_ED:2_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
+"LS:2080-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_PC:0_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:6_"
                                                ]
         '''
         '''
-        dataset_configs['SingleDiseaseZeller'] = ["LS:70-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:70_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_"
-"LS:40-64_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:40-4_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:4_PC:40_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:40-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:40-16_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:50-8_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:40-64_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:40-64_EA:linear_CA:linear_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:40-16_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:40-32_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:32_PC:40_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_"]
+        dataset_configs['ZellerReduced'] = [
+            "LS:8192-64_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:64_PC:0_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0",
+            "LS:40-50_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:50_PC:40_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0.25_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
+            "LS:50-8_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+            "LS:512-32_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:32_PC:0_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0.75_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0",
+        ]
+        '''
+
+        #'''
+        dataset_configs['SingleDiseaseFeng'] = [
+            "LS:40-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+            ]
+        #'''
+
+        '''
+        dataset_configs['ZellerReduced'] = ["LS:40-50_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:50_PC:40_AEP:50_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0.25_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
+"LS:40-50_EA:relu_CA:relu_DA:NA_OA:NA_ED:50_PC:40_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
+"LS:512-32_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:32_PC:0_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0.75_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0_",
+"LS:40-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0.25_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0_",
+"LS:50-32_EA:linear_CA:linear_DA:NA_OA:NA_ED:32_PC:50_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0.35_IDP:0.25_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
+"LS:512-32_EA:softmax_CA:softmax_DA:linear_OA:linear_ED:32_PC:0_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.35_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0_",
+"LS:8192-32_EA:relu_CA:relu_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.35_IDP:0.25_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_",
+"LS:50-64_EA:linear_CA:linear_DA:NA_OA:NA_ED:64_PC:50_AEP:50_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
+"LS:512-32_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:32_PC:0_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0_",
+"LS:50-64_EA:linear_CA:linear_DA:NA_OA:NA_ED:64_PC:50_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0.35_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",]
         '''
         '''
-        dataset_configs['SingleDiseaseFeng'] = ["LS:40-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:40_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_",
-"LS:70-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:70_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-8_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:8_PC:70_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
-"LS:70-4_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-8_EA:relu_CA:relu_DA:NA_OA:NA_ED:8_PC:70_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-4_EA:relu_CA:relu_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-16_EA:linear_CA:linear_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:70_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-16_EA:linear_CA:linear_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:50-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:50_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_"
+        dataset_configs['ZellerReduced'] = ["LS:70-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:70_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-64_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-4_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:4_PC:40_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-16_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:50-8_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:8_PC:50_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-64_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-64_EA:linear_CA:linear_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-16_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:16_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:40-32_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:32_PC:40_AEP:50_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_"]
+        '''
+        '''
+        dataset_configs['SingleDiseaseFeng'] = ["LS:40-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:40_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_",
+"LS:70-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:70_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-8_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:8_PC:70_AEP:50_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+"LS:70-4_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-8_EA:relu_CA:relu_DA:NA_OA:NA_ED:8_PC:70_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-4_EA:relu_CA:relu_DA:NA_OA:NA_ED:4_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-16_EA:linear_CA:linear_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:70_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-16_EA:linear_CA:linear_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:50-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:50_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_"
                                                 ]
         '''
-        #'''
+        '''
         dataset_configs['SingleDiseaseRA'] = [
-"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:512-2-4_EA:relu_CA:sigmoid_DA:tanh_OA:linear_ED:4_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:5_",
-"LS:524800-4_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.5_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:2080-4_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:4_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:6_",
-"LS:50-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:50_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
-"LS:2080-2-4_EA:sigmoid_CA:sigmoid_DA:relu_OA:tanh_ED:4_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:6_",
-"LS:512-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:5_"
+"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:512-2-4_EA:relu_CA:sigmoid_DA:tanh_OA:linear_ED:4_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:5_",
+"LS:524800-4_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0.5_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:2080-4_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:4_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:6_",
+"LS:50-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:50_AEP:50_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:70-16_EA:relu_CA:relu_DA:NA_OA:NA_ED:16_PC:70_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+"LS:2080-2-4_EA:sigmoid_CA:sigmoid_DA:relu_OA:tanh_ED:4_PC:0_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:6_",
+"LS:512-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:5_"
                                               ]
-        #'''
+        '''
 
         
         '''
-        dataset_configs['SingleDiseaseLiverCirrhosis'] = ['LS:8192-50_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:50_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0.5_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0',
-                                                          'LS:8192-50_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:50_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0',
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ['LS:8192-50_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:50_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0.5_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0',
+                                                          'LS:8192-50_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:50_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0',
                                                           ]
         '''
         '''
         dataset_configs['SingleDiseaseKarlsson'] = [
-            'LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
+            'LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
             ]
         '''
         
         '''
         dataset_configs['SingleDiseaseQin'] = [
-                                                "LS:32896-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-                                                "LS:32896-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-                                                "LS:32896-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-                                                "LS:32896-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-                                                "LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                "LS:32896-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                "LS:32896-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                "LS:32896-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                "LS:32896-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                "LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
 
                                                 ]
         '''                                                       
         '''
         dataset_configs['SingleDiseaseRA'] = [
-                                                "LS:32896-2-16_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-                                                "LS:32896-2_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-                                                "LS:32896-16448-4_EA:linear_CA:sigmoid_DA:relu_OA:linear_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-                                                "LS:32896-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-                                                "LS:32896-2-2_EA:tanh_CA:tanh_DA:softmax_OA:sigmoid_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
+                                                "LS:32896-2-16_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                "LS:32896-2_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                "LS:32896-16448-4_EA:linear_CA:sigmoid_DA:relu_OA:linear_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                "LS:32896-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                "LS:32896-2-2_EA:tanh_CA:tanh_DA:softmax_OA:sigmoid_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
                                                 ]
         '''
         '''
         dataset_configs['SingleDiseaseFeng'] = [
-                                                      "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-"LS:32896-16_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-                                                 "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__"
+                                                      "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+"LS:32896-16_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+"LS:32896-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                 "LS:32896-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__"
                                                
 ]
         '''
         '''
         dataset_configs['SingleDiseaseZeller'] = [
-                                                "LS:32896-16_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-"LS:32896-8_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:8_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-"LS:32896-16448-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
+                                                "LS:32896-16_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+"LS:32896-8_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:8_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+"LS:32896-16448-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
                                                 ]
         '''
         
         '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = [
-                                                        "LS:32896-2-8_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
-                                                        "LS:32896-2-4_EA:sigmoid_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-                                                        "LS:32896-2-2_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-                                                        "LS:32896-2-2_EA:sigmoid_CA:sigmoid_DA:softmax_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
-                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
+                                                        "LS:32896-2-8_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
+                                                        "LS:32896-2-4_EA:sigmoid_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                        "LS:32896-2-2_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                        "LS:32896-2-2_EA:sigmoid_CA:sigmoid_DA:softmax_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_",
+                                                        "LS:32896-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_"
                                                          ]
         '''
         '''
         dataset_configs['SingleDiseaseKarlsson'] = [
-                                                    "LS:32896-16_EA:relu_CA:relu_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-                                                    "LS:32896-2-8_EA:relu_CA:linear_DA:linear_OA:sigmoid_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-                                                    "LS:32896-16448-2_EA:sigmoid_CA:tanh_DA:tanh_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-                                                    "LS:32896-2-16_EA:softmax_CA:linear_DA:tanh_OA:linear_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
-                                                    "LS:32896-16448-16_EA:linear_CA:sigmoid_DA:sigmoid_OA:linear_ED:16_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__"
+                                                    "LS:32896-16_EA:relu_CA:relu_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                    "LS:32896-2-8_EA:relu_CA:linear_DA:linear_OA:sigmoid_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                    "LS:32896-16448-2_EA:sigmoid_CA:tanh_DA:tanh_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                    "LS:32896-2-16_EA:softmax_CA:linear_DA:tanh_OA:linear_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__",
+                                                    "LS:32896-16448-16_EA:linear_CA:sigmoid_DA:sigmoid_OA:linear_ED:16_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8__"
                                                     ]
 
         '''
 
         '''
         dataset_configs['SingleDiseaseQin'] = [
-                                                #"LS:8192-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                #"LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-2-4_EA:linear_CA:sigmoid_DA:relu_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-8_EA:linear_CA:linear_DA:relu_OA:relu_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-2_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-2_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                #"LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"
+                                                #"LS:8192-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                #"LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2-4_EA:linear_CA:sigmoid_DA:relu_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-8_EA:linear_CA:linear_DA:relu_OA:relu_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-4_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                #"LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"
                                                 ]
         '''
 
         '''
-        dataset_configs['SingleDiseaseRA'] = [#"LS:512-2_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                #"LS:512-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                #"LS:512-2-16_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                "LS:512-2-2_EA:tanh_CA:tanh_DA:softmax_OA:sigmoid_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                "LS:8192-2-8_EA:tanh_CA:softmax_DA:sigmoid_OA:linear_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:2080-4_EA:tanh_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                "LS:512-2_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                "LS:8192-2-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:512-256-128-8_EA:tanh_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                "LS:2080-1040-520-16_EA:linear_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_"]
+        dataset_configs['SingleDiseaseRA'] = [#"LS:512-2_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                #"LS:512-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                #"LS:512-2-16_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:512-2-2_EA:tanh_CA:tanh_DA:softmax_OA:sigmoid_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:8192-2-8_EA:tanh_CA:softmax_DA:sigmoid_OA:linear_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:2080-4_EA:tanh_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-2_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:2_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:8192-2-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:512-256-128-8_EA:tanh_CA:sigmoid_DA:sigmoid_OA:softmax_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:2080-1040-520-16_EA:linear_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_"]
         '''
 
         '''
-        dataset_configs['SingleDiseaseFeng'] = [#"LS:8192-16_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                #"LS:8192-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:512-256-128-16_EA:linear_CA:softmax_DA:tanh_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                "LS:8192-4096-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:softmax_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-2-16_EA:linear_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-2_EA:linear_CA:linear_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-2_EA:linear_CA:linear_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                "LS:8192-2-16_EA:linear_CA:linear_DA:relu_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"
+        dataset_configs['SingleDiseaseFeng'] = [#"LS:8192-16_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                #"LS:8192-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2-4_EA:linear_CA:sigmoid_DA:relu_OA:tanh_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-16_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:512-256-128-16_EA:linear_CA:softmax_DA:tanh_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:8192-4096-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:softmax_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2-16_EA:linear_CA:tanh_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2_EA:linear_CA:linear_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2_EA:linear_CA:linear_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                "LS:8192-2-16_EA:linear_CA:linear_DA:relu_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"
                                                 ]
         '''
         '''
-        dataset_configs['SingleDiseaseZeller'] = [#"LS:512-256-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                #"LS:2080-16_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                #"LS:2080-8_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:8_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                "LS:512-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                "LS:2080-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                "LS:512-256-16_EA:linear_CA:sigmoid_DA:linear_OA:tanh_ED:16_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                "LS:2080-16_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                "LS:512-2-2_EA:linear_CA:linear_DA:relu_OA:softmax_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
-                                                "LS:2080-16_EA:linear_CA:linear_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                "LS:512-8_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_"]
+        dataset_configs['SingleDiseaseZeller'] = [#"LS:512-256-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:relu_ED:16_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                #"LS:2080-16_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                #"LS:2080-8_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:8_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:2080-16_EA:sigmoid_CA:sigmoid_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-256-16_EA:linear_CA:sigmoid_DA:linear_OA:tanh_ED:16_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:2080-16_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-2-2_EA:linear_CA:linear_DA:relu_OA:softmax_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+                                                "LS:2080-16_EA:linear_CA:linear_DA:sigmoid_OA:sigmoid_ED:16_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                "LS:512-8_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:8_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_"]
         '''
         '''
-        dataset_configs['SingleDiseaseLiverCirrhosis'] = [#"LS:2080-2-2_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                            #"LS:2080-2-2_EA:sigmoid_CA:sigmoid_DA:softmax_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                            #"LS:2080-2-4_EA:sigmoid_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                            "LS:2080-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                            "LS:2080-2-2_EA:tanh_CA:linear_DA:softmax_OA:softmax_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                            "LS:2080-4_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:4_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                            "LS:8192-2-4_EA:softmax_CA:softmax_DA:tanh_OA:relu_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                            "LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:relu_OA:linear_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                            "LS:2080-8_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
-                                                            "LS:2080-1040-520-8_EA:sigmoid_CA:softmax_DA:softmax_OA:tanh_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_"]
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = [#"LS:2080-2-2_EA:softmax_CA:sigmoid_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            #"LS:2080-2-2_EA:sigmoid_CA:sigmoid_DA:softmax_OA:tanh_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            #"LS:2080-2-4_EA:sigmoid_CA:tanh_DA:softmax_OA:softmax_ED:4_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:2080-2_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:2_AEP:1_SEP:200_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:2080-2-2_EA:tanh_CA:linear_DA:softmax_OA:softmax_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:2080-4_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:4_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:8192-2-4_EA:softmax_CA:softmax_DA:tanh_OA:relu_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                            "LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:relu_OA:linear_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                            "LS:2080-8_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_",
+                                                            "LS:2080-1040-520-8_EA:sigmoid_CA:softmax_DA:softmax_OA:tanh_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_"]
         '''
         '''
-        dataset_configs['SingleDiseaseKarlsson'] = [#"LS:8192-16_EA:relu_CA:relu_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                    "LS:8192-4096-2_EA:sigmoid_CA:tanh_DA:tanh_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                    "LS:8192-4096-2048-8_EA:tanh_CA:sigmoid_DA:sigmoid_OA:relu_ED:8_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                    "LS:8192-4096-2048-8_EA:relu_CA:relu_DA:sigmoid_OA:linear_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                    "LS:8192-4096-2048-1024-2_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                    "LS:8192-4096-2048-1024-16_EA:sigmoid_CA:linear_DA:sigmoid_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                    "LS:8192-4096-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                    "LS:8192-4096-2048-1024-2_EA:tanh_CA:linear_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                    "LS:8192-4096-2048-1024-4_EA:relu_CA:sigmoid_DA:softmax_OA:relu_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
-                                                    "LS:8192-2-2_EA:linear_CA:linear_DA:sigmoid_OA:relu_ED:2_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"]
+        dataset_configs['SingleDiseaseKarlsson'] = [#"LS:8192-16_EA:relu_CA:relu_DA:tanh_OA:tanh_ED:16_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2_EA:sigmoid_CA:tanh_DA:tanh_OA:softmax_ED:2_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-8_EA:tanh_CA:sigmoid_DA:sigmoid_OA:relu_ED:8_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-8_EA:relu_CA:relu_DA:sigmoid_OA:linear_ED:8_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-1024-2_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-1024-16_EA:sigmoid_CA:linear_DA:sigmoid_OA:linear_ED:16_AEP:1_SEP:200_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-1024-2_EA:tanh_CA:linear_DA:sigmoid_OA:softmax_ED:2_AEP:1_SEP:400_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-4096-2048-1024-4_EA:relu_CA:sigmoid_DA:softmax_OA:relu_ED:4_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+                                                    "LS:8192-2-2_EA:linear_CA:linear_DA:sigmoid_OA:relu_ED:2_AEP:1_SEP:200_BS:32_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"]
         '''
 
 
-        #dataset_configs['SingleDiseaseMetaHIT'] = ['LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7']
+        #dataset_configs['SingleDiseaseMetaHIT'] = ['LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7']
         '''
-        dataset_configs['SingleDiseaseQin'] = ['LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
-                                               'LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
+        dataset_configs['SingleDiseaseQin'] = ['LS:8192-4_EA:tanh_CA:tanh_DA:linear_OA:linear_ED:4_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
+                                               'LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7',
                                                ]
         # This produced 0.759 AUC and 0.693 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
         # - a drop from the previous model as a result of avoiding overfitting.
         # the first model is the real one and the second is identical except with labels shuffled (for testing AUC statistical significance as in Pasolli)
         
-        dataset_configs['SingleDiseaseQin'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:0_UK:10_ITS:20_IT:0_NR:1_SL:0_ES:0_SA:0_PA:2_KS:5',
-                                               #'LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:3_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:0_UK:3_ITS:20_IT:0_NR:1_SL:1_ES:0_SA:0_PA:2_KS:5',
-                                               #'LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:3_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:0_UK:3_ITS:20_IT:0_NR:1_SL:0_ES:0_SA:0_PA:2_KS:5',
+        dataset_configs['SingleDiseaseQin'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AU:0_UK:10_ITS:20_IT:0_NR:1_SL:0_ES:0_SA:0_PA:2_KS:5',
+                                               #'LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:3_NO:L1_NI:1_BS:16_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AU:0_UK:3_ITS:20_IT:0_NR:1_SL:1_ES:0_SA:0_PA:2_KS:5',
+                                               #'LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:3_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AU:0_UK:3_ITS:20_IT:0_NR:1_SL:0_ES:0_SA:0_PA:2_KS:5',
 
                                               ]
         
-        dataset_configs['SingleDiseaseKarlsson'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:10__NR:1',# 'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:10__NR:1_SL:1'
+        dataset_configs['SingleDiseaseKarlsson'] = ['LS:512-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AU:1_UK:10__NR:1',# 'LS:1024-2_ED:2_EA:linear_CA:tanh_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:300_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AU:1_UK:10__NR:1_SL:1'
                                               ]
 
         # This produced 0.604 AUC and 0.601 ACC in average with 20 iterations and full randomness (shuffling and weight initialization)
         # but the std is too big (around 0.1 for both), suggesting again that the RA data is not amenable to this technique.
-        dataset_configs['SingleDiseaseRA'] = ['LS:512-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:10__NR:1']
-        #'LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_UK:10__NR:1_SL:1'
+        dataset_configs['SingleDiseaseRA'] = ['LS:512-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AU:1_UK:10__NR:1']
+        #'LS:1024-2_ED:2_EA:linear_CA:linear_DA:linear_OA:linear_LF:kullback_leibler_divergence_AEP:50_SEP:100_NO:L1_NI:1_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AU:1_UK:10__NR:1_SL:1'
         #]
         '''
        
@@ -1389,7 +1454,7 @@ if __name__ == '__main__':
         
         set_config(exp_config, dataset_key, ['HMP', 'SingleDiseaseMetaHIT', 'SingleDiseaseT2D', 'SingleDiseaseRA'])
 
-        dataset_configs['AllHealth'] = ['DS:AllHealth_LS:512-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:2_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AE:1_NR:0_UK:0_ITS:2_SL:0_SA:1_PA:2']
+        dataset_configs['AllHealth'] = ['DS:AllHealth_LS:512-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:2_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AU:1_NR:0_UK:0_ITS:2_SL:0_SA:1_PA:2']
 
         loop_over_dataset_configs()
     elif exp_mode == "SEARCH_SUPER_MODELS":
