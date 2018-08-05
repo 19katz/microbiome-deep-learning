@@ -28,6 +28,9 @@ from sklearn.metrics import roc_curve, auc, accuracy_score, f1_score, precision_
 from sklearn.preprocessing import label_binarize
 from sklearn.utils import shuffle
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+
+import umap
 
 backend = K.backend()
 
@@ -40,7 +43,7 @@ import deep_learning_models
 
 kmer_size=7
 
-#data_sets_healthy=['HMP', 'Qin_et_al','RA','MetaHIT','Feng','Karlsson_2013','LiverCirrhosis','Zeller_2014']
+#data_sets_healthy=['HMP', 'Qin_et_al','RA','MetaHIT','Feng','Karlsson_2013','LiverCirrhosis','Zeller_2014']  
 
 data_sets_healthy=['MetaHIT']
 allowed_labels=['0']
@@ -59,14 +62,22 @@ labels=labels.astype(np.int)
 healthy=np.where(labels==0)
 disease=np.where(labels==1)
 
-
 data=pd.DataFrame(kmer_cnts)
+
+#normalizing across rows
 data_normalized = normalize(data, axis = 1, norm = 'l1')
+
+#normalizing within columns
+#sample_mean = data_normalized.mean(axis=0)
+#sample_std = data_normalized.std(axis=0)
+
+# Normalize both training and test samples with the training mean and std
+#data_normalized = (data_normalized - sample_mean) / sample_std
 
 data_normalized, labels = shuffle(data_normalized, labels, random_state=0)
 
-######################################                                                                                                                     
-# TsNE before putting into the model #                                                                                                                     
+######################################                                                                       
+# TsNE before putting into the model #                                                                       
 ######################################
 
 X = data_normalized
@@ -109,8 +120,8 @@ plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(km
 
 #model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
 
-###############################                                                                                                                                 
-# get encoded weights to TsNE #                                                                                                                                 
+###############################                      
+# get encoded weights to TsNE #
 ###############################
 
 #def create_truncated_model(trained_model): 
@@ -187,8 +198,8 @@ plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(km
 #plt.title('TsNE Plot for ' + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
 #plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/TsNE_full_model_output.pdf")
 
-#######################################################################                                                                                                                               
-# How does changing t-SNE parameters change the output visualization? #                                                                                                                                
+#######################################################################
+# How does changing t-SNE parameters change the output visualization? #
 #######################################################################
 
 # Notes
@@ -216,12 +227,51 @@ def draw_tsne(n_components=2, perplexity=30, learning_rate=200, init='random', n
     plt.title(title, fontsize=18)
     plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/" + title + ".pdf")
 
-############################################################################                                                                                                                               
-# How does number of encoding dimensions change the output visualization? #                                                                                                                               
-############################################################################                                                                                                                               
+# t-SNE tuning                                                                                                                                                   
+encoding_dims = []
+#encoding_dims=[300]                                                                                                                                                                                     
+for encoding_dim in encoding_dims:
+    input_dim=len(data_normalized[0]) # this is the number of input kmers                                                                                                                                 
+                                                                                                                                                                                                          
+    encoded_activation = 'relu'
+    decoded_activation = 'sigmoid'
 
-# t-SNE
- 
+    loss='binary_crossentropy'
+
+    model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded_activation)
+
+    numEpochs = 1000
+    batchSize = 32
+    history = History()
+    model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
+
+    final_layer_model = Model(inputs=model.input,outputs=model.layers[-1].output)
+    final_output = final_layer_model.predict(data_normalized)
+
+    X = final_output
+    y = np.array(labels)
+
+    #perplexity                                                                                                                                                                                           
+    for p in (10,30,50,100):
+        draw_tsne(perplexity=p, title=str(encoding_dim) + 'perplexity = {}'.format(p))
+
+    #learning_rate                                                                                                                                                                                        
+    for l in (10, 100, 500, 1000):
+        draw_tsne(learning_rate=l, title=str(encoding_dim) + 'learning_rate = {}'.format(l))
+
+    #n_iter                                                                                                                                                                                               
+    for n in (250, 1000, 5000):
+        draw_tsne(n_iter=n, title=str(encoding_dim) + 'n_iter = {}'.format(n))
+
+    #init                                                                                                                                                                                                 
+    #draw_tsne(init='pca', title=str(encoding_dim) + 'pca_init') 
+
+############################################################################                                                                                                                              # How does number of encoding dimensions change the output visualization? #                                                                                                                               
+############################################################################                                                                                                                              
+
+#final output not compatible with PCA for some reason
+
+#encoding_dims=[int(len(data_normalized[0])*1/4), int(len(data_normalized[0])*1/2), int(len(data_normalized[0])*3/4)] 
 encoding_dims = []
 #encoding_dims=[8,300,4000]                                                                                                                                                              
 
@@ -251,6 +301,7 @@ for encoding_dim in encoding_dims:
     X = final_output
     y = np.array(labels)
 
+    #TsNE                                                                                                                                                                                                 
     X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)
     plt.figure()
     y_test_cat = np_utils.to_categorical(y, num_classes = 2)
@@ -260,86 +311,60 @@ for encoding_dim in encoding_dims:
         indices = indices[0]
         plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
     plt.legend(('Healthy', 'Diseased'))
-    plt.title('TsNE Plot final layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.title('TsNE final layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
     plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/TsNE_finallayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
 
+    #UMAP                                                                                                                                                                                                 
+    fit = umap.UMAP()
+    u = fit.fit_transform(X)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(u[indices,0], u[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('UMAP Plot final layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/UMAP_finallayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
 
-# t-SNE tuning
+####################################################################
+# Visualize hidden layer activations with varied encoding dimensions #
+####################################################################
 
 encoding_dims = []
-#encoding_dims=[300]                                                                                                                                                                                 
+#encoding_dims=[int(len(data_normalized[0])*1/4), int(len(data_normalized[0])*1/2), int(len(data_normalized[0])*3/4)]
+#encoding_dims = [int(len(data_normalized[0])*3/4)]
+#encoding_dims = [100, 200, 300, 400, 500]
 
 for encoding_dim in encoding_dims:
-    input_dim=len(data_normalized[0]) # this is the number of input kmers                                                                                                                                  
+    input_dim=len(data_normalized[0]) # this is the number of input kmers                                                                                                                                 
 
     encoded_activation = 'relu'
-    #encoded_activation = 'sigmoid'                                                                                                                                                                        
-    #encoded_activation = 'linear'                                                                                                                                                                         
-    #decoded_activation = 'softmax'                                                                                                                                                                        
+    #encoded_activation = 'sigmoid'
+    #encoded_activation = 'linear'                                                                                                                                                                        
+    #decoded_activation = 'softmax'                                                                                                                                                                       
     decoded_activation = 'sigmoid'
 
     loss='binary_crossentropy'
 
     model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded_activation)
 
+    # Fit the model #                                                                                                                                                                                     
     numEpochs = 1000
     batchSize = 32
     history = History()
     model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
 
-    #final_output = model.predict(data_normalized)                                                                                                                                                         
-    final_layer_model = Model(inputs=model.input,outputs=model.layers[-1].output)
-    final_output = final_layer_model.predict(data_normalized)
+#    penult_out_model = Model(inputs=model.input, outputs=model.layers[0].output)
+    penult_out_model = Model(inputs=model.layers[0].input, outputs=model.layers[0].output)
+#    penult_out_model = Model(inputs=model.layers[0].input, outputs=model.layers[(len(model.layers) - 1)].output)
+    penult_out = penult_out_model.predict(data_normalized)
 
-    X = final_output
+    X = penult_out
     y = np.array(labels)
 
-    #perplexity                                                                                                                                                                                            
-    for p in (10,30,50,100):
-        draw_tsne(perplexity=p, title=str(encoding_dim) + 'perplexity = {}'.format(p))
-
-    #learning_rate                                                                                                                                                                                        
-    for l in (10, 100, 500, 1000):
-        draw_tsne(learning_rate=l, title=str(encoding_dim) + 'learning_rate = {}'.format(l))
-
-    #n_iter
-    for n in (250, 1000, 5000):
-        draw_tsne(n_iter=n, title=str(encoding_dim) + 'n_iter = {}'.format(n))
-
-    #init
-    #draw_tsne(init='pca', title=str(encoding_dim) + 'pca_init')
-
-# some PCA
-
-#encoding_dims = []
-encoding_dims=[8,300,4000]                                                                                                                                                                                 
-
-for encoding_dim in encoding_dims:
-    input_dim=len(data_normalized[0]) # this is the number of input kmers                                                                                                                                   
-
-    encoded_activation = 'relu'
-    #encoded_activation = 'sigmoid'                                                                                                                                                                         
-    #encoded_activation = 'linear'                                                                                                                                                                          
-    #decoded_activation = 'softmax'                                                                                                                                                                         
-    decoded_activation = 'sigmoid'
-
-    loss='binary_crossentropy'
-
-    model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded_activation)
-
-    # Fit the model #                                                                                                                                                                                       
-    numEpochs = 1000
-    batchSize = 32
-    history = History()
-    model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
-
-    #final_output = model.predict(data_normalized)                                                                                                                                                          
-    final_layer_model = Model(inputs=model.input,outputs=model.layers[-1].output)
-    final_output = final_layer_model.predict(data_normalized)
-
-    X = final_output
-    y = np.array(labels)
-
+    #PCA
     X_pca = PCA(n_components=2, random_state=0).fit_transform(X)
     plt.figure()
     y_test_cat = np_utils.to_categorical(y, num_classes = 2)
@@ -349,5 +374,168 @@ for encoding_dim in encoding_dims:
         indices = indices[0]
         plt.scatter(X_pca[indices,0], X_pca[indices, 1], label=cl, alpha = 0.7)
     plt.legend(('Healthy', 'Diseased'))
-    plt.title('TsNE Plot final layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.title('PCA hidden layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/PCA_hiddenlayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
+    
+    #TsNE
+    X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('TsNE hidden layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/TsNE_hiddenlayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
+
+    #PCA2TsNE
+    X_pca = PCA(n_components=25, random_state=0).fit_transform(X)
+    X_tsne_pca = TSNE(n_components=2, random_state=0).fit_transform(X_pca.data)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_tsne_pca[indices,0], X_tsne_pca[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('PCA2TsNE hidden layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/PCA2TsNE_hiddenlayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
+
+    #UMAP
+    fit = umap.UMAP()
+    u = fit.fit_transform(X)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(u[indices,0], u[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('UMAP Plot hidden layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/UMAP_hiddenlayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
+
+
+#############################
+# hidden and final together #
+#############################
+
+encoding_dims=[int(len(data_normalized[0])*1/4), int(len(data_normalized[0])*1/2), int(len(data_normalized[0])*3/4)]                                                               
+#encoding_dims = []
+
+for encoding_dim in encoding_dims:
+    input_dim=len(data_normalized[0]) # this is the number of input kmers                                                                                                                                 
+
+    encoded_activation = 'relu'
+    #encoded_activation = 'sigmoid'                                                                                                                                                                       
+    #encoded_activation = 'linear'                                                                                                                                                                        
+    #decoded_activation = 'softmax'                                                                                                                                                                       
+    decoded_activation = 'sigmoid'
+
+    loss='binary_crossentropy'
+
+    model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded_activation)
+
+    # Fit the model #                                                                                                                                                                                     
+    numEpochs = 1000
+    batchSize = 32
+    history = History()
+    model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
+
+    final_layer_model = Model(inputs=model.input,outputs=model.layers[-1].output)
+    final_output = final_layer_model.predict(data_normalized)
+
+    penult_out_model = Model(inputs=model.layers[0].input, outputs=model.layers[0].output)
+    penult_out = penult_out_model.predict(data_normalized)
+
+    X1 = final_output
+    X2 = penult_out
+    y = np.array(labels)
+
+    #Final visualizations
+    #TsNE                                                                                                                                                                                                 
+    X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X1)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('TsNE final layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
     plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/TsNE_finallayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
+
+    #UMAP                                                                                                                                                                                                 
+    fit = umap.UMAP()
+    u = fit.fit_transform(X1)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(u[indices,0], u[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('UMAP Plot final layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/UMAP_finallayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
+
+    #Hidden visualizations
+    #PCA                                                                                                                                                                                                  
+    X_pca = PCA(n_components=2, random_state=0).fit_transform(X2)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_pca[indices,0], X_pca[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('PCA hidden layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/PCA_hiddenlayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
+
+    #TsNE                                                                                                                                                                                                 
+    X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X2)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('TsNE hidden layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/TsNE_hiddenlayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
+
+    #PCA2TsNE                                                                                                                                                                                             
+    X_pca = PCA(n_components=25, random_state=0).fit_transform(X2)
+    X_tsne_pca = TSNE(n_components=2, random_state=0).fit_transform(X_pca.data)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_tsne_pca[indices,0], X_tsne_pca[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('PCA2TsNE hidden layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/PCA2TsNE_hiddenlayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pd\
+f")
+
+    #UMAP                                                                                                                                                                                                 
+    fit = umap.UMAP()
+    u = fit.fit_transform(X2)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(u[indices,0], u[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('UMAP Plot hidden layer output, dims = ' + str(encoding_dim) + ", " + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/UMAP_hiddenlayeroutput_dims" + str(encoding_dim) + str(data_sets_healthy) + str(kmer_size) + ".pdf")
+
