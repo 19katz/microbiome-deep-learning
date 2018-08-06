@@ -76,8 +76,16 @@ dataset_config_iter_fold_results = {}
 # Values based on the values used in the
 # Pasolli paper 
 dataset_model_grid = {
-    #"Qin": "rf0-norm",
+    "Zeller": "rf5-norm",
+    "LiverCirrhosis": "rf9",
+    "Qin": "rf1-norm",
     "MetaHIT": "rf2",
+    "Feng": "rf3-norm",
+    "RA": "rf4",
+    #"Karlsson": "rf_karlsson",
+
+    #"Qin": "rf0-norm",
+    # "MetaHIT": "rf2",
     #"Feng": "rf3-norm",
     #"RA": "rf4-norm",
     #"Zeller": "rf5-norm",
@@ -165,6 +173,8 @@ model_param_grid = {
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
     "rf8": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0},
+    "rf9": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
 
     "gb1": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
              'LR': 0.1, 'MD': None, 'MF': 'sqrt', 'ML': 5, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
@@ -327,7 +337,7 @@ def get_feature_importances(clf, kmer_imps):
 # http://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description= "Program to run linear machine learning models on kmer datasets")
-    parser.add_argument('-features', type = int, default = 100, help = "Number of feature importances")
+    parser.add_argument('-features', type = int, default = -1, help = "Number of feature importances")
 
     arg_vals = parser.parse_args()
     num_features = arg_vals.features
@@ -571,7 +581,6 @@ if __name__ == '__main__':
                 if plot_iter:
                     # plot the confusion matrix
                     plot_confusion_matrix(conf_mat, config = config_iter)
-        
         for config in config_results:
             # per iteration results
             iter_results = np.array(config_results[config])
@@ -639,12 +648,16 @@ if __name__ == '__main__':
 
             if learn_type == 'rf':
                 print("SORTING FEATURE IMPORTANCES")
+                if (num_features == -1):
+                    num_features = len(kmer_imps)
+                
                 indices = np.argsort(kmer_imps)[::-1][0:num_features]
                 kmer_imps = kmer_imps[indices]
                 kmers_no_comp = [kmers_no_comp[i] for i in indices]
                 print("Importances\tfor\t" + str(dataset) + "\t" + config)
                 for i in range(len(kmer_imps)):
-                    print(kmers_no_comp[i] + "\t" + str(kmer_imps[i] / (n_iter * cv_testfolds)))
+                    if kmer_imps[i] > 0:
+                        print(kmers_no_comp[i] + "\t" + str(kmer_imps[i] / (n_iter * cv_testfolds)))
                 print("END FEATURE IMPORTANCE DUMP")
 
             if plot_overall:

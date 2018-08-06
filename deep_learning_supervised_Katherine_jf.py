@@ -499,11 +499,11 @@ def exec_config(k_folds):
             plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config=config)
 
         '''
-        print('tkfold-overall-loss: ' + str(loss) + ' for ' + class_name + ':' + config)
-        print('tkfold-overall-val-loss: ' + str(val_loss) + ' for ' + class_name + ':' + config)
-        print('tkfold-overall-acc: ' + str(acc) + ' for ' + class_name + ':' + config)
-        print('tkfold-overall-val-acc: ' + str(val_acc) + ' for ' + class_name + ':' + config)
-        print('tkfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + class_name + ':' + config)
+        print('kfold-overall-loss: ' + str(loss) + ' for ' + class_name + ':' + config)
+        print('kfold-overall-val-loss: ' + str(val_loss) + ' for ' + class_name + ':' + config)
+        print('kfold-overall-acc: ' + str(acc) + ' for ' + class_name + ':' + config)
+        print('kfold-overall-val-acc: ' + str(val_acc) + ' for ' + class_name + ':' + config)
+        print('kfold-overall-conf-mat: ' + str(conf_mat) + ' for ' + class_name + ':' + config)
         '''
         
         perf_metrics = np.vstack(np.concatenate(iter_results[:, 7]))
@@ -516,34 +516,37 @@ def exec_config(k_folds):
         # log the results for offline analysis
         print(('{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}({})\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tkfold-overall-perf-metrics for ' + class_name + ':{}').
               format(perf_means[0], perf_stds[0], perf_means[1], perf_stds[1], perf_means[2], perf_stds[2], perf_means[3], perf_stds[3], perf_means[4], perf_stds[4], perf_means[5], perf_stds[5], roc_auc[1], roc_auc['macro'], last_val_acc, last_val_loss, max_vai, min_vli, val_acc[max_vai], val_loss[min_vli], config))
-        '''
-        all_ae_results = np.vstack(np.concatenate(iter_results[:, 8]))
-        print(all_ae_results)
-        # mean autoencoder loss vs epochs across iterations times K folds
-        ae_loss = np.mean([ r[0]['loss'] for r in all_ae_results ], axis=0)
-        ae_val_loss = np.mean([ r[0]['val_loss'] for r in all_ae_results ], axis=0)
-        if plot_ae_overall:
-            # plot loss vs epochs
-            plot_loss_vs_epochs(ae_loss, ae_val_loss, config=config, name='ae_loss')
-        ae_means = np.mean([ [r[1], r[2]] for r in all_ae_results ], axis=0)
-        ae_stds = np.std([ [r[1], r[2]] for r in all_ae_results ], axis=0)
-        '''
 
-        #print(('{}({})\t{}({})\tkfold-overall-autoencoder-perf-metrics for ' + class_name + ':{}').
-              #format(ae_means[0], ae_stds[0], ae_means[1], ae_stds[1], config))
+        if get_config_val(use_ae_key, exp_config):           
+            all_ae_results = np.vstack(np.concatenate(iter_results[:, 8]))
+            # mean autoencoder loss vs epochs across iterations times K folds
+            ae_loss = np.mean([ r[0]['loss'] for r in all_ae_results ], axis=0)
+            ae_val_loss = np.mean([ r[0]['val_loss'] for r in all_ae_results ], axis=0)
+            if plot_ae_overall:
+                # plot loss vs epochs
+                plot_loss_vs_epochs(ae_loss, ae_val_loss, config=config, name='ae_loss')
+            ae_means = np.mean([ [r[1], r[2]] for r in all_ae_results ], axis=0)
+            ae_stds = np.std([ [r[1], r[2]] for r in all_ae_results ], axis=0)
+            ae_aggr_results = [ae_loss, ae_val_loss, ae_means, ae_stds]
+            print(('{}({})\t{}({})\tkfold-overall-autoencoder-perf-metrics for ' + class_name + ':{}').
+              format(ae_means[0], ae_stds[0], ae_means[1], ae_stds[1], config))
+        else:
+            ae_aggr_results = [9999, 9999, 9999, 9999]
+        
 
         # dump the model results into a file for offline analysis and plotting, e.g., merging plots from
         # different model instances (real and null)
         aggr_results = [val_acc, acc, val_loss, loss, conf_mat, fpr, tpr, roc_auc, accs, std_down, std_up, perf_means, perf_stds]
-        #ae_aggr_results = [ae_loss, ae_val_loss, ae_means, ae_stds]
 
         dataset_info = [source_ind, class_name, label_ind, classes, n_classes, class_to_ind, colors, markers]
 
         with open(graph_dir + "/aggr_results" + config +".pickle", "wb") as f:
             dump_dict = { "dataset_info": dataset_info, "results": [aggr_results, dataset_config_iter_fold_results[exp_config[dataset_key]][config]],
+                          "ae_results": ae_aggr_results
                            }
-            '''"ae_results": ae_aggr_results'''
+            print("dumping")
             pickle.dump(dump_dict, f)
+            print("finished dumping")
     dataset_config_iter_fold_results = {}
 
 # Performs data normalization before creation, training, and testing of model
@@ -725,11 +728,13 @@ def build_train_test(layers):
         #     plot_2d_codes(codes_pred, fig, 'ae_two_codes',
         #                   "This graph shows autoencoder's first 2 components of the encoding codes (the middle hidden layer output) with labels")
 
+        
         # Pop the decoding layers before supervised learning
         print("Current autoencoder")
         autoencoder.summary()
         for n in range(cnt_from_decoding()):
             autoencoder.pop()
+            
 
     norm_input = exp_config[norm_input_key]
     if norm_input:
@@ -740,10 +745,17 @@ def build_train_test(layers):
         x_train = (x_train - sample_mean) / sample_std
         # test samples are normalized using only the mean and std of the training samples
         x_test = (x_test - sample_mean) / sample_std
-        
+
+    if len(exp_config[after_ae_layers_key]) > 0:
+        for layer in autoencoder.layers:
+            layer.trainable = False
+        for dim in exp_config[after_ae_layers_key]:
+            autoencoder.add(Dense(dim))
+            autoencoder.add(Activation(exp_config[after_ae_act_key]))
+            
     # Add the classification layer for supervised learning - note that the loss function is always
     # categorical cross entropy - not what's in exp_configs, which is only used for the autoencoder.
-    autoencoder.add(Dense(n_classes, input_dim=layers[-1]))
+    autoencoder.add(Dense(n_classes))
     autoencoder.add(Activation('softmax'))
     autoencoder.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
     print("With classification layer")
@@ -1079,8 +1091,13 @@ def setup_exp_config_from_config_info(config):
             exp_config['LF'] = 'mean_squared_error'
         else:
             exp_config['LF'] = 'kullback_leibler_divergence'
+    
     if ae_datasets_key not in exp_config:
         exp_config[ae_datasets_key] = exp_configs[ae_datasets_key][2]
+    if after_ae_layers_key not in exp_config:
+        exp_config[after_ae_layers_key] = exp_configs[after_ae_layers_key][2]
+    if after_ae_act_key not in exp_config:
+        exp_config[after_ae_act_key] = exp_configs[after_ae_act_key][2]
             
 
 
@@ -1131,7 +1148,7 @@ def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, co
 if __name__ == '__main__':
     # the experiment mode can be one of SUPER_MODELS, AUTO_MODELS, SEARCH_SUPER_MODELS, SEARCH_AUTO_MODELS, OTHER
     # - see below
-    exp_mode = "SEARCH_SUPER_MODELS"
+    exp_mode = "AUTO_MODELS"
 
     if exp_mode == "SUPER_MODELS":
         plot_ae_fold = False
@@ -1146,6 +1163,10 @@ if __name__ == '__main__':
                                  #'SingleDiseaseMetaHIT', 'SingleDiseaseQin', 'SingleDiseaseKarlsson',
                                  #'SingleDiseaseFeng', 'SingleDiseaseZeller', 'SingleDiseaseLiverCirrhosis', 'SingleDiseaseRA', 'All-T2D'])
 
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:32896-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_"
+                                                          ]
+
+        
         '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:8192-2-2_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0",
 "LS:8192-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:7_",
@@ -1204,11 +1225,11 @@ if __name__ == '__main__':
         ]
         '''
 
-        #'''
+        '''
         dataset_configs['SingleDiseaseFeng'] = [
             "LS:40-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
             ]
-        #'''
+        '''
 
         '''
         dataset_configs['ZellerReduced'] = ["LS:40-50_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:50_PC:40_AEP:50_SEP:200_BS:8_LF:mean_squared_error_BN:0_DP:0.25_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_",
@@ -1452,9 +1473,10 @@ if __name__ == '__main__':
         #
         # You can add any specific models to be tested by adding them to their respective dataset_config list
         
-        set_config(exp_config, dataset_key, ['HMP', 'SingleDiseaseMetaHIT', 'SingleDiseaseT2D', 'SingleDiseaseRA'])
-
-        dataset_configs['AllHealth'] = ['DS:AllHealth_LS:512-2_ED:2_EA:tanh_CA:asenc_DA:asenc_OA:asenc_LF:mean_squared_error_AEP:2_SEP:1_NO:L1_NI:0_BS:32_BN:0_DO:0_AR:0_BE:tensorflow_V:2_AU:1_NR:0_UK:0_ITS:2_SL:0_SA:1_PA:2']
+        #dataset_configs['SingleDiseaseMetaHIT'] = ['LS:8192-8_EA:linear_CA:linear_DA:softmax_OA:softmax_ED:8_PC:0_AEP:200_SEP:1_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:0_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-Q-F-L-Z-K_AL:_AA:linear_']
+        #dataset_configs['SingleDiseaseQin'] = ['LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_PC:0_AEP:200_SEP:1_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:0_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-F-L-Z-M-K_AL:_AA:linear_']
+        #dataset_configs['SingleDiseaseFeng'] = ['LS:32896-64_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:64_PC:0_AEP:200_SEP:1_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:0_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:H-Q-L-Z-M-K_AL:_AA:linear_']
+        dataset_configs['ZellerReduced'] = ['LS:512-32_EA:linear_CA:linear_DA:softmax_OA:softmax_ED:32_PC:0_AEP:200_SEP:1_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:0_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0_AD:H-Q-L-F-M-K_AL:_AA:linear_']
 
         loop_over_dataset_configs()
     elif exp_mode == "SEARCH_SUPER_MODELS":
