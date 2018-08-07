@@ -389,7 +389,7 @@ def exec_config(k_folds):
             config_iter = config + '_' + iter_key + ':' + str(exp_config[iter_key])
             # sum the confusion matrices over the folds
             conf_mat = np.sum(fold_results[:, 2], axis=0)
-            shap_vals = np.vstack(fold_results[:, 8])
+            shap_vals = np.sum(fold_results[:, 8], axis=0)
 
             # mean loss across K folds for this iteration
             loss = np.mean([fold_results[k, 0]['loss'] for k in range(len(fold_results))], axis=0)
@@ -432,7 +432,7 @@ def exec_config(k_folds):
 
         # sum the confusion matrices over iterations
         conf_mat = np.sum(iter_results[:, 4], axis=0)
-        shap_vals = np.vstack(iter_results[:, 9])
+        shap_vals = np.sum(iter_results[:, 9], axis=0)
         
         # mean results for loss/val loss/acc/val acc across iterations
         mean_results = np.mean(iter_results[:, [0,1,2,3]], axis=0)
@@ -483,6 +483,7 @@ def exec_config(k_folds):
         # Finally average it and compute AUC
         all_tpr /= n_classes
 
+
         fpr["macro"] = all_fpr
         tpr["macro"] = all_tpr
         roc_auc['macro'] = auc(all_fpr, all_tpr)
@@ -516,8 +517,25 @@ def exec_config(k_folds):
             # plot the ROCs with AUCs/ACCs
             plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config=config)
 
+            global num_feature_imps
             if num_feature_imps != 0:
-                plot_feature_imps(shap_vals)
+                print("SORTING FEATURE IMPORTANCES")
+                if (num_feature_imps == -1):
+                    num_feature_imps = len(shap_vals)
+                indices = np.argsort(shap_vals)[::-1][0:num_feature_imps]
+                shap_vals = shap_vals[indices]
+                kmers_no_comp = []
+                all_kmers_caps = [''.join(_) for _ in product(['A', 'C', 'G', 'T'], repeat = exp_config[kmer_size_key])]
+                for kmer in all_kmers_caps:
+                    if get_reverse_complement(kmer) not in kmers_no_comp:
+                        kmers_no_comp.append(kmer)
+                kmers_no_comp = [kmers_no_comp[i] for i in indices]
+                print("FEATURE IMPORTANCE DUMP")
+                print("Importances\tfor\t" + str(exp_config[dataset_key]) + "\t" + config_info(exp_config))
+                for i in range(len(shap_vals)):
+                    if shap_vals[i] > 0:
+                        print(kmers_no_comp[i] + "\t" + str(shap_vals[i]/(exp_config[num_iters_key] * len(all_y_test))))
+                print("END FEATURE IMPORTANCE DUMP")
 
         '''
         print('kfold-overall-loss: ' + str(loss) + ' for ' + class_name + ':' + config)
@@ -926,7 +944,6 @@ def build_train_test(layers):
                  hist['loss'][min_li], min_li, hist['val_acc'][min_li], hist['acc'][min_li], hist['val_loss'][min_li],
                  ae_super_val_acc, ae_super_acc, ae_super_val_loss, ae_super_loss,
                  ae_val_loss, ae_loss, ae_mse, roc_auc[1], roc_auc['macro'], config_info(exp_config)))
-
     # calculate the accuracy/f1/precision/recall for this test fold - same way as in Pasolli
     test_true_label_inds = np.argmax(y_test, axis=1)
     test_pred_label_inds = np.argmax(y_test_pred, axis=1)
@@ -943,7 +960,9 @@ def build_train_test(layers):
         background = np.zeros((1, autoencoder.layers[0].batch_input_shape[1]))
         e = shap.DeepExplainer(autoencoder, background)
         shap_values = e.shap_values(x_test)
-        shap_values = shap_values[1]
+        shap_values = np.sum(np.absolute(shap_values[1]), axis=0)
+
+            
     else:
         shap_values = []
 
@@ -1159,17 +1178,14 @@ def setup_exp_config_from_config_info(config):
         exp_config[after_ae_act_key] = exp_configs[after_ae_act_key][2]
     if use_ae_key not in exp_config:
         exp_config[use_ae_key] = exp_configs[use_ae_key][2]
-
-def plot_feature_imps(shap_vals, name='feature_imp_'):
-    kmers_no_comp = []
-    all_kmers_caps = [''.join(_) for _ in product(['A', 'C', 'G', 'T'], repeat = exp_config[kmer_size_key])]
-    for kmer in all_kmers_caps:
-        if get_reverse_complement(kmer) not in kmers_no_comp:
-            kmers_no_comp.append(kmer)
-    shap.summary_plot(shap_vals, feature_names=kmers_no_comp, max_display = num_feature_imps, plot_type="bar")
-    filename = graph_dir + '/' + name + name_file_from_config(exp_config) + '.png'
-    pylab.savefig(filename , bbox_inches='tight')
-    pylab.close()          
+    if pca_dim_key not in exp_config:
+        exp_config[pca_dim_key] = exp_configs[pca_dim_key][2]
+    if max_norm_key not in exp_config:
+        exp_config[max_norm_key] = exp_configs[max_norm_key][2]
+    if dropout_pct_key not in exp_config:
+        exp_config[dropout_pct_key] = exp_configs[dropout_pct_key][2]
+    if input_dropout_pct_key not in exp_config:
+        exp_config[input_dropout_pct_key] = exp_configs[input_dropout_pct_key][2]
 
 
 # Add figure texts to plots that describe configs of the experiment that produced the plot
@@ -1218,7 +1234,7 @@ def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, co
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description= "Program to run linear machine learning models on kmer datasets")
-    parser.add_argument('-featimps', type = int, default = 0, help = "Number of feature importances")
+    parser.add_argument('-featimps', type = int, default = -1, help = "Number of feature importances")
 
     arg_vals = parser.parse_args()
     global num_feature_imps
@@ -1240,18 +1256,23 @@ if __name__ == '__main__':
         plot_overall = True
                                  #'SingleDiseaseMetaHIT', 'SingleDiseaseQin', 'SingleDiseaseKarlsson',
                                  #'SingleDiseaseFeng', 'SingleDiseaseZeller', 'SingleDiseaseLiverCirrhosis', 'SingleDiseaseRA', 'All-T2D'])
-        
+
+        #'''
+        dataset_configs['SingleDiseaseMetaHIT'] = [
+                                                    'LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:6_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_DP:0_IDP:0',
+                                                    ]
+        #'''
         '''
-        dataset_configs['SingleDiseaseFeng'] = ['LS:512-64_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:64_PC:0_AEP:2_SEP:2_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:1_NR:0_SL:0_SA:0_UK:3_ITS:1_KS:5_MN:0_AD:H-Q-L-Z-M-K_AL:40_AA:linear_']
+        dataset_configs['SingleDiseaseFeng'] = ['LS:512-32_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:32_PC:0_AEP:2_SEP:2_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:7_AU:0_NR:0_SL:0_SA:0_UK:3_ITS:1_KS:5_MN:0_AD:H-Q-L-Z-M-K_AL:_AA:linear_']
         '''
 
         '''
         dataset_configs['SingleDiseaseFeng'] = ['LS:32896-64_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:64_PC:0_AEP:200_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:H-Q-L-Z-M-K_AL:40_AA:sigmoid_']
         '''
         
-        #'''
+        '''
         dataset_configs['ZellerReduced'] = ['LS:512-32_EA:linear_CA:linear_DA:softmax_OA:softmax_ED:32_PC:0_AEP:200_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0_AD:H-Q-L-F-M-K_AL:_AA:linear_']
-        #'''
+        '''
 
         '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:512-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:4_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:3_ITS:1_MN:0_KS:5_"

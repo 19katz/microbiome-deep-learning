@@ -163,7 +163,7 @@ exp_configs = {
                 pca_dim_key:       [ [0,],
                                       #40, 50, 70],
                                       
-                                     'Number of principal components for PCA, if 0 no PCA should be used: {}'],
+                                     'Number of principal components for PCA, if 0 no PCA should be used: {}', 0],
                 # boolean for whether to use autoencoder for pretraining before supervised learning
                 use_ae_key:    [ [1], 'Use autoencoder pretraining for supervised learning: {}', 0 ],
 
@@ -199,10 +199,10 @@ exp_configs = {
                 batch_norm_key:    [ [0], 'Use batch normalization: {}' ],
                 dropout_pct_key:   [ [0,
                                       #0.25, 0.35, 0.5, 0.75
-                                      ], 'Dropout percent: {}'],
+                                      ], 'Dropout percent: {}', 0],
                 input_dropout_pct_key: [ [0,
                                           #0.25, 0.35, 0.5, 0.75
-                                          ], 'Dropout percent on input layer: {}'],
+                                          ], 'Dropout percent on input layer: {}', 0],
                 act_reg_key:       [ [0], 'Activation regularization (for sparsity): {}' ],
                 # boolean
                 early_stop_key:    [ [0],  'Use early stopping: {}' ],
@@ -223,7 +223,7 @@ exp_configs = {
                 # misc
                 backend_key:   [ [K.backend()], 'Backend: {}' ],
                 version_key:   [ ['6'], 'Version (catching all other unnamed configs): {}' ],
-                max_norm_key:  [ [0], 'Max norm for kernel constraint: {}']
+                max_norm_key:  [ [0], 'Max norm for kernel constraint: {}', 0]
             }
 
 class ConfigIterator:
