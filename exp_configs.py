@@ -165,7 +165,7 @@ exp_configs = {
                                       
                                      'Number of principal components for PCA, if 0 no PCA should be used: {}'],
                 # boolean for whether to use autoencoder for pretraining before supervised learning
-                use_ae_key:    [ [1], 'Use autoencoder pretraining for supervised learning: {}' ],
+                use_ae_key:    [ [1], 'Use autoencoder pretraining for supervised learning: {}', 0 ],
 
                 ae_datasets_key: [ [
                                         [

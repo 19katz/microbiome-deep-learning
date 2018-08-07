@@ -1157,6 +1157,8 @@ def setup_exp_config_from_config_info(config):
         exp_config[after_ae_layers_key] = exp_configs[after_ae_layers_key][2]
     if after_ae_act_key not in exp_config:
         exp_config[after_ae_act_key] = exp_configs[after_ae_act_key][2]
+    if use_ae_key not in exp_config:
+        exp_config[use_ae_key] = exp_configs[use_ae_key][2]
 
 def plot_feature_imps(shap_vals, name='feature_imp_'):
     kmers_no_comp = []
