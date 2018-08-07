@@ -88,6 +88,7 @@ exp_configs = {
                                         #8,
                                         #10
                                       ]
+
                                      , 'Kmer Size used: {}'],
                 # Deep net structure
                 # The last entry (-1 is the placeholder) of the layer list is for code layer dimensions - this is so we don't
@@ -221,7 +222,7 @@ exp_configs = {
 
                 # misc
                 backend_key:   [ [K.backend()], 'Backend: {}' ],
-                version_key:   [ ['5'], 'Version (catching all other unnamed configs): {}' ],
+                version_key:   [ ['6'], 'Version (catching all other unnamed configs): {}' ],
                 max_norm_key:  [ [0], 'Max norm for kernel constraint: {}']
             }
 

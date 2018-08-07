@@ -32,7 +32,8 @@ from exp_configs import *
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
-
+import shap
+import argparse
 
 from sklearn.metrics import precision_recall_curve
 
@@ -96,7 +97,6 @@ test_pct = 0.2
 input_drop_pct = 0
 
 dataset_load_name = None
-
 
 # map of <dataset_name, iteration index, K fold index> to list of <history>, <2d-codes-predicted>, etc,
 # for storing per-fold results
@@ -306,18 +306,19 @@ def get_k_folds(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_lab
     dataset_k_fold[(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_labels, shuffle_abunds)] = x_y_info_train_test
     return x_y_info_train_test
 
-
 # Loops over all configs in grid search and executes each
 # Stores each config in exp_config
 def loop_over_configs(random=False):
     for config in ConfigIterator(random=random):
         global exp_config
         exp_config = config
+        
         k_folds = get_k_folds(exp_config[dataset_key], exp_config[num_iters_key], exp_config[use_kfold_key],
                               exp_config[no_random_key], exp_config[kmer_size_key], exp_config[shuffle_labels_key],
                               exp_config[shuffle_abunds_key])
         
         exec_config(k_folds)
+
 
 # Loops over certain supervised models in dataset_configs and executes each
 # Stores each config in exp_config
@@ -332,6 +333,20 @@ def loop_over_dataset_configs():
             exec_config(k_folds)
 
 dataset_kmer_labels = {}
+
+def get_reverse_complement(kmer):
+    kmer_rev = ''
+    for c in kmer:
+        if c == 'A':
+            kmer_rev += 'T'
+        elif c == 'T':
+            kmer_rev += 'A'
+        elif c == 'C':
+            kmer_rev += 'G'
+        else:
+            kmer_rev += 'C'
+
+    return kmer_rev[::-1]
 
 def get_dataset(dataset_name, kmer_size):
     if (dataset_name, kmer_size) in dataset_kmer_labels:
@@ -374,6 +389,7 @@ def exec_config(k_folds):
             config_iter = config + '_' + iter_key + ':' + str(exp_config[iter_key])
             # sum the confusion matrices over the folds
             conf_mat = np.sum(fold_results[:, 2], axis=0)
+            shap_vals = np.vstack(fold_results[:, 8])
 
             # mean loss across K folds for this iteration
             loss = np.mean([fold_results[k, 0]['loss'] for k in range(len(fold_results))], axis=0)
@@ -396,10 +412,10 @@ def exec_config(k_folds):
             # save the results for this iteration so we can aggregate the overall results at the end
             if not config in config_results:
                 config_results[config] = []
+                
             # hist, [codes_pred, info_test], conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred],
             # [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']], [ae_hist, ae_val_loss, ae_mse]
-            config_results[config].append([val_acc, acc, val_loss, loss, conf_mat, fold_results[:, 3], fold_results[:, 5], fold_results[:, 6], fold_results[:, 7]])
-
+            config_results[config].append([val_acc, acc, val_loss, loss, conf_mat, fold_results[:, 3], fold_results[:, 5], fold_results[:, 6], fold_results[:, 7], shap_vals])
             # Per-iteration plots across K folds
             if plot_iter:
                 # plot the confusion matrix
@@ -409,12 +425,14 @@ def exec_config(k_folds):
 
                 # plot accuracy vs epochs
                 plot_acc_vs_epochs(acc, val_acc, config=config_iter)
+    
     for config in config_results:
         # per iteration results
         iter_results = np.array(config_results[config])
 
         # sum the confusion matrices over iterations
         conf_mat = np.sum(iter_results[:, 4], axis=0)
+        shap_vals = np.vstack(iter_results[:, 9])
         
         # mean results for loss/val loss/acc/val acc across iterations
         mean_results = np.mean(iter_results[:, [0,1,2,3]], axis=0)
@@ -497,6 +515,9 @@ def exec_config(k_folds):
 
             # plot the ROCs with AUCs/ACCs
             plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config=config)
+
+            if num_feature_imps != 0:
+                plot_feature_imps(shap_vals)
 
         '''
         print('kfold-overall-loss: ' + str(loss) + ' for ' + class_name + ':' + config)
@@ -628,15 +649,25 @@ def build_train_test(layers):
 
     # the model from input to the code layer - used for plotting 2D graphs
     code_layer_model = Model(inputs=autoencoder.layers[0].input,
-                             outputs=autoencoder.layers[cnt_to_coding_layer() - 1].output)
+                                 outputs=autoencoder.layers[cnt_to_coding_layer() - 1].output)
     
-    #print("Code layer model:")
-    #code_layer_model.summary()
-
+    print("CODE LAYER MODEL FOR DIMENSIONALITY REDUCTION")
+    code_layer_model.summary()
 
     # stats for the autoencoder - the 9s are for when autoencoder is (optionally) not used before supervised learning
     ae_val_loss, ae_loss, ae_mse = 999999, 999999, 999999
     ae_hist = []
+
+    norm_input = exp_config[norm_input_key]
+    if norm_input and (exp_config[after_ae_layers_key] is None or len(exp_config[after_ae_layers_key]) == 0):
+        sample_mean = x_train.mean(axis=0)
+        sample_std = x_train.std(axis=0)
+
+        # Normalize both training and test samples with the training mean and std
+        x_train = (x_train - sample_mean) / sample_std
+        # test samples are normalized using only the mean and std of the training samples
+        x_test = (x_test - sample_mean) / sample_std
+    
     if get_config_val(use_ae_key, exp_config):
         ae_datasets = exp_config[ae_datasets_key]
 
@@ -653,6 +684,7 @@ def build_train_test(layers):
         autoencoder.add(Dense(layers[i], input_dim=layers[i+1]))
         autoencoder.add(Activation(exp_config[enc_act_key if exp_config[out_act_key] == SAME_AS_ENC else out_act_key]))
         autoencoder.compile(optimizer='adadelta', loss=exp_config[loss_func_key])
+        print("FULL AUTOENCODER")
         autoencoder.summary()
         
         datasets = list(ae_datasets)
@@ -669,7 +701,7 @@ def build_train_test(layers):
             else:
                 kmers_train = np.concatenate((kmer_train, kmers_train))
 
-        if not kmers_train == None:
+        if not kmers_train is None:
             autoencoder.fit(kmers_train, kmers_train,
                             epochs=exp_config[auto_epochs_key],
                             batch_size=exp_config[batch_size_key],
@@ -711,6 +743,8 @@ def build_train_test(layers):
         min_vli = np.argmin(ae_hist['val_loss'])
         min_li = np.argmin(ae_hist['loss'])
 
+        
+
         # Log the autoencoder stats/performance
         print('{},{},{}\t{},{},{}\t{}\t{}\t{}\tautoencoder-min-loss-general:{}'.
               format(ae_hist['val_loss'][min_vli], min_vli, ae_hist['loss'][min_vli],
@@ -728,38 +762,45 @@ def build_train_test(layers):
         #     plot_2d_codes(codes_pred, fig, 'ae_two_codes',
         #                   "This graph shows autoencoder's first 2 components of the encoding codes (the middle hidden layer output) with labels")
 
-        
         # Pop the decoding layers before supervised learning
-        print("Current autoencoder")
-        autoencoder.summary()
+        
         for n in range(cnt_from_decoding()):
             autoencoder.pop()
-            
+        print("POPPED OFF DECODING LAYERS")
+        autoencoder.summary()
 
-    norm_input = exp_config[norm_input_key]
-    if norm_input:
-        sample_mean = x_train.mean(axis=0)
-        sample_std = x_train.std(axis=0)
+        if exp_config[after_ae_layers_key] is not None and len(exp_config[after_ae_layers_key]) > 0:
+            x_train = code_layer_model.predict(x_train)
+            x_test = code_layer_model.predict(x_test)
 
-        # Normalize both training and test samples with the training mean and std
-        x_train = (x_train - sample_mean) / sample_std
-        # test samples are normalized using only the mean and std of the training samples
-        x_test = (x_test - sample_mean) / sample_std
+            if norm_input:
+                sample_mean = x_train.mean(axis=0)
+                sample_std = x_train.std(axis=0)
 
-    if len(exp_config[after_ae_layers_key]) > 0:
-        for layer in autoencoder.layers:
-            layer.trainable = False
-        for dim in exp_config[after_ae_layers_key]:
-            autoencoder.add(Dense(dim))
+                # Normalize both training and test samples with the training mean and std
+                x_train = (x_train - sample_mean) / sample_std
+                # test samples are normalized using only the mean and std of the training samples
+                x_test = (x_test - sample_mean) / sample_std
+
+            print("CREATING NEW SUPERVISED MODEL USING AUTOENCODER OUTPUT AS INPUTS")
+            autoencoder = None
+            autoencoder = Sequential()
+            autoencoder.add(Dense(exp_config[after_ae_layers_key][0], input_dim=exp_config[enc_dim_key]))
             autoencoder.add(Activation(exp_config[after_ae_act_key]))
+            for dim in range(1, len(exp_config[after_ae_layers_key])):
+                autoencoder.add(Dense(dim))
+                autoencoder.add(Activation(exp_config[after_ae_act_key]))
+            code_layer_model = Model(inputs=autoencoder.layers[0].input,
+                             outputs=autoencoder.layers[-1].output)
+            print("CODE LAYER MODEL FOR PLOTTING 2D CODES")
+            code_layer_model.summary()
             
+    
     # Add the classification layer for supervised learning - note that the loss function is always
     # categorical cross entropy - not what's in exp_configs, which is only used for the autoencoder.
     autoencoder.add(Dense(n_classes))
     autoencoder.add(Activation('softmax'))
     autoencoder.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
-    print("With classification layer")
-    autoencoder.summary()
 
     history = History()
     callbacks = [history]
@@ -774,6 +815,11 @@ def build_train_test(layers):
                     verbose=0,
                     validation_data=(x_test, y_test),
                     callbacks=callbacks)
+    
+    print("SUPERVISED MODEL WITH CLASSIFICATION LAYER")
+    autoencoder.summary()
+    
+
 
     # plot the 2D codes for the test samples
     codes_pred = code_layer_model.predict(x_test)
@@ -892,6 +938,15 @@ def build_train_test(layers):
     print(('{}\t{}\t{}\t{}\t{}\t{}\tfold-perf-metrics for ' + class_name + ':{}').
           format(accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro'], config_info(exp_config)))
 
+    if num_feature_imps != 0:
+        # select a set of background examples to take an expectation over
+        background = np.zeros((1, autoencoder.layers[0].batch_input_shape[1]))
+        e = shap.DeepExplainer(autoencoder, background)
+        shap_values = e.shap_values(x_test)
+        shap_values = shap_values[1]
+    else:
+        shap_values = []
+
     # the config info for this exp but no fold/iter indices because we need to aggregate stats over them
     config_key = name_file_from_config(exp_config, skip_keys=[kfold_key, iter_key])
     global config_iter_fold_results
@@ -908,9 +963,11 @@ def build_train_test(layers):
     # extend the list for the fold if necessary
     if len(config_iter_fold_results[config_key][iter_ind]) <= fold_ind:
         config_iter_fold_results[config_key][iter_ind].append([])
-
+        
     config_iter_fold_results[config_key][iter_ind][fold_ind] = [hist, [codes_pred, info_test], conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred],
-                                                                [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']], [ae_hist, ae_val_loss, ae_mse]]
+                                                                    [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']], [ae_hist, ae_val_loss, ae_mse], shap_values]
+        
+            
 
     
 # Plot the 2D codes in the layer right before the final classification layer
@@ -1083,7 +1140,9 @@ def setup_exp_config_from_config_info(config):
                     v[i] = int(v[i])
 
             # Network layer dimension specs are list of list of integers
-            exp_config[k] = v[0] if cnt2 <= 1 else v
+            exp_config[k] = v[0] if (cnt2 <= 1 and k != after_ae_layers_key and k!= ae_datasets_key) else v
+            if exp_config[k] == ['']:
+                exp_config[k] = []
     # The loss function name 'kullback_leibler_divergence' mixes up with the key/value separation char '_', so handle
     # it here separately
     if cnt1 > 1:
@@ -1098,7 +1157,17 @@ def setup_exp_config_from_config_info(config):
         exp_config[after_ae_layers_key] = exp_configs[after_ae_layers_key][2]
     if after_ae_act_key not in exp_config:
         exp_config[after_ae_act_key] = exp_configs[after_ae_act_key][2]
-            
+
+def plot_feature_imps(shap_vals, name='feature_imp_'):
+    kmers_no_comp = []
+    all_kmers_caps = [''.join(_) for _ in product(['A', 'C', 'G', 'T'], repeat = exp_config[kmer_size_key])]
+    for kmer in all_kmers_caps:
+        if get_reverse_complement(kmer) not in kmers_no_comp:
+            kmers_no_comp.append(kmer)
+    shap.summary_plot(shap_vals, feature_names=kmers_no_comp, max_display = num_feature_imps, plot_type="bar")
+    filename = graph_dir + '/' + name + name_file_from_config(exp_config) + '.png'
+    pylab.savefig(filename , bbox_inches='tight')
+    pylab.close()          
 
 
 # Add figure texts to plots that describe configs of the experiment that produced the plot
@@ -1146,9 +1215,16 @@ def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, co
     pylab.close(fig)
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description= "Program to run linear machine learning models on kmer datasets")
+    parser.add_argument('-featimps', type = int, default = 0, help = "Number of feature importances")
+
+    arg_vals = parser.parse_args()
+    global num_feature_imps
+    num_feature_imps = arg_vals.featimps
+    
     # the experiment mode can be one of SUPER_MODELS, AUTO_MODELS, SEARCH_SUPER_MODELS, SEARCH_AUTO_MODELS, OTHER
     # - see below
-    exp_mode = "AUTO_MODELS"
+    exp_mode = "SUPER_MODELS"
 
     if exp_mode == "SUPER_MODELS":
         plot_ae_fold = False
@@ -1162,10 +1238,28 @@ if __name__ == '__main__':
         plot_overall = True
                                  #'SingleDiseaseMetaHIT', 'SingleDiseaseQin', 'SingleDiseaseKarlsson',
                                  #'SingleDiseaseFeng', 'SingleDiseaseZeller', 'SingleDiseaseLiverCirrhosis', 'SingleDiseaseRA', 'All-T2D'])
+        
+        '''
+        dataset_configs['SingleDiseaseFeng'] = ['LS:512-64_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:64_PC:0_AEP:2_SEP:2_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:1_NR:0_SL:0_SA:0_UK:3_ITS:1_KS:5_MN:0_AD:H-Q-L-Z-M-K_AL:40_AA:linear_']
+        '''
 
+        '''
+        dataset_configs['SingleDiseaseFeng'] = ['LS:32896-64_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:64_PC:0_AEP:200_SEP:400_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:H-Q-L-Z-M-K_AL:40_AA:sigmoid_']
+        '''
+        
+        #'''
+        dataset_configs['ZellerReduced'] = ['LS:512-32_EA:linear_CA:linear_DA:softmax_OA:softmax_ED:32_PC:0_AEP:200_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0_AD:H-Q-L-F-M-K_AL:_AA:linear_']
+        #'''
+
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:512-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:4_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:3_ITS:1_MN:0_KS:5_"
+                                                                       ]
+        '''
+        
+        '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:32896-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_"
-                                                          ]
-
+                                                                ]
+        '''
         
         '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:8192-2-2_EA:tanh_CA:tanh_DA:sigmoid_OA:sigmoid_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0",
