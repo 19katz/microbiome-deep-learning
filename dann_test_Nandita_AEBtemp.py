@@ -27,10 +27,10 @@ import load_kmer_cnts_jf
 
 #This is temporary code I used so that I could pickle loaded kmer sets and take them locally to work on QC_plots.py.
 
-kmer_size=10 #change depending on datset to be loaded
+kmer_size=7 #change depending on datset to be loaded
 
 #data_sets_healthy=['HMP', 'Qin_et_al', 'RA', 'MetaHIT', 'Feng', 'Karlsson_2013', 'LiverCirrhosis', 'Zeller_2014']
-data_sets_healthy= ['RA']
+data_sets_healthy= ['MetaHIT']
 num_data_sets=len(data_sets_healthy)
 
 allowed_labels=['0', '1'] #change depending on whether you want all labels
@@ -49,8 +49,8 @@ data=pd.DataFrame(kmer_cnts)
 #data_normalized = normalize(data, axis = 1, norm = 'l1')
 #accessions = pd.DataFrame(accessions)
 #accessions.to_csv("/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/karlsson10mers.csv")
-data.to_pickle("/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/RA10mers.pickle")
+data.to_pickle("/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/MetaHIT7mers.pickle")
 data_labels = pd.DataFrame(labels)
-data_labels.to_csv("/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/RA10mers.csv", header=False, index=False)
+data_labels.to_csv("/pollard/home/abustion/deep_learning_microbiome/data/pickled_dfs/MetaHIT7mers.csv", header=False, index=False)
 
 

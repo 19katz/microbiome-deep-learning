@@ -37,6 +37,39 @@ backend = K.backend()
 import load_kmer_cnts_jf
 import deep_learning_models
 
+#############
+# Functions #
+#############
+
+# plot tSNE                                                                                                                                                                                                
+def plot_TSNE(X, y, layer = ''): # set layer to hidden or final
+    X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)                                                                                                            
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('tSNE' + layer + 'layer output')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/kmers/tSNEoutput_" + layer + ".pdf")
+
+# plot UMAP
+def plot_UMAP(X, y, layer = ''):
+    fit = umap.UMAP()
+    u = fit.fit_transform(X)
+    plt.figure()
+    y_test_cat = np_utils.to_categorical(y, num_classes = 2)
+    color_map = np.argmax(y_test_cat, axis=1)
+    for cl in range(2):
+        indices = np.where(color_map==cl)
+        indices = indices[0]
+        plt.scatter(u[indices,0], u[indices, 1], label=cl, alpha = 0.7)
+    plt.legend(('Healthy', 'Diseased'))
+    plt.title('UMAP' + layer + 'layer output')
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/kmers/UMAPoutput_" + layer + ".pdf")
+
 #################
 # Load the data # 
 #################
@@ -77,23 +110,15 @@ data_normalized = normalize(data, axis = 1, norm = 'l1')
 data_normalized, labels = shuffle(data_normalized, labels, random_state=0)
 
 ######################################                                                                       
-# TsNE before putting into the model #                                                                       
+# TsNE/UMAP before putting into the model #                                                                       
 ######################################
 
 X = data_normalized
 y = np.array(labels)
 
-X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)
-plt.figure()
-y_test_cat = np_utils.to_categorical(y, num_classes = 2)
-color_map = np.argmax(y_test_cat, axis=1)
-for cl in range(2):
-    indices = np.where(color_map==cl)
-    indices = indices[0]
-    plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
-plt.legend(('Healthy', 'Diseased'))
-plt.title('TsNE Plot for ' + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
-plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/TsNE_before_model.pdf")
+plot_TSNE(X, y, layer = 'none')
+plot_UMAP(X, y, layer = 'none')
+
 
 ###############################################
 # standalone model without varying dimensions #
@@ -140,17 +165,7 @@ plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(km
 #y = np.array(labels)
 
 #TsNE plot                                                                                                                                                     
-#X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)
-#plt.figure()
-#y_test_cat = np_utils.to_categorical(y, num_classes = 2)
-#color_map = np.argmax(y_test_cat, axis=1)
-#for cl in range(2):
-#    indices = np.where(color_map==cl)
-#    indices = indices[0]
-#    plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
-#plt.legend(('Healthy', 'Diseased'))
-#plt.title('TsNE Plot for ' + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
-#plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/TsNE_encoded_weights.pdf")
+#plot_TSNE(X, y, layer = 'hidden_weights')
 
 
 #############################################
@@ -164,17 +179,8 @@ plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(km
 #X = intermediate_output
 #y = np.array(labels)
 
-#X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)                                                      
-#plt.figure()
-#y_test_cat = np_utils.to_categorical(y, num_classes = 2)
-#color_map = np.argmax(y_test_cat, axis=1)
-#for cl in range(2):
-#    indices = np.where(color_map==cl)
-#    indices = indices[0]
-#    plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
-#plt.legend(('Healthy', 'Diseased'))
-#plt.title('TsNE Plot hidden layer output' + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')                                                         
-#plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" +str(kmer_size) + "mers/TsNE_hiddenlayer_output.pdf") 
+#plot_TSNE(X, y, layer = 'hidden_activations')
+
 
 ######################################                                                                                                                          
 # Visualize full model output w/TsNE #                                                                                                                          
@@ -186,17 +192,9 @@ plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(km
 #X = final_output
 #y = np.array(labels)
 
-#TsNE plot                                                                                                                                                                                                #X_tsne = TSNE(n_components=2, random_state=0).fit_transform(X)
-#plt.figure()
-#y_test_cat = np_utils.to_categorical(y, num_classes = 2)
-#color_map = np.argmax(y_test_cat, axis=1)
-#for cl in range(2):
-#    indices = np.where(color_map==cl)
-#    indices = indices[0]
-#    plt.scatter(X_tsne[indices,0], X_tsne[indices, 1], label=cl, alpha = 0.7)
-#plt.legend(('Healthy', 'Diseased'))
-#plt.title('TsNE Plot for ' + str(data_sets_healthy) + ' ' + str(kmer_size) + 'mers')
-#plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/TsNE_full_model_output.pdf")
+#TsNE plot                                                                                                                                                                                                #
+#plot_TSNE(X, y, layer = 'final')
+
 
 #######################################################################
 # How does changing t-SNE parameters change the output visualization? #
@@ -423,8 +421,8 @@ for encoding_dim in encoding_dims:
 # hidden and final together #
 #############################
 
-encoding_dims=[int(len(data_normalized[0])*1/4), int(len(data_normalized[0])*1/2), int(len(data_normalized[0])*3/4)]                                                               
-#encoding_dims = []
+#encoding_dims=[int(len(data_normalized[0])*1/4), int(len(data_normalized[0])*1/2), int(len(data_normalized[0])*3/4)]                                                               
+encoding_dims = []
 
 for encoding_dim in encoding_dims:
     input_dim=len(data_normalized[0]) # this is the number of input kmers                                                                                                                                 
