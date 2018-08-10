@@ -81,7 +81,8 @@ plot_fold = False
 plot_iter = False
 
 # Overall plotting - aggregate results across both folds and iteration
-plot_overall = False
+# 080917 Everything works when this is False, but it doesn't spit out all data
+plot_overall = True
 
 # controls transparency of the CI (Confidence Interval) band around the ROCs as in Pasolli
 plot_alpha = 0.2
@@ -1048,7 +1049,7 @@ def plot_tSNE(codes, name = 'tSNE', desc = '', config=None):
 #    keys.sort()
 #    pylab.legend([handles[k] for k in keys], keys, prop={'size': plot_text_size})
     add_figtexts_and_save(fig, name, desc, config=config)
-    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/kmers/tSNE_justincase.pdf")
+#    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/kmers/tSNE_justincase.pdf")
 
 # Plot UMAP
 def plot_UMAP(codes, name = 'UMAP', desc = '', config=None):
@@ -1070,7 +1071,6 @@ def plot_UMAP(codes, name = 'UMAP', desc = '', config=None):
     plt.legend(('Healthy', 'Diseased'))
     plt.title('UMAP')
     add_figtexts_and_save(fig, name, desc, config=config)
-    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/kmers/UMAP_justincase.pdf")
 
 # plot loss vs epochs
 def plot_loss_vs_epochs(loss, val_loss, name='super_loss', title='Loss vs Epochs', 
@@ -1307,8 +1307,9 @@ if __name__ == '__main__':
     if exp_mode == "SUPER_MODELS":
         plot_ae_fold = False
         plot_ae_overall = False
-
-        plot_fold = True
+        
+        #plot_fold was TRUE as of 3:49PM 080918 and worked
+        plot_fold = False
         plot_iter = False
         
 
