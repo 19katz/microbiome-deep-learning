@@ -33,6 +33,8 @@ import warnings
 import pylab
 from sklearn.exceptions import ConvergenceWarning
 
+import shap
+
 # filter out warnings about convergence 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
@@ -76,12 +78,23 @@ dataset_config_iter_fold_results = {}
 # Values based on the values used in the
 # Pasolli paper 
 dataset_model_grid = {
-    "Zeller": "rf5-norm",
-    "LiverCirrhosis": "rf9",
-    "Qin": "rf1-norm",
-    "MetaHIT": "rf2",
-    "Feng": "rf3-norm",
-    "RA": "rf4",
+    "Qin": "svm0",
+    "MetaHIT": "svm2",
+    "Feng": "svm3",
+    "RA": "svm4",
+    "Zeller": "svm5",
+    "LiverCirrhosis": "svm6",
+    "Karlsson": "svm7",
+    #"All-CRC": "rf9_norm",
+    #"All-T2D": "rf8_norm",
+    
+    #"Qin": "svm0",
+    #"Zeller": "rf5-norm",
+    #"LiverCirrhosis": "rf9",
+    #"Qin": "rf1-norm",
+    #"MetaHIT": "rf2",
+    #"Feng": "rf3-norm",
+    #"RA": "rf4",
     #"Karlsson": "rf_karlsson",
 
     #"Qin": "rf0-norm",
@@ -120,7 +133,9 @@ model_param_grid = {
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': -1, 'KS': 5, 'NR': 1},
     "rf9-norm": {'DS': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': -1, 'KS': 5, 'NR': 1},
-    
+
+    "svm0": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 3,'N': 1,'M': "svm",'CL': [0, 1],
+             'C': 100, 'KN': 'linear', 'GM': 'auto', 'KS': 5},
     "svm1": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
              'C': 100, 'KN': 'linear', 'GM': 'auto', 'KS': 7},
     "svm2": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
@@ -455,8 +470,19 @@ if __name__ == '__main__':
                 y_test_pred= np.array(estimator.predict_proba(x_test))
                 print("FIT TO ESTIMATOR")
 
+                
                 if learn_type == 'rf':
-                    get_feature_importances(estimator, kmer_imps)
+                    if num_features != 0:
+                        get_feature_importances(estimator, kmer_imps)
+
+                if learn_type == 'svm':
+                    if num_features != 0:
+                        background = np.zeros((1, len(kmers_no_comp)))
+                        explainer = shap.KernelExplainer(estimator.predict_proba, background, link="logit")
+                        shap_values = explainer.shap_values(x_test, nsamples=100)
+                        shap_values = np.sum(np.absolute(shap_values[1]), axis=0)
+                    else:
+                        shap_values = []
 
                 if learn_type == 'enet' or learn_type == 'lasso':
                     # Convert the predicted values to 0 or 1
@@ -553,13 +579,14 @@ if __name__ == '__main__':
                 if len(config_iter_fold_results[config_string][i]) <= kfold:
                     config_iter_fold_results[config_string][i].append([])
 
-                config_iter_fold_results[config_string][i][kfold] = [conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred], [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']]]
+                config_iter_fold_results[config_string][i][kfold] = [conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred], [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']], shap_values]
                 fold_results = np.array(config_iter_fold_results[config_string][i])
                 kfold += 1
                 
             for config in config_iter_fold_results:
                 # K-fold results
                 fold_results = np.array(config_iter_fold_results[config][i])
+                shap_vals = np.sum(fold_results[:, 5], axis=0)
 
                 # the config for this iteration
                 config_iter = config + '_' + 'IT:' + str(i)
@@ -575,7 +602,7 @@ if __name__ == '__main__':
                     config_results[config] = []
 
 
-                config_results[config].append([conf_mat, fold_results[:, 1], fold_results[:, 3], fold_results[:, 4]])
+                config_results[config].append([conf_mat, fold_results[:, 1], fold_results[:, 3], fold_results[:, 4], shap_vals])
 
                 # Per-iteration plots across K folds
                 if plot_iter:
@@ -584,6 +611,7 @@ if __name__ == '__main__':
         for config in config_results:
             # per iteration results
             iter_results = np.array(config_results[config])
+            shap_vals = np.sum(iter_results[:, 4], axis=0)
 
             # sum the confusion matrices over iterations
             conf_mat = np.sum(iter_results[:, 0], axis=0)
@@ -646,19 +674,30 @@ if __name__ == '__main__':
             perf_means = np.mean(perf_metrics, axis=0)
             perf_stds = np.std(perf_metrics, axis=0)
 
-            if learn_type == 'rf':
+            if learn_type == 'rf' or learn_type == 'svm':
+                if learn_type == 'rf':
+                    imps = kmer_imps
+                else:
+                    imps = shap_vals
                 print("SORTING FEATURE IMPORTANCES")
                 if (num_features == -1):
-                    num_features = len(kmer_imps)
+                    num_features = len(imps)
                 
-                indices = np.argsort(kmer_imps)[::-1][0:num_features]
-                kmer_imps = kmer_imps[indices]
+                indices = np.argsort(imps)[::-1][0:num_features]
+                imps = imps[indices]
                 kmers_no_comp = [kmers_no_comp[i] for i in indices]
                 print("Importances\tfor\t" + str(dataset) + "\t" + config)
-                for i in range(len(kmer_imps)):
-                    if kmer_imps[i] > 0:
-                        print(kmers_no_comp[i] + "\t" + str(kmer_imps[i] / (n_iter * cv_testfolds)))
+                if learn_type == 'rf':
+                    for i in range(len(imps)):
+                        if imps[i] > 0:
+                            print(kmers_no_comp[i] + "\t" + str(imps[i] / (n_iter * cv_testfolds)))
+                else:
+                    for i in range(len(imps)):
+                        if imps[i] > 0:
+                            print(kmers_no_comp[i] + "\t" + str(imps[i] / (n_iter * len(all_y_test))))
                 print("END FEATURE IMPORTANCE DUMP")
+            
+                
 
             if plot_overall:
                 # plot the confusion matrix
