@@ -1,5 +1,10 @@
 The grid search for the best linear models is done by running all_linear_models_katherine.py, and the stats and plots for the best models after grid searh can be obtained through running linear_stats_plots.py.
 
+
+###########
+GRID SEARCH
+###########
+
 In all_linear_models_katherine.py: 
 
 In data_sets_to_use (line 44), comment or uncomment the datasets that you want to run
@@ -17,7 +22,9 @@ cat [output files] | grep Aggregated | sort -n -r | less
 
 This orders the models by their cross-validated accuracy and allows you to retrieve the parameters for the best models. To find the best models across kmer sizes per dataset, put the output files for all the kmer sizes after cat and search for the dataset name in less by typing /[dataset name]
 
-
+#################################
+PLOTS AND STATISTICAL AGGREGATION
+#################################
 
 In linear_stats_plots.py: 
 
@@ -44,4 +51,24 @@ In order to view detailed statistics:
 
 cat [output files] | [python] process_perf_logs_linear.py | less
 
+#####################################################
+RETRIEVING AND PLOTTING TOP N MOST IMPORTANT FEATURES
+#####################################################
 
+In order to get the feature importance dump, run the linear_stats_plots.py with a -features option as follows: 
+
+[python] linear_stats_plots.py -features [preferred number of features to be dumped] >> [output file]
+
+The default number of features to be dumped is set to be -1, denoting that all non-zero features should be dumped. 0 means no feature importance dump. 
+
+For both RFs and SVMs, the list of most important features ranked by importance can be retrieved from the output file. The start of the feature importance dump is denoted by: "Importances	for	[dataset name]	[config string]" where each word is tab-separated. The end of the dump is denoted by "END FEATURE IMPORTANCE DUMP." 
+
+In the middle of the feature importance dumps, there may be warnings printed by the program, or in the case of SVMs, progress markers that look like this: 
+
+^M  0%|          | 0/17 [00:00<?, ?it/s]^M  6%|▌         | 1/17 [00:00<00:08,  1.87it/s]^M 12%|█▏        | 2/17 [00:01<00:08,  1.75it/s]^M 18%|█▊        | 3/17 [00:01<00:08,  1.71it/s]^M 24%|██▎       | 4/17 [00:02<00:07,  1.73it/s]^M 29%|██▉
+
+I haven't figured out how to suppress this output, so for the time being, you may have to remove these extra lines. 
+
+After you have extracted the feature importances and placed them in a file of their own, you can run plot_feature_importances.py with the following line: 
+
+[python] plot_feature_importances.py -file [feature importances file] -numfeats [number of features to be recorded in the graph] -name [name of file to store bar graph]
