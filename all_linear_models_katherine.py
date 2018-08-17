@@ -23,6 +23,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils import shuffle
 import _search
 import _validation
+import load_kmer_cnts_pasolli_jf
 
 
 # filter out warnings about convergence 
@@ -42,13 +43,13 @@ random_state = None
 # From the second, diseased samples will be extracted.
 # The two sets will then be combined. 
 data_sets_to_use = [
+    [['MetaHIT'], ['MetaHIT']],
     #[['Qin_et_al'], ['Qin_et_al']],
-    #[['MetaHIT'], ['MetaHIT']],
-    #[['RA'], ['RA']],
-    #[['Feng'], ['Feng']],
     #[['Zeller_2014'], ['Zeller_2014']],
     #[['LiverCirrhosis'], ['LiverCirrhosis']],
-    [['Karlsson_2013'], ['Karlsson_2013']]
+    #[['Karlsson_2013'], ['Karlsson_2013']],
+    #[['RA'], ['RA']],
+    #[['Feng'], ['Feng']],
     #[['Karlsson_2013', 'Qin_et_al'], ['Karlsson_2013', 'Qin_et_al']],
     #[['Feng', 'Zeller_2014'],['Feng', 'Zeller_2014']]
     ]
@@ -98,7 +99,6 @@ def evaluate(model, test_features, test_labels):
     accuracy = 1 - mape
     return accuracy
 
-
 # This reference explains some of the things I'm doing here
 # http://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html
 if __name__ == '__main__':
@@ -107,9 +107,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description= "Program to run linear machine learning models on kmer datasets")
     parser.add_argument('-m', type = str, default = 'rf', help = "Model type")
     parser.add_argument('-k', type = int, default = 5, help = "Kmer Size")
-    parser.add_argument('-cvg', type = int, default = 9, help = "Number of CV folds for grid search")
+    parser.add_argument('-cvg', type = int, default = 10, help = "Number of CV folds for grid search")
     parser.add_argument('-cvt', type = int, default = 10, help = "Number of CV folds for testing")
-    parser.add_argument('-ng', type = int, default = 10, help = "Number of iterations of k-fold cross validation for grid search")
+    parser.add_argument('-ng', type = int, default = 20, help = "Number of iterations of k-fold cross validation for grid search")
     parser.add_argument('-nt', type = int, default = 20, help = "Number of iterations of k-fold cross validation for testing")
     parser.add_argument('-nrf', type = bool, default = True, help = "Whether to use normalization on the random forest")
 
@@ -127,33 +127,21 @@ if __name__ == '__main__':
 
     
     for data_set in data_sets_to_use:
-        data_sets_healthy=data_set[0]
-        data_sets_diseased=data_set[1]
-
-        # Retrieve healthy data and labels
-        allowed_labels=['0']
-        kmer_cnts_healthy, accessions_healthy, labels_healthy, domain_labels = load_kmer_cnts_jf.load_kmers(kmer_size, data_sets_healthy, allowed_labels)
-
+        data_set = data_set[0]
+        
         # Retrieve diseased data and labels
-        allowed_labels=['1']
-        kmer_cnts_diseased, accessions_diseased, labels_diseased, domain_labels_diseased = load_kmer_cnts_jf.load_kmers(kmer_size,data_sets_diseased, allowed_labels)
-
-        # concatenate with healthy
-        kmer_cnts=np.concatenate((kmer_cnts_healthy,kmer_cnts_diseased))
-        accessions=np.concatenate((accessions_healthy,accessions_diseased))
-        labels=np.concatenate((labels_healthy,labels_diseased))
-        #domain_labels=np.concatenate((domain_labels, domain_labels_diseased))
-
+        allowed_labels = ['0', '1']
+        kmer_cnts, accessions, labels, domain_labels = load_kmer_cnts_pasolli_jf.load_kmers(kmer_size, data_set, allowed_labels)
+        print("LOADED DATASET " + str(data_set[0]) + ": " + str(len(kmer_cnts)) + " SAMPLES")
         labels=np.asarray(labels)
         labels=labels.astype(np.int)
 
         # Normalize and shuffle the data
-        kmer_cnts = normalize(kmer_cnts, axis = 1, norm = 'l1')
-        kmer_cnts, labels = shuffle(kmer_cnts, labels)
-
+        data_normalized = normalize(kmer_cnts, axis = 1, norm = 'l1')
+        data_normalized, labels = shuffle(data_normalized, labels, random_state=0)
 
         # Set up data and labels
-        x = kmer_cnts
+        x = data_normalized
         y = labels
 
         param_grid = param_dict[learn_type]
@@ -206,12 +194,11 @@ if __name__ == '__main__':
                     current_estimator = RandomForestClassifier(criterion=criterion, max_depth=max_depth, max_features=max_features,
                                                        min_samples_split=min_samples_split, n_estimators=n_estimators, n_jobs=n_jobs)
                     
-                print("Params for healthy samples from " + str(data_sets_healthy) +
-                  " and diseased samples from " + str(data_sets_diseased) + 
+                print("Params for samples from " + str(data_set) +
                   " with model " + learn_type + " and kmer size " + str(kmer_size)
                   + ": " + str(all_params[i]) + " produces "
                   + " score of " + str(accuracies[i]))
-
+                '''
                 if learn_type == "rf" and not norm_for_rf:
                     cross_val = cross_val_score(current_estimator, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
                 else:
@@ -219,7 +206,7 @@ if __name__ == '__main__':
                 print(str(np.mean(cross_val)) + "\tAggregated cross validation accuracy for healthy samples from " + str(data_sets_healthy) +
                           " and diseased samples from " + str(data_sets_diseased) + 
                           " with model " + learn_type + " and kmer size " + str(kmer_size) + " with params " + str(all_params[i]))
-
+                '''
 
         
         # For Elastic Net and Lasso, do a stratified k-fold cross validation

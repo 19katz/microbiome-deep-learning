@@ -28,7 +28,7 @@ import pickle
 import matplotlib.pyplot as plt
 
 import argparse
-import load_kmer_cnts_jf
+import load_kmer_cnts_pasolli_jf
 import warnings
 import pylab
 from sklearn.exceptions import ConvergenceWarning
@@ -78,31 +78,33 @@ dataset_config_iter_fold_results = {}
 # Values based on the values used in the
 # Pasolli paper 
 dataset_model_grid = {
-    "Qin": "svm0",
-    "MetaHIT": "svm2",
-    "Feng": "svm3",
-    "RA": "svm4",
-    "Zeller": "svm5",
-    "LiverCirrhosis": "svm6",
-    "Karlsson": "svm7",
+    "Feng": "svm0",
+    #"Zeller": "svm5",
+    #"LiverCirrhosis": "svm6",
+    #"RA": "svm4",
+    #"Feng": "svm3",
+    #"Qin": "svm1",
+    #"Karlsson": "svm7",
     #"All-CRC": "rf9_norm",
     #"All-T2D": "rf8_norm",
     
-    #"Qin": "svm0",
-    #"Zeller": "rf5-norm",
-    #"LiverCirrhosis": "rf9",
-    #"Qin": "rf1-norm",
+
+    #"Qin": "rf1",
     #"MetaHIT": "rf2",
+    #"Feng": "rf3-norm",
+    #"RA": "rf4-norm",
+    #"Zeller": "rf5",
+    #"LiverCirrhosis": "rf6-norm",
+    #"Karlsson": "rf7-norm",
+    
     #"Feng": "rf3-norm",
     #"RA": "rf4",
     #"Karlsson": "rf_karlsson",
 
-    #"Qin": "rf0-norm",
+    #"Qin": "rf1",
     # "MetaHIT": "rf2",
-    #"Feng": "rf3-norm",
-    #"RA": "rf4-norm",
     #"Zeller": "rf5-norm",
-    #"LiverCirrhosis": "rf6-norm",
+    #"LiverCirrhosis": "rf6",
     #"Karlsson": "rf_karlsson",
     #"All-CRC": "rf9_norm",
     #"All-T2D": "rf8_norm",
@@ -112,7 +114,8 @@ dataset_model_grid = {
 model_param_grid = {
     "rf_karlsson": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0},
-    
+    "svm2-norm": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 1, 'KN': 'linear', 'GM': 'auto', 'KS': 7},
     "rf0-norm": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 3,'N': 1,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 10, 'NJ': 1, 'KS': 5, 'NR': 1},
     "rf1-norm": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
@@ -120,22 +123,22 @@ model_param_grid = {
     "rf2-norm": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 1},
     "rf3-norm": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 7, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 1},
     "rf4-norm": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 1},
     "rf5-norm": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1},
     "rf6-norm": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 100, 'NJ': 1, 'KS': 8, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 1},
     "rf7-norm": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 100, 'NJ': 1, 'KS': 10, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1},
     "rf8-norm": {'DS': [["Karlsson_2013", "Qin_et_al"],["Karlsson_2013", "Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': -1, 'KS': 5, 'NR': 1},
     "rf9-norm": {'DS': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': -1, 'KS': 5, 'NR': 1},
 
-    "svm0": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 3,'N': 1,'M': "svm",'CL': [0, 1],
-             'C': 100, 'KN': 'linear', 'GM': 'auto', 'KS': 5},
+    "svm0": {'DS': [["Feng"],["Feng"]],  'CVT': 3,'N': 1,'M': "svm",'CL': [0, 1],
+             'C': 100, 'KN': 'rbf', 'GM': 0.0001, 'KS': 5},
     "svm1": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
              'C': 100, 'KN': 'linear', 'GM': 'auto', 'KS': 7},
     "svm2": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
@@ -173,17 +176,17 @@ model_param_grid = {
              'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
     
     "rf1": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 8, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0},
     "rf2": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 8, 'NR': 0},
     "rf3": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 7, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 8, 'NR': 0},
     "rf4": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
     "rf5": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
     "rf6": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
     "rf7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
             'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
     "rf8": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
@@ -369,23 +372,13 @@ if __name__ == '__main__':
         global class_to_ind
         class_to_ind = { classes[i]: i for i in range(n_classes)}
         print("GETTING DATA")
-        data_sets = param_grid["DS"]
-        data_sets_healthy=data_sets[0]
-        data_sets_diseased=data_sets[1]
+        data_set = param_grid["DS"][0]
         kmer_size = param_grid["KS"]
         
-        # Retrieve healthy data and labels
-        allowed_labels=['0']
-        kmer_cnts_healthy, accessions_healthy, labels_healthy, domain_labels = load_kmer_cnts_jf.load_kmers(kmer_size, data_sets_healthy, allowed_labels)
         # Retrieve diseased data and labels
-        allowed_labels=['1']
-        kmer_cnts_diseased, accessions_diseased, labels_diseased, domain_labels_diseased = load_kmer_cnts_jf.load_kmers(kmer_size,data_sets_diseased, allowed_labels)
-
-        # concatenate with healthy
-        kmer_cnts=np.concatenate((kmer_cnts_healthy,kmer_cnts_diseased))
-        accessions=np.concatenate((accessions_healthy,accessions_diseased))
-        labels=np.concatenate((labels_healthy,labels_diseased))
-
+        allowed_labels = ['0', '1']
+        kmer_cnts, accessions, labels, domain_labels = load_kmer_cnts_pasolli_jf.load_kmers(kmer_size, data_set, allowed_labels)
+        print("LOADED DATASET " + str(data_set[0]) + ": " + str(len(kmer_cnts)) + " SAMPLES")
         labels=np.asarray(labels)
         labels=labels.astype(np.int)
 
@@ -400,7 +393,7 @@ if __name__ == '__main__':
         learn_type = param_grid['M']
         cv_testfolds = param_grid['CVT']
 
-        config_string = config_info(data_sets[0][0], learn_type, param_grid, kmer_size)
+        config_string = config_info(data_set[0], learn_type, param_grid, kmer_size)
 
         kmers_no_comp = []
         print("GENERATING ALL KMERS CAPS")
@@ -474,13 +467,20 @@ if __name__ == '__main__':
                 if learn_type == 'rf':
                     if num_features != 0:
                         get_feature_importances(estimator, kmer_imps)
+                    shap_values = []
 
                 if learn_type == 'svm':
                     if num_features != 0:
                         background = np.zeros((1, len(kmers_no_comp)))
-                        explainer = shap.KernelExplainer(estimator.predict_proba, background, link="logit")
-                        shap_values = explainer.shap_values(x_test, nsamples=100)
-                        shap_values = np.sum(np.absolute(shap_values[1]), axis=0)
+                        try:
+                            estimator.predict_proba(background)
+                            explainer = shap.KernelExplainer(estimator.predict_proba, background, link="logit")
+                            shap_values = explainer.shap_values(x_test, nsamples=100)
+                            shap_values = np.sum(np.absolute(shap_values[1]), axis=0)
+                            print(shap_values)
+                        except Exception as e:
+                            print("Got exception: " + str(e) + " on " + str(data_set))
+                            shap_values = []
                     else:
                         shap_values = []
 
@@ -586,7 +586,11 @@ if __name__ == '__main__':
             for config in config_iter_fold_results:
                 # K-fold results
                 fold_results = np.array(config_iter_fold_results[config][i])
-                shap_vals = np.sum(fold_results[:, 5], axis=0)
+                try:
+                    shap_vals = np.sum(fold_results[:, 5], axis=0)
+                except Exception as e:
+                    print("Got exception " +  str(e) + " on " + str(data_set))
+                    shap_vals = []
 
                 # the config for this iteration
                 config_iter = config + '_' + 'IT:' + str(i)
@@ -611,7 +615,12 @@ if __name__ == '__main__':
         for config in config_results:
             # per iteration results
             iter_results = np.array(config_results[config])
-            shap_vals = np.sum(iter_results[:, 4], axis=0)
+            try:
+                shap_vals = np.sum(iter_results[:, 4], axis=0)
+            except Exception as e:
+                print("Got exception " + str(e) + " on " + str(data_set))
+                shap_vals = []
+
 
             # sum the confusion matrices over iterations
             conf_mat = np.sum(iter_results[:, 0], axis=0)
@@ -682,20 +691,21 @@ if __name__ == '__main__':
                 print("SORTING FEATURE IMPORTANCES")
                 if (num_features == -1):
                     num_features = len(imps)
-                
-                indices = np.argsort(imps)[::-1][0:num_features]
-                imps = imps[indices]
-                kmers_no_comp = [kmers_no_comp[i] for i in indices]
-                print("Importances\tfor\t" + str(dataset) + "\t" + config)
-                if learn_type == 'rf':
-                    for i in range(len(imps)):
-                        if imps[i] > 0:
-                            print(kmers_no_comp[i] + "\t" + str(imps[i] / (n_iter * cv_testfolds)))
-                else:
-                    for i in range(len(imps)):
-                        if imps[i] > 0:
-                            print(kmers_no_comp[i] + "\t" + str(imps[i] / (n_iter * len(all_y_test))))
-                print("END FEATURE IMPORTANCE DUMP")
+                if imps is not None and len(imps) > 0:
+                    indices = np.argsort(imps)[::-1][0:num_features]
+                    imps = imps[indices]
+                    kmers_no_comp = [kmers_no_comp[i] for i in indices]
+                    file = open(graph_dir + "/feat_imps_" + config + ".txt", "w")
+                    file.write("Importances\tfor\t" + str(dataset) + "\t" + config + "\n")
+                    if learn_type == 'rf':
+                        for i in range(len(imps)):
+                            if imps[i] > 0:
+                                file.write(kmers_no_comp[i] + "\t" + str(imps[i] / (n_iter * cv_testfolds)) + "\n")
+                    else:
+                        for i in range(len(imps)):
+                            if imps[i] > 0:
+                                file.write(kmers_no_comp[i] + "\t" + str(imps[i] / (n_iter * len(all_y_test))) + "\n")
+                    print("END FEATURE IMPORTANCE DUMP")
             
                 
 

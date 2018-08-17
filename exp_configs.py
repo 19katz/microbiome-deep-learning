@@ -38,6 +38,8 @@ pca_dim_key = 'PC'
 ae_datasets_key = 'AD'
 after_ae_act_key = 'AA'
 after_ae_layers_key = 'AL'
+nmf_dim_key = 'NM'
+class_weight_key = 'CW'
 
 
 
@@ -46,18 +48,20 @@ config_keys = [dataset_key, layers_key, enc_act_key,
                batch_size_key, loss_func_key,  batch_norm_key, dropout_pct_key, input_dropout_pct_key, act_reg_key,
                norm_input_key, early_stop_key, patience_key, norm_sample_key, backend_key,
                version_key, use_ae_key, no_random_key, shuffle_labels_key, shuffle_abunds_key,
-               use_kfold_key, num_iters_key, kmer_size_key, max_norm_key, ae_datasets_key, after_ae_layers_key, after_ae_act_key, iter_key, kfold_key]
+               use_kfold_key, num_iters_key, kmer_size_key, max_norm_key, ae_datasets_key, after_ae_layers_key, after_ae_act_key, nmf_dim_key, class_weight_key, iter_key, kfold_key]
 
 config_info_filename = [ dataset_key, kmer_size_key, layers_key, enc_act_key, code_act_key, dec_act_key, out_act_key,
-                loss_func_key, #auto_epochs_key,
+                #loss_func_key,
+                #auto_epochs_key,
                 pca_dim_key, super_epochs_key, norm_sample_key, norm_input_key, batch_size_key,
                 # Thes two are not used yet, so skip them to save file name length
                 # early_stop_key, patience_key,
                 dropout_pct_key, input_dropout_pct_key,
-                #backend_key, version_key,
+                #backend_key,
+                version_key,
                 use_ae_key, no_random_key,
                 # kfold_key should be the last and iter_key second to last
-                use_kfold_key, num_iters_key, shuffle_labels_key, shuffle_abunds_key, max_norm_key,  ae_datasets_key, after_ae_layers_key, after_ae_act_key, iter_key, kfold_key]
+                use_kfold_key, num_iters_key, shuffle_labels_key, shuffle_abunds_key, max_norm_key,  ae_datasets_key, after_ae_layers_key, after_ae_act_key, nmf_dim_key, class_weight_key, iter_key, kfold_key]
  
 SAME_AS_ENC = "asenc"
 
@@ -66,26 +70,26 @@ exp_configs = {
                 # Datasets to use
                 dataset_key:       [ [
                                        #'SingleDiseaseMetaHIT',
-                                       'SingleDiseaseQin',
+                                       #'SingleDiseaseQin',
                                        #'SingleDiseaseRA',
                                        #'SingleDiseaseFeng',
                                        #'ZellerReduced',
                                        #'KarlssonReduced',
-                                       #'SingleDiseaseLiverCirrhosis',
+                                       'SingleDiseaseLiverCirrhosis',
                                      ], 'Dataset: {}'],
                 
                 norm_sample_key:   [ [
                                        'L1',
                                        # 'L2'
                                      ], 'Normalize each sample with: {}' ],
-                # 1 for supervised and 0 for autoencoder only -- CHANGE IT BACK TO 1 FOR ANY SUPERVISED LEARNING!!!
-                norm_input_key:    [ [0], 'Normalize across samples (each component with zero mean/unit std across training samples): {}' ],
+                # 1 for supervised and 0 for autoencoder only, 2 for mean centering only without std dev scaling -- CHANGE IT BACK TO 1 FOR ANY SUPERVISED LEARNING!!!
+                norm_input_key:    [ [1], 'Normalize across samples (each component with zero mean/unit std across training samples): {}' ],
 
                 kmer_size_key:     [ [
                                         #5,
                                         #6,
                                         7,
-                                        #8,
+                                        8,
                                         #10
                                       ]
 
@@ -106,13 +110,13 @@ exp_configs = {
                                        #[1, 1/2, 1/4, 1/8, "random"],
                                        #[1, 1/2, 1/4, 1/8, 1/16, "random"],
                                      ], "Layers for autoencoder's first half : {}" ],
-                enc_dim_key:       [ [8],  'Encoding dimensions: {}' ],
+                enc_dim_key:       [ [256, 512, 1024],  'Encoding dimensions: {}' ],
                 enc_act_key:       [ [
                                          'sigmoid',
-                                         'relu',
-                                         'linear',
-                                         'softmax',
-                                         'tanh',
+                                         #'relu',
+                                         #'linear',
+                                         #'softmax',
+                                         #'tanh',
                                      ], 'Encoding activation: {}' ],
                 code_act_key:      [ [
                                          #SAME_AS_ENC,
@@ -127,10 +131,10 @@ exp_configs = {
                 # after autoencoder training
                 dec_act_key:       [ [
                                          #SAME_AS_ENC,
-                                         'linear',
-                                         'sigmoid',
-                                         'relu',
-                                         'softmax',
+                                         #'linear',
+                                         #'sigmoid',
+                                         #'relu',
+                                         #'softmax',
                                          'tanh',
                                      ], 'Decoding layer activation: {}' ],
                 out_act_key:       [ [
@@ -160,12 +164,15 @@ exp_configs = {
                                          #'tanh',
                                         ], 'Autoencoder activation: {}', None ],
                                         
-                pca_dim_key:       [ [0,],
-                                      #40, 50, 70],
+                pca_dim_key:       [ [0],
                                       
                                      'Number of principal components for PCA, if 0 no PCA should be used: {}', 0],
+
+                nmf_dim_key:       [ [0],
+                                      
+                                     'Number of principal components for NMF, if 0 no NMF should be used: {}', 0],
                 # boolean for whether to use autoencoder for pretraining before supervised learning
-                use_ae_key:    [ [1], 'Use autoencoder pretraining for supervised learning: {}', 0 ],
+                use_ae_key:    [ [0], 'Use autoencoder pretraining for supervised learning: {}', 0 ],
 
                 ae_datasets_key: [ [
                                         [
@@ -182,13 +189,17 @@ exp_configs = {
                                       'Other datasets to train the autoencoder on: {}',
                                        []
                                       ],
+
+                class_weight_key: [ [0],
+                                    'Ratio of weights of diseased over healthy: {}',
+                                        0 ],
                 
                 # Training options
-                auto_epochs_key :  [ [200
+                auto_epochs_key :  [ [0
                     # 50
                     ], 'Max number of epochs for autoencoder training: {}' ],
-                super_epochs_key : [ [1,
-                                      #200, 400
+                super_epochs_key : [ [200,
+                                      #400
                                       ], 'Max number of epochs for supervised training: {}' ],
                 batch_size_key:    [ [
                                       8,
@@ -197,11 +208,11 @@ exp_configs = {
                                       ], 'Batch size used during training: {}' ],
                 # two booleans
                 batch_norm_key:    [ [0], 'Use batch normalization: {}' ],
-                dropout_pct_key:   [ [0,
-                                      #0.25, 0.35, 0.5, 0.75
+                dropout_pct_key:   [ [0, 0.25, 0.5, 
+                    #0.25, 0.35, 0.5, 0.75
                                       ], 'Dropout percent: {}', 0],
-                input_dropout_pct_key: [ [0,
-                                          #0.25, 0.35, 0.5, 0.75
+                input_dropout_pct_key: [ [0,0.25, 0.5, 
+                    #0.25, 0.35, 0.5, 0.75
                                           ], 'Dropout percent on input layer: {}', 0],
                 act_reg_key:       [ [0], 'Activation regularization (for sparsity): {}' ],
                 # boolean
@@ -212,7 +223,7 @@ exp_configs = {
                 # boolean for whether no randomness should be used
                 no_random_key:    [ [0], "Eliminate randomness in training: {}" ],
                 # number of iterations
-                num_iters_key:    [ [20], "Number of iterations: {}" ],
+                num_iters_key:    [ [1], "Number of iterations: {}" ],
                 # the current iteration index
                 iter_key:    [ [0], "Iteration: {}" ],
                 # boolean
@@ -222,8 +233,8 @@ exp_configs = {
 
                 # misc
                 backend_key:   [ [K.backend()], 'Backend: {}' ],
-                version_key:   [ ['6'], 'Version (catching all other unnamed configs): {}' ],
-                max_norm_key:  [ [0], 'Max norm for kernel constraint: {}', 0]
+                version_key:   [ ['AD'], 'Version (catching all other unnamed configs): {}' ],
+                max_norm_key:  [ [0, 1, 2, 3, 4], 'Max norm for kernel constraint: {}', 0]
             }
 
 class ConfigIterator:
@@ -320,7 +331,15 @@ def change_layers(next_config_dict):
         else:
             input_dimensions = next_config_dict[pca_dim_key]
         next_config_dict[pca_dim_key] = input_dimensions
-        next_config_dict[use_ae_key] = 0 
+        next_config_dict[use_ae_key] = 0
+        next_config_dict[nmf_dim_key] = 0
+    if next_config_dict[nmf_dim_key] > 0:
+        if next_config_dict[nmf_dim_key] < 1:
+            input_dimensions = int(next_config_dict[nmf_dim_key] * input_dimensions + epsilon)
+        else:
+            input_dimensions = next_config_dict[nmf_dim_key]
+        next_config_dict[nmf_dim_key] = input_dimensions
+        next_config_dict[use_ae_key] = 0
 
     layers = list(next_config_dict[layers_key])
     for i in range(len(layers) - 1):
@@ -344,6 +363,9 @@ def change_layers(next_config_dict):
             after_ae_layers[i] = int(enc_dims * after_ae_layers[i] + epsilon)
 
     next_config_dict[after_ae_layers_key] = after_ae_layers
+
+    if next_config_dict[dropout_pct_key] == 0:
+        next_config_dict[input_dropout_pct_key] = 0
             
 if __name__ == "__main__":
     for config in ConfigIterator(random=True, count=20):

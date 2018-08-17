@@ -23,7 +23,7 @@ class PlotPar:
     
 
     def __init__(self, dataset_name, config_name):
-        self.title = 'Feature Importances by DeepLIFT for ' + dataset_name
+        self.title = 'Feature Importances for ' + dataset_name
         self.config_name = config_name
 
     def get_graph_info(self):

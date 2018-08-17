@@ -35,6 +35,7 @@ from sklearn.decomposition import PCA
 import shap
 import argparse
 
+from sklearn.decomposition import NMF
 from sklearn.metrics import precision_recall_curve
 
 
@@ -241,9 +242,9 @@ def setup_randomness(no_random):
 # Adds activation after a dense layer, and optionally adds batch normalization
 # as well as dropout
 def add_layer_common(autoencoder, activation):
+    autoencoder.add(Activation(activation))
     if exp_config[batch_norm_key]:
         autoencoder.add(BatchNormalization())
-    autoencoder.add(Activation(activation))
     if not exp_config[dropout_pct_key] == 0:
         autoencoder.add(Dropout(float(exp_config[dropout_pct_key])))
 
@@ -266,6 +267,7 @@ def get_k_folds(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_lab
         data, orig_target = data_loader(kmer_size)
     else:
         data, orig_target = get_dataset(dataset_load_name, kmer_size)
+    print("LOADED DATASET " + str(dataset) + ": " + str(len(data)) + " SAMPLES")
     orig_target = np.array(orig_target)
 
     for i in range(num_iters):
@@ -530,11 +532,12 @@ def exec_config(k_folds):
                     if get_reverse_complement(kmer) not in kmers_no_comp:
                         kmers_no_comp.append(kmer)
                 kmers_no_comp = [kmers_no_comp[i] for i in indices]
-                print("FEATURE IMPORTANCE DUMP")
-                print("Importances\tfor\t" + str(exp_config[dataset_key]) + "\t" + config_info(exp_config))
+                file = open(graph_dir + "/feat_imps_" + name_file_from_config(exp_config, skip_keys=[iter_key, kfold_key]) + ".txt", "w")
+                print("FEATURE IMPORTANCE DUMP\n")
+                file.write("Importances\tfor\t" + str(exp_config[dataset_key]) + "\t" + name_file_from_config(exp_config, skip_keys=[iter_key, kfold_key]) + "\n")
                 for i in range(len(shap_vals)):
                     if shap_vals[i] > 0:
-                        print(kmers_no_comp[i] + "\t" + str(shap_vals[i]/(exp_config[num_iters_key] * len(all_y_test))))
+                        file.write(kmers_no_comp[i] + "\t" + str(shap_vals[i]/(exp_config[num_iters_key] * len(all_y_test))) + "\n")
                 print("END FEATURE IMPORTANCE DUMP")
 
         '''
@@ -600,6 +603,12 @@ def normalize_train_test():
         x_train = pca.fit_transform(x_train)
         x_test = pca.transform(x_test)
         pca = None
+
+    elif exp_config[nmf_dim_key] > 0:
+        nmf = NMF(n_components=exp_config[nmf_dim_key])
+        x_train = nmf.fit_transform(x_train)
+        x_test = nmf.transform(x_test)
+        nmf = None
     
     layers = exp_config[layers_key]
     # exp with # of epochs for autoencoder training
@@ -680,13 +689,20 @@ def build_train_test(layers):
     if norm_input and (exp_config[after_ae_layers_key] is None or len(exp_config[after_ae_layers_key]) == 0):
         sample_mean = x_train.mean(axis=0)
         sample_std = x_train.std(axis=0)
+        # Normalize both training and test samples with the training mean 
+        x_train = (x_train - sample_mean)
+        # test samples are normalized using only the mean of the training samples
+        x_test = (x_test - sample_mean)
 
-        # Normalize both training and test samples with the training mean and std
-        x_train = (x_train - sample_mean) / sample_std
-        # test samples are normalized using only the mean and std of the training samples
-        x_test = (x_test - sample_mean) / sample_std
+        if norm_input != 2:
+            # Normalize both training and test samples with the training std
+            x_train = x_train / sample_std
+            # test samples are normalized using only the std of the training samples
+            x_test = x_test / sample_std
+        
     
     if get_config_val(use_ae_key, exp_config):
+        print("AUTOENCODER")
         ae_datasets = exp_config[ae_datasets_key]
 
         # Use the autoencoder before supervised learning
@@ -704,47 +720,61 @@ def build_train_test(layers):
         autoencoder.compile(optimizer='adadelta', loss=exp_config[loss_func_key])
         print("FULL AUTOENCODER")
         autoencoder.summary()
-        
-        datasets = list(ae_datasets)
-        for i in range(len(ae_datasets)):
-            datasets[i] = dataset_name_dict[ae_datasets[i]]
+            
+        if auto_weights_file:
+            print("LOADING AUTO WEIGHTS")
+            autoencoder.load_weights(os.path.expanduser('~') + '/deep_learning_microbiome/scripts/' + auto_weights_file)
+            ae_hist = {}
+            keys = ['loss', 'val_loss']
+            for key in keys:
+                ae_hist[key] = [999999]
 
-        kmers_train = None
-        for i in range(len(datasets)):
-            kmer_train, labels = get_dataset(datasets[i], exp_config[kmer_size_key])
-            norm_func = norm_func_dict[exp_config[norm_sample_key]]
-            kmer_train = (norm_func)(kmer_train)
-            if i == 0:
-                kmers_train = kmer_train
-            else:
-                kmers_train = np.concatenate((kmer_train, kmers_train))
+        else:
+            print("TRAINING")
+            datasets = list(ae_datasets)
+            for i in range(len(ae_datasets)):
+                datasets[i] = dataset_name_dict[ae_datasets[i]]
 
-        if not kmers_train is None:
-            autoencoder.fit(kmers_train, kmers_train,
+            kmers_train = None
+            for i in range(len(datasets)):
+                kmer_train, labels = get_dataset(datasets[i], exp_config[kmer_size_key])
+                norm_func = norm_func_dict[exp_config[norm_sample_key]]
+                kmer_train = (norm_func)(kmer_train)
+                if i == 0:
+                    kmers_train = kmer_train
+                else:
+                    kmers_train = np.concatenate((kmer_train, kmers_train))
+
+            if not kmers_train is None:
+                autoencoder.fit(kmers_train, kmers_train,
+                                epochs=exp_config[auto_epochs_key],
+                                batch_size=exp_config[batch_size_key],
+                                # shuffle the training samples per epoch only if removing randomness is not specified
+                                shuffle=(not get_config_val(no_random_key, exp_config)),
+                                validation_data=None,
+                                verbose=0)        
+
+            history = History()
+            
+            callbacks = [history]
+            # Support for early stopping - not used because Keras is too sensitive.
+            if exp_config[early_stop_key]:
+                callbacks.append(EarlyStopping(monitor='val_loss', patience=exp_config[patience_key], verbose=0))
+            
+            # train
+            autoencoder.fit(x_train, x_train,
                             epochs=exp_config[auto_epochs_key],
                             batch_size=exp_config[batch_size_key],
                             # shuffle the training samples per epoch only if removing randomness is not specified
                             shuffle=(not get_config_val(no_random_key, exp_config)),
-                            validation_data=None,
-                            verbose=0)        
-
-        history = History()
-        callbacks = [history]
-        # Support for early stopping - not used because Keras is too sensitive.
-        if exp_config[early_stop_key]:
-            callbacks.append(EarlyStopping(monitor='val_loss', patience=exp_config[patience_key], verbose=0))
-        
-        # train
-        autoencoder.fit(x_train, x_train,
-                        epochs=exp_config[auto_epochs_key],
-                        batch_size=exp_config[batch_size_key],
-                        # shuffle the training samples per epoch only if removing randomness is not specified
-                        shuffle=(not get_config_val(no_random_key, exp_config)),
-                        validation_data=(x_test, x_test),
-                        verbose=0,
-                        callbacks=callbacks)
-
-        ae_hist = history.history
+                            validation_data=(x_test, x_test),
+                            verbose=0,
+                            callbacks=callbacks)
+            ae_hist = history.history
+        if save_weights_auto:
+            print("SAVING AUTO WEIGHTS")
+            filename = "ae_weights_" + name_file_from_config(exp_config) + ".h5"
+            autoencoder.save_weights(filename)
         
         # Plot training/test loss by epochs for the autoencoder
         if plot_ae_fold:
@@ -791,14 +821,19 @@ def build_train_test(layers):
             x_train = code_layer_model.predict(x_train)
             x_test = code_layer_model.predict(x_test)
 
-            if norm_input:
+            if norm_input and (exp_config[after_ae_layers_key] is None or len(exp_config[after_ae_layers_key]) == 0):
                 sample_mean = x_train.mean(axis=0)
                 sample_std = x_train.std(axis=0)
+                # Normalize both training and test samples with the training mean 
+                x_train = (x_train - sample_mean)
+                # test samples are normalized using only the mean of the training samples
+                x_test = (x_test - sample_mean)
 
-                # Normalize both training and test samples with the training mean and std
-                x_train = (x_train - sample_mean) / sample_std
-                # test samples are normalized using only the mean and std of the training samples
-                x_test = (x_test - sample_mean) / sample_std
+                if norm_input != 2:
+                    # Normalize both training and test samples with the training std
+                    x_train = x_train / sample_std
+                    # test samples are normalized using only the std of the training samples
+                    x_test = x_test / sample_std
 
             print("CREATING NEW SUPERVISED MODEL USING AUTOENCODER OUTPUT AS INPUTS")
             autoencoder = None
@@ -813,6 +848,7 @@ def build_train_test(layers):
             print("CODE LAYER MODEL FOR PLOTTING 2D CODES")
             code_layer_model.summary()
             
+   
     
     # Add the classification layer for supervised learning - note that the loss function is always
     # categorical cross entropy - not what's in exp_configs, which is only used for the autoencoder.
@@ -822,21 +858,45 @@ def build_train_test(layers):
 
     history = History()
     callbacks = [history]
+    
     if exp_config[early_stop_key]:
         callbacks.append(EarlyStopping(monitor='val_acc', patience=exp_config[patience_key], verbose=0))
 
-    # Train
-    autoencoder.fit(x_train, y_train,
-                    epochs=exp_config[super_epochs_key],
-                    batch_size=exp_config[batch_size_key],
-                    shuffle=(not get_config_val(no_random_key, exp_config)),
-                    verbose=0,
-                    validation_data=(x_test, y_test),
-                    callbacks=callbacks)
+    if super_weights_file:
+        print("LOADING SUPER WEIGHTS")
+        autoencoder.load_weights(os.path.expanduser('~') + '/deep_learning_microbiome/scripts/' + super_weights_file)
+        keys = ['val_acc', 'acc', 'val_loss', 'loss']
+        hist = {}
+        for key in keys:
+            hist[key] = [999999]
+    
+    else:
+        # Train
+        weight = exp_config[class_weight_key]
+        class_weight = None
+        if weight != 0:
+            class_weight = {}
+            class_weight[0] = 1.0
+            class_weight[1] = float(weight)
+        autoencoder.fit(x_train, y_train,
+                        epochs=exp_config[super_epochs_key],
+                        batch_size=exp_config[batch_size_key],
+                        shuffle=(not get_config_val(no_random_key, exp_config)),
+                        verbose=0,
+                        validation_data=(x_test, y_test),
+                        class_weight=class_weight,
+                        callbacks=callbacks)
+
+        hist = history.history
+
     
     print("SUPERVISED MODEL WITH CLASSIFICATION LAYER")
     autoencoder.summary()
-    
+
+    if save_weights_super:
+        print("SAVING SUPER WEIGHTS")
+        filename = "super_weights_" + name_file_from_config(exp_config) + ".h5"
+        autoencoder.save_weights(filename)
 
 
     # plot the 2D codes for the test samples
@@ -906,8 +966,6 @@ def build_train_test(layers):
     fpr["macro"] = all_fpr
     tpr["macro"] = mean_tpr
     roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
-
-    hist = history.history
 
     # Plot all ROC curves
     if plot_fold:
@@ -1186,6 +1244,10 @@ def setup_exp_config_from_config_info(config):
         exp_config[dropout_pct_key] = exp_configs[dropout_pct_key][2]
     if input_dropout_pct_key not in exp_config:
         exp_config[input_dropout_pct_key] = exp_configs[input_dropout_pct_key][2]
+    if class_weight_key not in exp_config:
+        exp_config[class_weight_key] = exp_configs[class_weight_key][2]
+    if nmf_dim_key not in exp_config:
+        exp_config[nmf_dim_key] = exp_configs[nmf_dim_key][2]
 
 
 # Add figure texts to plots that describe configs of the experiment that produced the plot
@@ -1235,10 +1297,18 @@ def add_figtexts_and_save(fig, name, desc, x_off=0.02, y_off=0.56, step=0.04, co
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description= "Program to run linear machine learning models on kmer datasets")
     parser.add_argument('-featimps', type = int, default = -1, help = "Number of feature importances")
-
+    parser.add_argument('-saveweightsauto', type = bool, default = False, help = "Whether to save model weights from the autoencoder")
+    parser.add_argument('-saveweightssuper', type = bool, default = False, help = "Whether to save model weights from supervised learning")
+    parser.add_argument('-autoweightsfile', type = str, default = '', help = "File to load autoencoder weights from")
+    parser.add_argument('-superweightsfile', type = str, default = '', help = "File to load supervised weights from")
+    
     arg_vals = parser.parse_args()
-    global num_feature_imps
+    global num_feature_imps, save_weights_auto, save_weights_super, auto_weights_file, super_weights_file
     num_feature_imps = arg_vals.featimps
+    save_weights_auto = arg_vals.saveweightsauto
+    save_weights_super = arg_vals.saveweightssuper
+    auto_weights_file = arg_vals.autoweightsfile
+    super_weights_file = arg_vals.superweightsfile
     
     # the experiment mode can be one of SUPER_MODELS, AUTO_MODELS, SEARCH_SUPER_MODELS, SEARCH_AUTO_MODELS, OTHER
     # - see below
@@ -1254,16 +1324,193 @@ if __name__ == '__main__':
 
         # Overall plotting - aggregate results across both folds and iteration
         plot_overall = True
-                                 #'SingleDiseaseMetaHIT', 'SingleDiseaseQin', 'SingleDiseaseKarlsson',
-                                 #'SingleDiseaseFeng', 'SingleDiseaseZeller', 'SingleDiseaseLiverCirrhosis', 'SingleDiseaseRA', 'All-T2D'])
 
-        #'''
-        dataset_configs['SingleDiseaseMetaHIT'] = [
-                                                    'LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:6_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_DP:0_IDP:0',
-                                                    ]
-        #'''
         '''
-        dataset_configs['SingleDiseaseFeng'] = ['LS:512-32_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:32_PC:0_AEP:2_SEP:2_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:7_AU:0_NR:0_SL:0_SA:0_UK:3_ITS:1_KS:5_MN:0_AD:H-Q-L-Z-M-K_AL:_AA:linear_']
+
+        dataset_configs['SingleDiseaseRA'] = [
+            "LS:8192-32_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:2080-64_EA:linear_CA:linear_DA:softmax_OA:softmax_ED:64_PC:0_AEP:50_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:2080-64_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:64_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:8192-32_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:32_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:8192-64_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:64_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:2080-50_EA:relu_CA:relu_DA:softmax_OA:softmax_ED:50_PC:0_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:8192-32_EA:linear_CA:linear_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:2080-32_EA:tanh_CA:tanh_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:8192-64_EA:linear_CA:linear_DA:linear_OA:linear_ED:64_PC:0_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:8192-4096-64_EA:linear_CA:sigmoid_DA:linear_OA:softmax_ED:64_PC:0_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
+
+            ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseQin'] = [
+            "LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:18_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7"
+
+            ]
+        '''
+
+        '''
+
+        dataset_configs['SingleDiseaseFeng'] = [
+            "LS:40-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_",
+            ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = [
+            "LS:32896-8-2_EA:sigmoid_CA:softmax_DA:NA_OA:NA_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_",
+            ]
+        '''
+
+        '''
+        dataset_configs['ZellerReduced'] = [
+            "LS:512-32_EA:softmax_CA:softmax_DA:sigmoid_OA:sigmoid_ED:32_PC:0_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0.75_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AE:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0_",
+            ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseRA'] = [
+            "LS:512-2-2_EA:sigmoid_CA:softmax_DA:linear_OA:tanh_ED:2_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:18_AE:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_",
+            ]
+        '''
+
+        '''
+
+        dataset_configs['KarlssonReduced'] = [
+            "LS:50-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:50_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_",
+            ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = [
+            "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseQin'] = [
+            "LS:8192-8_EA:sigmoid_CA:sigmoid_DA:tanh_OA:tanh_ED:8_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:18_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",
+            ]
+        '''
+        
+
+    
+        
+
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = [
+                                                            "LS:8192-512_EA:relu_CA:relu_DA:NA_OA:NA_ED:512_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:14_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:4_AD:_AL:_AA:linear_NM:0_CW:1.5_",
+"LS:32896-1024_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:1024_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:15_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:3_AD:_AL:_AA:linear_NM:0_CW:0_",
+"LS:8192-1024_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:1024_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:15_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:1_AD:_AL:_AA:linear_NM:0_CW:2_",
+"LS:32896-512_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:512_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.25_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:15_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:1_AD:_AL:_AA:linear_NM:0_CW:2.5_",
+"LS:32896-512_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:512_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.25_IDP:0.25_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:15_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:2_AD:_AL:_AA:linear_NM:0_CW:2.5_",
+"LS:8192-512_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:512_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.25_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:15_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:3_AD:_AL:_AA:linear_NM:0_CW:1.5_",
+"LS:8192-512_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:512_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:15_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:2_AD:_AL:_AA:linear_NM:0_CW:3.5_",
+"LS:8192-512_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:512_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.25_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:15_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:1_AD:_AL:_AA:linear_NM:0_CW:1.5_",
+"LS:32896-1024_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:1024_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.25_IDP:0.25_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:15_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:2_AD:_AL:_AA:linear_NM:0_CW:0_",
+"LS:32896-512_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:512_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:15_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:1_KS:8_MN:4_AD:_AL:_AA:linear_NM:0_CW:2_",
+                                                            ]
+        '''
+
+
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:512-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_PC:0_AEP:50_SEP:4_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:3_ITS:1_MN:0_KS:5_"
+                                                                       ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = [
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:1.1875",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:1.3125",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:1.4375",
+                                                    ]
+
+        '''
+        
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = [
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:1.25",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:1.125",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:1.375",
+                                                    ]
+
+        '''
+        
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = [
+
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:1.5",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:2",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:2.5",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:3",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:3.5",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_CW:4",
+
+
+                                                    ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = [
+                "LS:8192-512_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:512_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.75_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:1_AD:_AL:_AA:linear_NM:0_",
+                "LS:8192-128_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:128_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.35_IDP:0.35_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:3_AD:_AL:_AA:linear_NM:0_",
+                "LS:8192-128_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:128_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.25_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_NM:0_",
+                "LS:8192-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.25_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:2_AD:_AL:_AA:linear_NM:0_",
+                "LS:8192-1024_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:1024_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.35_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:1_AD:_AL:_AA:linear_NM:0_",
+                "LS:8192-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:1_AD:_AL:_AA:linear_NM:0_",
+                "LS:8192-1024_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:1024_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.35_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:3_AD:_AL:_AA:linear_NM:0_",
+                "LS:8192-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:3_AD:_AL:_AA:linear_NM:0_",
+                "LS:8192-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.75_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:2_AD:_AL:_AA:linear_NM:0_",
+                "LS:8192-16_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:16_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.35_IDP:0.35_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:13_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:3_AD:_AL:_AA:linear_NM:0_",
+                        ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:32896-8-2_EA:sigmoid_CA:softmax_DA:linear_OA:linear_ED:2_PC:0_AEP:0_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:2_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:None_"
+                                                        ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseQin'] = ["LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:2_ES:0_PA:2_NO:L1_BE:tensorflow_V:6_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:None_"]
+
+        '''
+        
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = ["LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_",
+                                                    "LS:8192-80_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:80_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_",
+                                                    "LS:8192-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:0_AEP:0_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_",
+                                                    "LS:80-40_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:40_PC:80_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_AD:_AL:_AA:linear_",
+                                                    "LS:2080-1040-20_EA:linear_CA:tanh_DA:NA_OA:NA_ED:20_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.25_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:_AL:_AA:linear_",
+                                                    "LS:8192-20_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:20_PC:0_AEP:0_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_",
+                                                    "LS:8192-20_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:20_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_",
+                                                    "LS:8192-20_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:20_PC:0_AEP:0_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_",
+                                                    "LS:8192-80_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:80_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:12_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:linear_",
+                                                    ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = ["LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:11_AE:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_"
+                                                    ]
+        
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:32896-8-2_EA:sigmoid_CA:softmax_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:0_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_"]
+        '''
+        
+        '''
+        dataset_configs['SingleDiseaseQin'] = [
+                                                "LS:8192-2-4_EA:sigmoid_CA:sigmoid_DA:softmax_OA:sigmoid_ED:4_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DO:0_AR:0_NI:0_ES:0_PA:2_NO:L1_BE:tensorflow_V:6_AU:0_UK:10_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_",]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseMetaHIT'] = [
+                                                    'LS:8192-8_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:8_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:10_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_DP:0_IDP:0',
+                                                    ]
+        '''
+        '''
+        dataset_configs['SingleDiseaseFeng'] = ['LS:80-32_EA:sigmoid_CA:sigmoid_DA:softmax_OA:softmax_ED:32_PC:0_AEP:2_SEP:2_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0.5_IDP:0.5_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:7_AU:0_NR:0_SL:0_SA:0_UK:3_ITS:1_KS:5_MN:0_AD:_AL:_AA:linear_NM:80']
         '''
 
         '''
@@ -1273,11 +1520,14 @@ if __name__ == '__main__':
         '''
         dataset_configs['ZellerReduced'] = ['LS:512-32_EA:linear_CA:linear_DA:softmax_OA:softmax_ED:32_PC:0_AEP:200_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:5_MN:0_AD:H-Q-L-F-M-K_AL:_AA:linear_']
         '''
-
         '''
-        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:512-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:4_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:3_ITS:1_MN:0_KS:5_"
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:32896-8-2_EA:sigmoid_CA:softmax_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_"]
+        '''
+                                                          
+        #'''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:512-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_PC:0_AEP:1_SEP:1_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:3_ITS:1_MN:0_KS:5_"
                                                                        ]
-        '''
+        #'''
         
         '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:32896-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_"
