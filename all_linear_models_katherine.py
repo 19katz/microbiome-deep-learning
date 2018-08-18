@@ -194,10 +194,9 @@ if __name__ == '__main__':
                     current_estimator = RandomForestClassifier(criterion=criterion, max_depth=max_depth, max_features=max_features,
                                                        min_samples_split=min_samples_split, n_estimators=n_estimators, n_jobs=n_jobs)
                     
-                print("Params for samples from " + str(data_set) +
+                print( str(accuracies[i]) + "(acc) produced by params for samples from " + str(data_set) +
                   " with model " + learn_type + " and kmer size " + str(kmer_size)
-                  + ": " + str(all_params[i]) + " produces "
-                  + " score of " + str(accuracies[i]))
+                  + ": " + str(all_params[i]))
                 '''
                 if learn_type == "rf" and not norm_for_rf:
                     cross_val = cross_val_score(current_estimator, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
