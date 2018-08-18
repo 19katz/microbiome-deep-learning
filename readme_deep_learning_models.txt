@@ -39,7 +39,11 @@ input_dropout_pct_key = 'IDP'		% of dropout for the input layer
 max_norm_key = 'MN'			max norm, used to limit the magnitude of the network's weights
 pca_dim_key = 'PC'			number of principal components for PCA
 ae_datasets_key = 'AD'			datasets used to train the autoencoder, with each dataset name's initial representing the dataset
-version_key = 'V'			version, meant to catch any unnamed parameters			
+after_ae_act_key = 'AA'		the activation function used when the code layer of the autoencoder is used as input to supervised learning
+after_ae_layers_key = 'AL'		layer structure if the code layer of the autoencoder is used as input to supervised learning	
+nmf_dim_key = 'NM'			number of components for nmf (0 if no nmf should be used)
+version_key = 'V'			version, meant to catch any unnamed parameters
+class_weight_key = 'CW'		class weight ratio (diseased:healthy)			
 
 ######################
 TO RUN SPECIFIC MODELS
@@ -47,9 +51,9 @@ TO RUN SPECIFIC MODELS
 
 In deep_learning_supervised_Katherine_jf.py: 
 
-Change exp_mode (line 1134) to SUPER_MODELS
+Change exp_mode (line 1315) to SUPER_MODELS
 
-In "if exp_mode == "SUPER_MODELS":" (line 1136), set configs for each dataset by doing:
+In "if exp_mode == "SUPER_MODELS":" (line 1317), set configs for each dataset by doing:
 
 dataset_configs[DATASET NAME] = [
 					CONFIG STRING 1,
@@ -71,6 +75,67 @@ cat [output file] | [python] process_perf_logs.py | sort -n -r -k 17 | less
 
 All the plots are saved in analysis/kmers.
 
+#########################################
+TO RECORD FEATURE IMPORTANCES FOR A MODEL
+#########################################
+
+Run the code as follows: 
+
+nohup [python] deep_learning_supervised_Katherine_jf.py -featimps [number of features] >> [output file] &
+
+Number of features should be set to 0 if no features should be dumped and -1 for all features. The default value is -1. 
+
+This also now dumps the feature importances into a file named as follows:
+
+feat_imps_[config].txt
+
+###############################
+TO SAVE WEIGHTS FOR AUTOENCODER
+###############################
+
+Run the code as follows: 
+
+nohup [python] deep_learning_supervised_Katherine_jf.py -saveweightsauto True >> [output file] &
+
+This will save the weights (per fold per iteration) in a file in the same directory as the code under a name of the following format:
+
+ae_weights_[config].h5
+
+#######################################
+TO SAVE WEIGHTS FOR SUPERVISED LEARNING
+#######################################
+
+Run the code as follows: 
+
+nohup [python] deep_learning_supervised_Katherine_jf.py -saveweightssuper True >> [output file] &
+
+This will save the weights (per fold per iteration) in a file in the same directory as the code under a name of the following format:
+
+super_weights_[config].h5
+
+###############################
+TO LOAD WEIGHTS FOR AUTOENCODER
+###############################
+
+Run the code as follows: 
+
+nohup [python] deep_learning_supervised_Katherine_jf.py -autoweightsfile [file name] >> [output file] &
+
+This will load the weights from the given file and use them instead of retraining the autoencoder. 
+
+#######################################
+TO LOAD WEIGHTS FOR SUPERVISED LEARNING
+#######################################
+
+Run the code as follows: 
+
+nohup [python] deep_learning_supervised_Katherine_jf.py -superweightsfile [file name] >> [output file] &
+
+This will load the weights from the given file and use them instead of retraining the supervised learning models. 
+
+#############################################################
+Of course, all the command line options above can be combined.
+#############################################################
 
 ######################
 TO RUN THE GRID SEARCH
@@ -78,11 +143,11 @@ TO RUN THE GRID SEARCH
 
 In exp_configs.py: 
 
-Modify the list of possible values for each parameter in the exp_configs dictionary (line 61). Since the server I use has 4 GPUs, I usually run the grid search one dataset at a time and evenly distribute the datasets among the GPUs. To do that, each time, I comment out all of the datasets except the one I want to run.
+Modify the list of possible values for each parameter in the exp_configs dictionary (line 69). Since the server I use has 4 GPUs, I usually run the grid search one dataset at a time and evenly distribute the datasets among the GPUs. To do that, each time, I comment out all of the datasets except the one I want to run.
 
 In deep_learning_supervised_Katherine_jf.py: 
 
-Change exp_mode (line 1134) to SEARCH_SUPER_MODELS
+Change exp_mode (line 1315) to SEARCH_SUPER_MODELS
 
 Run the code: 
 
