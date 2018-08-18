@@ -279,7 +279,8 @@ class ConfigIterator:
 
 def name_file_from_config(config, skip_keys=[]):
     filename = ''
-    
+    # Canonicalize old config info first so we don't generate different file names for different folds
+    config_info(config)
     for k in config_info_filename:
         # skip the specified keys, used for skipping the fold and iteration indices (for aggregating results across them)
         if not k in skip_keys:
@@ -369,7 +370,7 @@ def change_layers(next_config_dict):
             
 if __name__ == "__main__":
     for config in ConfigIterator(random=True, count=20):
-        print(config)
+        print(name_file_from_config(config))
     
         
             
