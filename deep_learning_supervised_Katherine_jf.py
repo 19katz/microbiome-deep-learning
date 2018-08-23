@@ -99,6 +99,7 @@ input_drop_pct = 0
 
 dataset_load_name = None
 
+
 # map of <dataset_name, iteration index, K fold index> to list of <history>, <2d-codes-predicted>, etc,
 # for storing per-fold results
 global dataset_config_iter_fold_results
@@ -365,6 +366,15 @@ def exec_config(k_folds):
     x_y_info_train_test = k_folds
     dataset_config_iter_fold_results[exp_config[dataset_key]] = {}
 
+    if log_iter_feats:
+        kmers_no_comp = []
+        print("GENERATING ALL KMERS CAPS")
+        all_kmers_caps = [''.join(_) for _ in product(['A', 'C', 'G', 'T'], repeat = exp_config[kmer_size_key])]
+        print("GENERATED ALL KMERS CAPS")
+        for kmer in all_kmers_caps:
+            if get_reverse_complement(kmer) not in kmers_no_comp:
+                kmers_no_comp.append(kmer)
+        
     for i in range(exp_config[num_iters_key]):
         exp_config[iter_key] = i
         exp_config[kfold_key] = 0
@@ -418,6 +428,21 @@ def exec_config(k_folds):
             # hist, [codes_pred, info_test], conf_mat, [fpr, tpr, roc_auc], classes, [y_test, y_test_pred],
             # [accuracy, f1, precision, recall, roc_auc[1], roc_auc['macro']], [ae_hist, ae_val_loss, ae_mse]
             config_results[config].append([val_acc, acc, val_loss, loss, conf_mat, fold_results[:, 3], fold_results[:, 5], fold_results[:, 6], fold_results[:, 7], shap_vals])
+
+            print("DUMPING FEATURE IMPORTANCES FOR ITERATION " + str(i))
+            if log_iter_feats:
+                num_features = num_feature_imps
+                if (num_features == -1):
+                    num_features = len(shap_vals)
+                file = open(graph_dir + "/feat_imps_" + name_file_from_config(exp_config, skip_keys=[kfold_key]) + ".txt", "w")
+                file.write("Importances\tfor\t" + str(exp_config[dataset_key]) + "\t" + name_file_from_config(exp_config, skip_keys=[kfold_key]) + "\n")
+                for j in range(num_features):
+                    if shap_vals[j] > 0:
+                        file.write(kmers_no_comp[j] + "\t" + str(shap_vals[j]/(len(y_test) + len(y_train))) + "\n")
+                print("END FEATURE IMPORTANCE DUMP " + str(i))
+                file.close()
+
+
             # Per-iteration plots across K folds
             if plot_iter:
                 # plot the confusion matrix
@@ -519,12 +544,12 @@ def exec_config(k_folds):
             # plot the ROCs with AUCs/ACCs
             plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config=config)
 
-            global num_feature_imps
             if num_feature_imps != 0:
                 print("SORTING FEATURE IMPORTANCES")
-                if (num_feature_imps == -1):
-                    num_feature_imps = len(shap_vals)
-                indices = np.argsort(shap_vals)[::-1][0:num_feature_imps]
+                num_features = num_feature_imps
+                if (num_features == -1):
+                    num_features = len(shap_vals)
+                indices = np.argsort(shap_vals)[::-1][0:num_features]
                 shap_vals = shap_vals[indices]
                 kmers_no_comp = []
                 all_kmers_caps = [''.join(_) for _ in product(['A', 'C', 'G', 'T'], repeat = exp_config[kmer_size_key])]
@@ -533,12 +558,12 @@ def exec_config(k_folds):
                         kmers_no_comp.append(kmer)
                 kmers_no_comp = [kmers_no_comp[i] for i in indices]
                 file = open(graph_dir + "/feat_imps_" + name_file_from_config(exp_config, skip_keys=[iter_key, kfold_key]) + ".txt", "w")
-                print("FEATURE IMPORTANCE DUMP\n")
                 file.write("Importances\tfor\t" + str(exp_config[dataset_key]) + "\t" + name_file_from_config(exp_config, skip_keys=[iter_key, kfold_key]) + "\n")
-                for i in range(len(shap_vals)):
+                for i in range(num_features):
                     if shap_vals[i] > 0:
-                        file.write(kmers_no_comp[i] + "\t" + str(shap_vals[i]/(exp_config[num_iters_key] * len(all_y_test))) + "\n")
+                        file.write(kmers_no_comp[i] + "\t" + str(shap_vals[i]/(len(all_y_test))) + "\n")
                 print("END FEATURE IMPORTANCE DUMP")
+                file.close()
 
         '''
         print('kfold-overall-loss: ' + str(loss) + ' for ' + class_name + ':' + config)
@@ -1227,6 +1252,10 @@ def setup_exp_config_from_config_info(config):
             exp_config['LF'] = 'mean_squared_error'
         else:
             exp_config['LF'] = 'kullback_leibler_divergence'
+
+    global version
+    if version is not None:
+        exp_config['V'] = version
     
     if ae_datasets_key not in exp_config:
         exp_config[ae_datasets_key] = exp_configs[ae_datasets_key][2]
@@ -1301,14 +1330,20 @@ if __name__ == '__main__':
     parser.add_argument('-saveweightssuper', type = bool, default = False, help = "Whether to save model weights from supervised learning")
     parser.add_argument('-autoweightsfile', type = str, default = '', help = "File to load autoencoder weights from")
     parser.add_argument('-superweightsfile', type = str, default = '', help = "File to load supervised weights from")
+    parser.add_argument('-logiterfeats', type = bool, default = False, help = "Whether to log feature importances for all iterations")
+    parser.add_argument('-version', type = str, default = None, help = "Version of the model being run")
     
     arg_vals = parser.parse_args()
-    global num_feature_imps, save_weights_auto, save_weights_super, auto_weights_file, super_weights_file
+    global num_feature_imps, log_iter_feats, version, save_weights_auto, save_weights_super, auto_weights_file, super_weights_file
     num_feature_imps = arg_vals.featimps
     save_weights_auto = arg_vals.saveweightsauto
     save_weights_super = arg_vals.saveweightssuper
     auto_weights_file = arg_vals.autoweightsfile
     super_weights_file = arg_vals.superweightsfile
+    log_iter_feats = arg_vals.logiterfeats
+    version = arg_vals.version
+    if log_iter_feats:
+        num_feature_imps = -1
     
     # the experiment mode can be one of SUPER_MODELS, AUTO_MODELS, SEARCH_SUPER_MODELS, SEARCH_AUTO_MODELS, OTHER
     # - see below
@@ -1325,8 +1360,53 @@ if __name__ == '__main__':
         # Overall plotting - aggregate results across both folds and iteration
         plot_overall = True
 
+        #'''
+        dataset_configs['SingleDiseaseMetaHIT'] = [
+            'LS:8192-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:18_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
+            ]
+            
+        #'''
+
+        '''
+        dataset_configs['SingleDiseaseQin'] = [
+            'DS:SingleDiseaseQin_LS:8192-3_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
+            ]
+        '''
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = [
+            'DS:SingleDiseaseLiverCirrhosis_LS:32896-8-2_EA:sigmoid_CA:softmax_DA:NA_OA:NA_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
+            ]
         '''
 
+        '''
+        dataset_configs['ZellerReduced'] = [
+            'DS:ZellerReduced_LS:512-32_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:32_PC:0_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0.75_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:5_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
+        ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseFeng'] = [
+            'DS:SingleDiseaseFeng_LS:40-64_EA:relu_CA:relu_DA:NA_OA:NA_ED:64_PC:40_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
+        ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseRA'] = [
+            'DS:SingleDiseaseRA_LS:512-2-2_EA:sigmoid_CA:softmax_DA:NA_OA:NA_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:16_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:5_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
+        ]
+        '''
+        
+        
+        '''
+        dataset_configs['KarlssonReduced'] = [
+            'DS:KarlssonReduced_LS:50-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:50_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:10_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
+            ]
+        '''
+
+        
+        
+
+        '''
         dataset_configs['SingleDiseaseRA'] = [
             "LS:8192-32_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
             "LS:2080-64_EA:linear_CA:linear_DA:softmax_OA:softmax_ED:64_PC:0_AEP:50_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:H-R-F-L-Z-M-K_",
@@ -1524,10 +1604,10 @@ if __name__ == '__main__':
         dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:32896-8-2_EA:sigmoid_CA:softmax_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:6_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_"]
         '''
                                                           
-        #'''
+        '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:512-2_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:2_PC:0_AEP:1_SEP:1_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:1_NR:0_SL:0_SA:0_UK:3_ITS:1_MN:0_KS:5_"
                                                                        ]
-        #'''
+        '''
         
         '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = ["LS:32896-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:5_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_MN:0_KS:8_"

@@ -8,11 +8,12 @@ import os, sys
 import re
 from itertools import product, cycle
 from sklearn.metrics import auc
+from scipy import stats
 
 graph_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/kmers'
 
 # controls transparency of the std band around the ROCs as in Pasolli
-plot_alpha = 0.2
+plot_alpha = 0.1
 
 plot_text_size = 10
 plot_title_size = plot_text_size + 2
@@ -24,13 +25,18 @@ iter_fold_results = {}
 config_aggr_results = {}
 config_ae_results = {}
 
+dataset_label = { 'SingleDiseaseMetaHIT': 'MetaHIT', 'KarlssonReduced': 'Karlsson', 'SingleDiseaseFeng': 'Feng', 'SingleDiseaseQin': 'Qin', 
+                  'SingleDiseaseLiverCirrhosis': 'LiverCirrhosis', 'SingleDiseaseRA': 'RA', 'ZellerReduced': 'Zeller' }
+
+dataset_color = { 'MetaHIT': 'r', 'Qin': 'g', 'Karlsson': 'b', 'LiverCirrhosis': 'c', 'Feng': 'm', 'Zeller': 'darkblue', 'RA': 'darkorange', }
+
 def process_pickles(filenames):
     roc_aucs = []
     ae_results = None
     for filename in filenames:
         with open(filename, "rb") as f:
             print("Loading pickle from " + filename)
-            config = re.search(r'^aggr_results(.+)\.pickle', filename).groups()[0]
+            config = re.search(r'aggr_results(.+)\.pickle', filename).groups()[0]
             dump_dict = pickle.load(f)
             dataset_info = dump_dict['dataset_info']
             #has_ae_results = 'ae_results' in dump_dict
@@ -46,7 +52,8 @@ def process_pickles(filenames):
             val_acc, acc, val_loss, loss, conf_mat, fpr, tpr, roc_auc, accs, std_down, std_up, perf_means, perf_stds = aggr_results
             config_aggr_results[config] = aggr_results
             is_shuffled = re.search(r'_SL:1', config)
-            roc_aucs.append([class_name, is_shuffled, config, fpr, tpr, roc_auc, accs, std_down, std_up])
+            dataset_name = re.search(r'_DS:([^_]+)', config).groups()[0]
+            roc_aucs.append([dataset_label[dataset_name], is_shuffled, config, fpr, tpr, roc_auc, accs, std_down, std_up])
             
             # plot_confusion_matrix(conf_mat, config)
             # plot_loss_vs_epochs(loss, val_loss, config)
@@ -65,7 +72,7 @@ def process_pickles(filenames):
             # only for autoencoder experiments.
             if len(val_acc) > 50:
                 is_binary = (n_classes == 2)
-                plot_2d_codes_for_avg_fold(perf_means[0], perf_means[4] if is_binary else perf_means[5], is_binary, iter_results, config, title='')
+                #plot_2d_codes_for_avg_fold(perf_means[0], perf_means[4] if is_binary else perf_means[5], is_binary, iter_results, config, title='')
                 
             iter_fold_results[config] = iter_results
 
@@ -104,8 +111,8 @@ def process_pickles(filenames):
         if len(res1[3]) < 50:
             continue
         res2 = config_aggr_results[s_config]
-        plot_loss_vs_epoch_pair([res1[3], res1[2]], [res2[3], res2[2]], n_config, title='')#, xlabel='', ylabel='')
-        plot_acc_vs_epoch_pair([res1[1], res1[0]], [res2[1], res2[0]], n_config, title='')#, xlabel='', ylabel='')
+        #plot_loss_vs_epoch_pair([res1[3], res1[2]], [res2[3], res2[2]], n_config, title='')#, xlabel='', ylabel='')
+        #plot_acc_vs_epoch_pair([res1[1], res1[0]], [res2[1], res2[0]], n_config, title='')#, xlabel='', ylabel='')
 
     for config in config_ae_results:
         s_config = re.sub(r'SA:0', 'SA:1', config)
@@ -121,11 +128,11 @@ def process_pickles(filenames):
         n_config = re.sub(r'SA:0', 'SA:All', config)
         res1 = config_ae_results[config]
         res2 = config_ae_results[s_config]
-        plot_loss_vs_epoch_pair([res1[0], res1[1]], [res2[0], res2[1]], n_config, title='')#xlabel='', ylabel='')
+        #plot_loss_vs_epoch_pair([res1[0], res1[1]], [res2[0], res2[1]], n_config, title='')#xlabel='', ylabel='')
 
     compute_t_stats()
-    if has_ae_results:
-        compute_ae_t_stats()
+    #if has_ae_results:
+        #compute_ae_t_stats()
 
 def shorten_label(label):
     d = { 'North America': 'NA', 'United States': 'US', 'MetaHIT': 'MH' }
@@ -298,7 +305,7 @@ def plot_confusion_matrix(cm, config, cmap=pylab.cm.Reds):
             sub_plt.text(j, i, format(conf_mat[i, j], fmt),
                          horizontalalignment="center",
                          color="white" if conf_mat[i, j] > thresh else "black", size=plot_title_size)
-        sub_plt.set_ylabel('True Label', size=plot_text_size)
+        sub_plt.set_ylabel('Real Label', size=plot_text_size)
         sub_plt.set_xlabel('Predicted Label', size=plot_text_size)
     pylab.tight_layout()
     pylab.gca().set_position((.1, 10, 0.8, .8))
@@ -347,17 +354,21 @@ def plot_roc_aucs(fpr, tpr, roc_auc, accs, std_down, std_up, config, name='pickl
     save_close_fig(fig, name, config)
 
 # Plot all the ROCs from all of the input files
-def plot_all_roc_aucs(roc_auc_info_list, config='', name='pickled_all_roc_auc', title='ROC Curves', 
+def plot_all_roc_aucs(roc_auc_info_list, config='', name='pickled_all_roc_auc', title='ROC Curves for Deep Learning', 
                   xlabel='False Positive Rate', ylabel='True Positive Rate'):
     fig = pylab.figure()
     lw = 2
 
+    #color_list = ['b','g','r','c','m','orange', 'darkblue']
     #roc_colors = cycle(['green', 'red', 'blue', 'purple', 'darkorange', 'darkgreen'])
-    roc_colors = cycle(['b','g','r','c','m','orange'])
+    #roc_colors = cycle(color_list)
 
     color = None
     config_color = {}
+    dataset_names = []
+    colors = []
     for cls_name, shuffled, config, fpr, tpr, roc_auc, accs, std_down, std_up in roc_auc_info_list:
+        """
         config_key = re.sub(r'_SL:1', '_SL:0', config)
         if not config_key in config_color:
             color = next(roc_colors)
@@ -366,6 +377,12 @@ def plot_all_roc_aucs(roc_auc_info_list, config='', name='pickled_all_roc_auc', 
         else:
             color = config_color[config_key]
             #print("using color for " + config + ": " + color)
+        """
+
+        color = dataset_color[cls_name]
+        if cls_name not in dataset_names:
+            dataset_names.append(cls_name)
+            colors.append(color)
 
         i = None
         if 2 in fpr:
@@ -397,10 +414,10 @@ def plot_all_roc_aucs(roc_auc_info_list, config='', name='pickled_all_roc_auc', 
     #pylab.legend(loc="lower right", prop={'size': plot_text_size})
 
     real_models = list(filter(lambda r: not r[1], roc_auc_info_list))
-    roc_colors = ['b','g','r','c','m','orange']
+    # roc_colors = ['b','g','r','c','m','orange', 'teal']
     #leg_col = [pylab.Rectangle((0, 0), 1, 1, fc=s, linewidth=0) for s in roc_colors[:len(real_models)]] + [pylab.Line2D([0,1], [0,1], c='k', ls='-', lw=2)] + [pylab.Line2D([0,1], [0,1], c='k', ls='--', lw=2)]
-    leg_col = [pylab.Rectangle((0, 0), 0.25, 0.25, fc=s, linewidth=0) for s in roc_colors[:len(real_models)]] + [pylab.Line2D([0,0.25], [0,0.25], c='k', ls='-', lw=2)] + [pylab.Line2D([0,0.25], [0,0.25], c='k', ls='--', lw=2)]
-    leg_l = [r[0] for r in real_models] + ['True labels'] + ['Shuffled labels']
+    leg_col = [pylab.Rectangle((0, 0), 0.25, 0.25, fc=s, linewidth=0) for s in colors] + [pylab.Line2D([0,0.25], [0,0.25], c='k', ls='-', lw=2)] + [pylab.Line2D([0,0.25], [0,0.25], c='k', ls='--', lw=2)]
+    leg_l = dataset_names + ['Real labels'] + ['Shuffled labels']
     #leg = pylab.legend(leg_col, leg_l, prop={'size':plot_title_size}, loc='center left', bbox_to_anchor=(1.02,0.5), numpoints=1)
 
     pylab.gca().set_position((0.0, .7, .8, .8))
@@ -461,9 +478,9 @@ def compute_t_stats():
             iter_stds.append(np.std(fold_diffs))
         
         #t_stats = total_diff/(n_iters * len(iter_results[0]) *np.mean(iter_stds))
-        t_stats = total_diff/(n_iters * np.sqrt(len(iter_results[0])) * np.mean(iter_stds))
+        t_stats = abs(total_diff/(n_iters * np.sqrt(len(iter_results[0])) * np.mean(iter_stds)))
 
-        print('t statistic for ' + config + ' is: ' + str(t_stats))
+        print('t statistic for ' + config + ' is: ' + str(t_stats) +" with p-value: " + str(stats.t.sf(t_stats, 9)*2))
 
 def compute_ae_t_stats():
     for config in iter_fold_results:
@@ -489,9 +506,9 @@ def compute_ae_t_stats():
             iter_stds.append(np.std(fold_diffs))
         
         #t_stats = total_diff/(n_iters * len(iter_results[0]) *np.mean(iter_stds))
-        t_stats = total_diff/(n_iters * np.sqrt(len(iter_results[0])) * np.mean(iter_stds))
+        t_stats = abs(total_diff/(n_iters * np.sqrt(len(iter_results[0])) * np.mean(iter_stds)))
 
-        print('t statistic for ' + config + ' is: ' + str(t_stats))
+        print('t statistic for ' + config + ' is: ' + str(t_stats) +" with p-value: " + abs(stats.t.sf(t_stats, 9)*2))
         
         
 

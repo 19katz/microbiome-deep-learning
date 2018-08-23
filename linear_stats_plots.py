@@ -78,136 +78,173 @@ dataset_config_iter_fold_results = {}
 # Values based on the values used in the
 # Pasolli paper 
 dataset_model_grid = {
-    "Feng": "svm0",
-    #"Zeller": "svm5",
-    #"LiverCirrhosis": "svm6",
-    #"RA": "svm4",
-    #"Feng": "svm3",
-    #"Qin": "svm1",
-    #"Karlsson": "svm7",
-    #"All-CRC": "rf9_norm",
-    #"All-T2D": "rf8_norm",
+    #"Feng": "rf0"
     
 
-    #"Qin": "rf1",
-    #"MetaHIT": "rf2",
+    #"Qin": "rf1-norm-shuffled",
+    #"MetaHIT": "rf2-norm-shuffled",
+    #"Feng": "rf3-norm-shuffled",
+    #"RA": "rf4-norm-shuffled",
+    #"Zeller": "rf5-norm-shuffled",
+    #"LiverCirrhosis": "rf6-shuffled",
+    #"Karlsson": "rf8-shuffled",
+    
+
+    #"Qin": "svm1-shuffled",
+    #"MetaHIT": "svm2-shuffled",
+    #"Feng": "svm3-shuffled",
+    #"RA": "svm4-shuffled",
+    #"Zeller": "svm5-shuffled",
+    #"LiverCirrhosis": "svm6-shuffled",
+    #"Karlsson": "svm8-shuffled",
+
+
+    #"Qin": "rf1-norm",
+    "MetaHIT": "rf2-norm",
     #"Feng": "rf3-norm",
     #"RA": "rf4-norm",
-    #"Zeller": "rf5",
-    #"LiverCirrhosis": "rf6-norm",
-    #"Karlsson": "rf7-norm",
-    
-    #"Feng": "rf3-norm",
-    #"RA": "rf4",
-    #"Karlsson": "rf_karlsson",
-
-    #"Qin": "rf1",
-    # "MetaHIT": "rf2",
     #"Zeller": "rf5-norm",
     #"LiverCirrhosis": "rf6",
-    #"Karlsson": "rf_karlsson",
-    #"All-CRC": "rf9_norm",
-    #"All-T2D": "rf8_norm",
+    #"Karlsson": "rf8",
+    
+
+    #"Qin": "svm1",
+    #"MetaHIT": "svm2",
+    #"Feng": "svm3",
+    #"RA": "svm4",
+    #"Zeller": "svm5",
+    #"LiverCirrhosis": "svm6",
+    #"Karlsson": "svm8",
     }
 
-
 model_param_grid = {
+    "svm1-shuffled": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 100, 'KN': 'linear', 'GM': 'auto', 'KS': 7, 'SL': 1},
+    "rf1-norm-shuffled": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1, 'SL':1},
+    "svm2-shuffled": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 1, 'KN': 'linear', 'GM': 'auto', 'KS': 7, 'SL':1},
+    "rf2-norm-shuffled": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 1, 'SL':1},
+    "svm4-shuffled": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'GM': 0.0001, 'KN': 'rbf', 'KS': 7, 'SL':1},
+    "rf4-norm-shuffled": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 1, 'SL':1},
+    "rf3-norm-shuffled": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 1, 'SL':1},
+    "svm3-shuffled": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 6, 'SL':1},
+    "rf5-norm-shuffled": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1, 'SL':1},
+    "svm5-shuffled": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5, 'SL':1},
+    "rf8-shuffled": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':1},
+    "svm8-shuffled": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+        'C': 10, 'GM': 0.0001, 'KN':'rbf', 'KS': 5, 'SL':1},
+    "rf6-shuffled": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':1},
+    "svm6-shuffled": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
+             'C': 10, 'KN': 'linear', 'GM': 'auto', 'KS': 6, 'SL':1},
+    
     "rf_karlsson": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':0},
     "svm2-norm": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 1, 'KN': 'linear', 'GM': 'auto', 'KS': 7},
+             'C': 1, 'KN': 'linear', 'GM': 'auto', 'KS': 7, 'SL':0},
     "rf0-norm": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 3,'N': 1,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 10, 'NJ': 1, 'KS': 5, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 10, 'NJ': 1, 'KS': 5, 'NR': 1, 'SL':0},
     "rf1-norm": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1, 'SL':0},
     "rf2-norm": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 1, 'SL':0},
     "rf3-norm": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 1, 'SL':0},
     "rf4-norm": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 1, 'SL':0},
     "rf5-norm": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1, 'SL':0},
     "rf6-norm": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 8, 'NR': 1, 'SL':0},
     "rf7-norm": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': 1, 'KS': 10, 'NR': 1, 'SL':0},
     "rf8-norm": {'DS': [["Karlsson_2013", "Qin_et_al"],["Karlsson_2013", "Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': -1, 'KS': 5, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 200, 'NJ': -1, 'KS': 5, 'NR': 1, 'SL':0},
     "rf9-norm": {'DS': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': -1, 'KS': 5, 'NR': 1},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': -1, 'KS': 5, 'NR': 1, 'SL':0},
 
     "svm0": {'DS': [["Feng"],["Feng"]],  'CVT': 3,'N': 1,'M': "svm",'CL': [0, 1],
-             'C': 100, 'KN': 'rbf', 'GM': 0.0001, 'KS': 5},
+             'C': 100, 'KN': 'rbf', 'GM': 0.0001, 'KS': 5, 'SL':0},
     "svm1": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 100, 'KN': 'linear', 'GM': 'auto', 'KS': 7},
+             'C': 100, 'KN': 'linear', 'GM': 'auto', 'KS': 7, 'SL':0},
     "svm2": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 10, 'KN': 'linear', 'GM': 'auto', 'KS': 7},
+             'C': 1, 'KN': 'linear', 'GM': 'auto', 'KS': 7, 'SL':0},
     "svm3": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 6},
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 6, 'SL':0},
     "svm4": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 10, 'GM': 0.0001, 'KN': 'rbf', 'KS': 7},
+             'C': 10, 'GM': 0.0001, 'KN': 'rbf', 'KS': 7, 'SL':0},
     "svm5": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5},
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5, 'SL':0},
     "svm6": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 10, 'KN': 'linear', 'GM': 'auto', 'KS': 6},
+             'C': 10, 'KN': 'linear', 'GM': 'auto', 'KS': 6, 'SL':0},
     "svm7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 10, 'GM': 0.0001, 'KN':'rbf', 'KS': 5},
+             'C': 10, 'GM': 0.0001, 'KN':'rbf', 'KS': 5, 'SL':0},
     "svm8": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-        'C': 1, 'GM': 0.001, 'KN':'rbf', 'KS': 5},
+        'C': 1, 'GM': 0.001, 'KN':'rbf', 'KS': 5, 'SL':0},
     
     "svm1_norm": {'DS': [["Qin_et_al"],["Qin_et_al"]],  'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
+             'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5, 'SL':0},
     "svm2_norm": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 1000, 'KN': 'rbf', 'GM': 0.0001, 'KS': 5},
+             'C': 1000, 'KN': 'rbf', 'GM': 0.0001, 'KS': 5, 'SL':0},
     "svm3_norm": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 1, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
+             'C': 1, 'KN': 'rbf', 'GM': 0.001, 'KS': 5, 'SL':0},
     "svm4_norm": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5},
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5, 'SL':0},
     "svm5_norm": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 100, 'KN': 'rbf', 'GM': 0.0001, 'KS': 5},
+             'C': 100, 'KN': 'rbf', 'GM': 0.0001, 'KS': 5, 'SL':0},
     "svm6_norm": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
+             'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5, 'SL':0},
     "svm7_norm": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5},
+             'C': 100, 'GM': 0.0001, 'KN': 'rbf', 'KS': 5, 'SL':0},
     "svm8_norm": {'DS': [["Karlsson_2013", "Qin_et_al"],["Karlsson_2013", "Qin_et_al"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 10, 'GM': 0.001, 'KN': 'rbf', 'KS': 5},
+             'C': 10, 'GM': 0.001, 'KN': 'rbf', 'KS': 5, 'SL':0},
     "svm9_norm": {'DS': [["Zeller_2014", "Feng"],["Zeller_2014", "Feng"]], 'CVT': 10,'N': 20,'M': "svm",'CL': [0, 1],
-             'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5},
+             'C': 10, 'KN': 'rbf', 'GM': 0.001, 'KS': 5, 'SL':0},
     
+    "rf0": {'DS': [["Feng"],["Feng"]],  'CVT': 3,'N': 1,'M': "rf", "CL":[0, 1],
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 100, 'NJ': 1, 'KS': 5, 'NR': 0, 'SL':0},
     "rf1": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':0},
     "rf2": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 8, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 8, 'NR': 0, 'SL':0},
     "rf3": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 8, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 8, 'NR': 0, 'SL':0},
     "rf4": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':0},
     "rf5": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':0},
     "rf6": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':0},
     "rf7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':0},
     "rf8": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 400, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':0},
     "rf9": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "rf",'CL': [0, 1],
-            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0},
+            'CR': 'gini', 'MD': None, 'MF': 'sqrt', 'MS': 2, 'NE': 500, 'NJ': 1, 'KS': 10, 'NR': 0, 'SL':0},
 
     "gb1": {'DS': [["Qin_et_al"],["Qin_et_al"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
-             'LR': 0.1, 'MD': None, 'MF': 'sqrt', 'ML': 5, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
+             'LR': 0.1, 'MD': None, 'MF': 'sqrt', 'ML': 5, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5, 'SL':0},
     "gb2": {'DS': [["MetaHIT"],["MetaHIT"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
-            'LR': 0.1, 'MD': None, 'MF': 'sqrt', 'ML': 5, 'MS': 2, 'NE': 400, 'SS': 0.8, 'KS': 5},
+            'LR': 0.1, 'MD': None, 'MF': 'sqrt', 'ML': 5, 'MS': 2, 'NE': 400, 'SS': 0.8, 'KS': 5, 'SL':0},
     "gb3": {'DS': [["Feng"],["Feng"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
-            'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 1, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
+            'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 1, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5, 'SL':0},
     "gb4": {'DS': [["RA"],["RA"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
-            'LR': 0.05, 'MD': None, 'MF': 'sqrt', 'ML': 2, 'MS': 2, 'NE': 100, 'SS': 0.8, 'KS': 5},
+            'LR': 0.05, 'MD': None, 'MF': 'sqrt', 'ML': 2, 'MS': 2, 'NE': 100, 'SS': 0.8, 'KS': 5, 'SL':0},
     "gb5": {'DS': [["Zeller_2014"],["Zeller_2014"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
-            'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 2, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
+            'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 2, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5, 'SL':0},
     "gb6": {'DS': [["LiverCirrhosis"],["LiverCirrhosis"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
-            'LR': 0.05, 'MD': None, 'MF': 'sqrt', 'ML': 4, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5},
+            'LR': 0.05, 'MD': None, 'MF': 'sqrt', 'ML': 4, 'MS': 2, 'NE': 500, 'SS': 0.8, 'KS': 5, 'SL':0},
     "gb7": {'DS': [["Karlsson_2013"],["Karlsson_2013"]], 'CVT': 10,'N': 20,'M': "gb",'CL': [0, 1],
-            'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 4, 'MS': 2, 'NE': 200, 'SS': 0.8, 'KS':5}
+            'LR': 0.01, 'MD': None, 'MF': 'sqrt', 'ML': 4, 'MS': 2, 'NE': 200, 'SS': 0.8, 'KS':5, 'SL':0}
     }
 
 def class_to_target(cls):
@@ -356,9 +393,15 @@ def get_feature_importances(clf, kmer_imps):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description= "Program to run linear machine learning models on kmer datasets")
     parser.add_argument('-features', type = int, default = -1, help = "Number of feature importances")
+    parser.add_argument('-logiterfeats', type = bool, default = False, help = "Whether to log all feature importances from each iteration")
+    parser.add_argument('-version', type = str, default = '1', help = "Version of the model being run")
 
     arg_vals = parser.parse_args()
     num_features = arg_vals.features
+    log_iter_feats = arg_vals.logiterfeats
+    version = arg_vals.version
+    if log_iter_feats:
+        num_features = -1
     
     # Loop over all data sets
     for dataset in dataset_model_grid.keys():
@@ -392,6 +435,8 @@ if __name__ == '__main__':
         n_iter = param_grid['N']
         learn_type = param_grid['M']
         cv_testfolds = param_grid['CVT']
+        shuffle_labels = param_grid['SL']
+        param_grid['V'] = version
 
         config_string = config_info(data_set[0], learn_type, param_grid, kmer_size)
 
@@ -407,6 +452,8 @@ if __name__ == '__main__':
         print("GENERATED KMERS NO COMP")
         
         for i in range(n_iter):
+            if shuffle_labels:
+                np.random.shuffle(y)
             # Set the estimator based on the model type
             if (learn_type == "enet"):
                 # doing a separate grid search using stratified k fold -- k - 1 folds should be used
@@ -477,7 +524,6 @@ if __name__ == '__main__':
                             explainer = shap.KernelExplainer(estimator.predict_proba, background, link="logit")
                             shap_values = explainer.shap_values(x_test, nsamples=100)
                             shap_values = np.sum(np.absolute(shap_values[1]), axis=0)
-                            print(shap_values)
                         except Exception as e:
                             print("Got exception: " + str(e) + " on " + str(data_set))
                             shap_values = []
@@ -607,11 +653,35 @@ if __name__ == '__main__':
 
 
                 config_results[config].append([conf_mat, fold_results[:, 1], fold_results[:, 3], fold_results[:, 4], shap_vals])
+                if log_iter_feats and (learn_type == 'rf' or learn_type == 'svm'):
+                    if learn_type == 'rf':
+                        imps = kmer_imps
+                    else:
+                        imps = shap_vals
+                    print("DUMPING FEATURE IMPORTANCES FOR ITERATION " + str(i))
+                    num_feature_imps = num_features
+                    if (num_feature_imps == -1):
+                        num_feature_imps = len(imps)
+                    if imps is not None and num_feature_imps > 0:
+                        file = open(graph_dir + "/feat_imps_" + config_iter + ".txt", "w")
+                        file.write("Importances\tfor\t" + str(dataset) + "\t" + config_iter + "\n")
+                        if learn_type == 'rf':
+                            for j in range(num_feature_imps):
+                                if imps[j] > 0:
+                                    file.write(kmers_no_comp[j] + "\t" + str(imps[j] / ((i + 1) * cv_testfolds)) + "\n")
+                        else:
+                            for j in range(num_feature_imps):
+                                if imps[j] > 0:
+                                    file.write(kmers_no_comp[j] + "\t" + str(imps[j] / (len(y_train) + len(y_test))) + "\n")
+                        print("END FEATURE IMPORTANCE DUMP FOR ITERATION " + str(i))
+                        file.close()
 
                 # Per-iteration plots across K folds
                 if plot_iter:
                     # plot the confusion matrix
                     plot_confusion_matrix(conf_mat, config = config_iter)
+
+                
         for config in config_results:
             # per iteration results
             iter_results = np.array(config_results[config])
@@ -689,23 +759,25 @@ if __name__ == '__main__':
                 else:
                     imps = shap_vals
                 print("SORTING FEATURE IMPORTANCES")
-                if (num_features == -1):
-                    num_features = len(imps)
-                if imps is not None and len(imps) > 0:
-                    indices = np.argsort(imps)[::-1][0:num_features]
+                num_feature_imps = num_features
+                if (num_feature_imps == -1):
+                    num_feature_imps = len(imps)
+                if imps is not None and num_feature_imps > 0:
+                    indices = np.argsort(imps)[::-1][0:num_feature_imps]
                     imps = imps[indices]
                     kmers_no_comp = [kmers_no_comp[i] for i in indices]
                     file = open(graph_dir + "/feat_imps_" + config + ".txt", "w")
                     file.write("Importances\tfor\t" + str(dataset) + "\t" + config + "\n")
                     if learn_type == 'rf':
-                        for i in range(len(imps)):
+                        for i in range(num_feature_imps):
                             if imps[i] > 0:
                                 file.write(kmers_no_comp[i] + "\t" + str(imps[i] / (n_iter * cv_testfolds)) + "\n")
                     else:
-                        for i in range(len(imps)):
+                        for i in range(num_feature_imps):
                             if imps[i] > 0:
-                                file.write(kmers_no_comp[i] + "\t" + str(imps[i] / (n_iter * len(all_y_test))) + "\n")
+                                file.write(kmers_no_comp[i] + "\t" + str(imps[i] / (len(all_y_test))) + "\n")
                     print("END FEATURE IMPORTANCE DUMP")
+                    file.close()
             
                 
 

@@ -193,9 +193,12 @@ if __name__ == '__main__':
                     n_jobs = -1
                     current_estimator = RandomForestClassifier(criterion=criterion, max_depth=max_depth, max_features=max_features,
                                                        min_samples_split=min_samples_split, n_estimators=n_estimators, n_jobs=n_jobs)
-                    
+
+                normalized = " with normalization"
+                if learn_type == "rf" and not norm_for_rf:
+                    normalizd = " without normalization"
                 print( str(accuracies[i]) + "(acc) produced by params for samples from " + str(data_set) +
-                  " with model " + learn_type + " and kmer size " + str(kmer_size)
+                  " with model " + learn_type + normalized + " and kmer size " + str(kmer_size)
                   + ": " + str(all_params[i]))
                 '''
                 if learn_type == "rf" and not norm_for_rf:
