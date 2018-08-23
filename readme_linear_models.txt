@@ -31,11 +31,11 @@ In linear_stats_plots.py:
 Once the parameters for the best models are retrieved, they should be entered into model_param_grid (line 114) in the following format: 
 
 For SVMs: [name]: {'DS': [datasets],  'CVT': [# k folds],'N': [# iterations],'M': "svm",'CL': [0, 1],
-             'C': [value for C], 'KN': [value for kernel], 'GM': [value for gamma], 'KS': [kmer size]}
+             'C': [value for C], 'KN': [value for kernel], 'GM': [value for gamma], 'KS': [kmer size], 'SL': [shuffle labels]}
 
 For RFs: [name]: {'DS': [datasets],  'CVT': [# k folds],'N': [# iterations],'M': "svm",'CL': [0, 1],
 		'CR': [value for criterion], 'MD': [value for max_depth], 'MF': [value for max_features], 'MS': [value for min_samples_split], 
-		'NE': [value for number of estimators], 'NJ': [number of jobs], 'KS': [kmer size], 'NR': [whether to use normalization to zero mean 		and unit stdev]}
+		'NE': [value for number of estimators], 'NJ': [number of jobs], 'KS': [kmer size], 'NR': [whether to use normalization to zero mean 		and unit stdev],  'SL': [shuffle labels]}
 
 (In many cases, the best params for your model are already in the model_param_grid, so you can make a copy of them)
 
@@ -70,3 +70,39 @@ In the case of shap on SVM, a Singular Matrix Exception may cause the feature im
 With the feature importances file, you can plot by running plot_feature_importances.py with the following line: 
 
 [python] plot_feature_importances.py -file [feature importances file] -numfeats [number of features to be recorded in the graph] -name [name of file to store bar graph]
+
+######################################
+LOGGING THE PER-ITERATION FEATURE IMPS
+######################################
+
+In linear_stats_plots.py, I added the parameter logiterfeats, which indicates whether the features should be logged per iteration. 
+
+Run linear_stats_plots.py with the parameter logiterfeats set to True. 
+
+nohup [python] [file to run] -logiterfeats True >> [output file] &
+
+#######################
+RUNNING SHUFFLED MODELS
+#######################
+
+In linear_stats_plots.py, the model_param_grid now includes a key 'SL' which indicates shuffled (1) or not (0). In order to run a shuffled model, set 'SL' to 1 and put the model in dataset_model_grid. 
+
+########
+VERSIONS
+########
+
+The new key -version can be used to manually set a version for the config (for different runs of the same model, for example). 
+
+###################################################
+TO COMBINE ROC PLOTS AND CALCULATE T-STATS/P-VALUES
+###################################################
+
+Run deep_learning_merge_plots_linear.py and give the names of the pickle file names of all the models whose ROC's are to be merged should be in the list of filenames. In order to get the t-statistics and p-values for a certain model, both the real model's pickle file and the corresponding shuffled model's pickle file should be in the list. 
+
+[python] deep_learning_merge_plots_linear.py [file names] >> [output file]
+
+To view the t-statistics and p-values: 
+
+less [output file]
+
+The plots will be generated in analysis/kmers. 

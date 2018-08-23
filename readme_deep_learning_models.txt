@@ -158,3 +158,33 @@ To look at the aggregated statistics for the best models, sorted from best to wo
 cat [output file] | [python] process_perf_logs.py | sort -n -r -k 17 | less
 
 All the plots are saved in analysis/kmers.
+
+######################################
+LOGGING THE PER-ITERATION FEATURE IMPS
+######################################
+
+In deep_learning_supervised_Katherine_jf.py, I added the parameter logiterfeats, which indicates whether the features should be logged per iteration. 
+
+Run deep_learning_supervised_Katherine_jf.py with the parameter logiterfeats set to True. 
+
+nohup [python] [file to run] -logiterfeats True >> [output file] &
+
+########
+VERSIONS
+########
+
+The new key -version can be used to manually set a version for the config (for different runs of the same model, for example). 
+
+###################################################
+TO COMBINE ROC PLOTS AND CALCULATE T-STATS/P-VALUES
+###################################################
+
+Run deep_learning_merge_plots.py and give the names of the pickle files of all the models whose ROC's are to be merged should be in the list of filenames. In order to get the t-statistics and p-values for a certain model, both the real model's pickle file and the corresponding shuffled model's pickle file should be in the list. 
+
+[python] deep_learning_merge_plots.py [file names] >> [output file]
+
+To view the t-statistics and p-values: 
+
+less [output file]
+
+The plots will be generated in analysis/kmers. 
