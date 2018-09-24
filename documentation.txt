@@ -495,6 +495,7 @@ python ~/deep_learning_microbiome/scripts/jellyfish_wrapper.py
 
 nohup nice bash ~/deep_learning_microbiome/tmp_intermediate_files/all_commands_qin_10mers.sh &
 
+
 # manually do this, but included in next round of jellyfish -- dump the output. 
 
 while read file; do
@@ -528,6 +529,16 @@ while read file; do
     fi
     
 done <  ~/deep_learning_microbiome/Qin_et_al_samples.txt 
+
+# One Qin sample was not inlcuded. Run Jellyfish on this last sample: 
+dir='/pollard/home/ngarud/shattuck/metagenomic_fastq_files/T2D/fastq_files'
+file=SRR1778450
+data_set=Qin_et_al
+for kmer_size in 5 6 7 8 10; do
+    #jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
+
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/Qin_et_al/${file}_${kmer_size}mer.jf | grep '>' | gzip > ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.gz
+done
 
 
 # Run Jellyfish on HMP
@@ -620,24 +631,30 @@ while read file; do
 done <  ~/deep_learning_microbiome/MetaHIT_accessions_only.txt 
 
 
+# combine technical replicates for MetaHIT
+python combine_kmerized_files_MetaHIT.py
+
+
+
+
 # Jellyfish on Feng et al. 
 python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_Feng.py
 
 # check if all the kmers are outputted. If not, I need to then add in a zero
 data_set='Feng'
-kmer_size=7
+kmer_size=10
 while read file; do
     echo $file
     jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
     num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
-    if [ $num_lines = 16384 ]
+    if [ $num_lines = 1049600 ]
 	then
 	echo 'file is ok...'
 	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
 	else
 	echo 'filling in zeros...'
 	# rerun jellyfish
-	dir='/pollard/shattuck0/snayfach/metagenomes/${data_set}/fastq'
+	dir='/pollard/home/ngarud/shattuck/metagenomic_fastq_files/Feng_2015/combined_fastq_files'
 	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
 	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
 	# run a script to find the missing kmers and fill in a zero
@@ -656,19 +673,19 @@ python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_LiverCirrhosis.py
 
 # check if all the kmers are outputted. If not, I need to then add in a zero
 data_set='LiverCirrhosis'
-kmer_size=7
+kmer_size=10
 while read file; do
     echo $file
     jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
     num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
-    if [ $num_lines = 16384 ]
+    if [ $num_lines = 1049600 ]
 	then
 	echo 'file is ok...'
 	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
 	else
 	echo 'filling in zeros...'
 	# rerun jellyfish
-	dir='/pollard/shattuck0/snayfach/metagenomes/${data_set}/fastq'
+	dir='/pollard/shattuck0/snayfach/metagenomes/LiverCirrhosis/fastq'
 	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
 	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
 	# run a script to find the missing kmers and fill in a zero
@@ -679,24 +696,34 @@ done <  ~/deep_learning_microbiome/data/metadata/LiverCirrhosis_ids.txt
 
 
 
+# rename the files
+python rename_kmerized_files_LiverCirrhosis.py
+
+
+
 # Jellyfish on Karlsson et al. 
 python ~/deep_learning_microbiome/scripts/jellyfish_wrapper_Karlsson.py
 
+# rerun jellyfish on Karlsson without the adapters.
+
+# final check 
+qsub ~/deep_learning_microbiome/scripts/final_check_Karlsson_no_adapter_qsub
+
 
 data_set='Karlsson_2013'
-kmer_size=7
+kmer_size=8
 while read file; do
     echo $file
     jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
     num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
-    if [ $num_lines = 16384 ]
+    if [ $num_lines = 65792 ]
 	then
 	echo 'file is ok...'
 	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
 	else
 	echo 'filling in zeros...'
 	# rerun jellyfish
-	dir='/pollard/shattuck0/snayfach/metagenomes/${data_set}/fastq'
+	dir='/pollard/home/ngarud/shattuck/metagenomic_fastq_files/Karlsson_2013/fastq_files'
 	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
 	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
 	# run a script to find the missing kmers and fill in a zero
@@ -712,20 +739,20 @@ done <  ~/shattuck/metagenomic_fastq_files/Karlsson_2013/PRJEB1786_run_accession
 
 
 
-data_set='Zeller'
-kmer_size=7
+data_set='Zeller_2014'
+kmer_size=10
 while read file; do
     echo $file
     jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
     num_lines=`wc -l tmpOut.txt | cut -f1 -d' '`
-    if [ $num_lines = 16384 ]
+    if [ $num_lines = 1049600 ]
 	then
 	echo 'file is ok...'
 	    #cat tmpOut.txt | grep '>' | gzip > ~/deep_learning_microbiome/data/10mers_jf/${data_set}/${file}_${kmer_size}mer.gz
 	else
 	echo 'filling in zeros...'
 	# rerun jellyfish
-	dir='/pollard/shattuck0/snayfach/metagenomes/${data_set}/fastq'
+	dir='/pollard/home/ngarud/shattuck/metagenomic_fastq_files/Zeller_2014/combined_fastq_files'
 	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf
 	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${data_set}/${file}_${kmer_size}mer.jf > tmpOut.txt
 	# run a script to find the missing kmers and fill in a zero
@@ -784,3 +811,429 @@ bowtie2 --no-unal -x /pollard/home/ngarud/deep_learning_microbiome/separate_read
 #################################################
 
 supervised_learning_model_test_Nandita.py
+
+################################################
+# July 26, 2018
+# Run Katherine's code
+################################################
+
+# step 1: Modify exp_config.py to explore the functions we want and data type we want
+
+# Step 2 make sure that in deep_learning_supervised_katherine_jf.py exp_mode = SEARCH_SUPER_MODELS. 
+
+# now run:
+
+~/./miniconda3/bin/python deep_learning_supervised_katherine_jf.py >> grid_search.txt
+
+# parse the log:
+cat grid_search.txt | ~/./miniconda3/bin/python process_perf_logs.py 
+
+# I ran the following for Liver Cirrhosis:
+7mers
+[1, -1]
+enc_dim_key:       [ [50, 200 ]
+dropout_pct_key:   [ [0, 0.1, 0.25, 0.5]
+
+nohup nice ~/./miniconda3/bin/python deep_learning_supervised_Katherine_jf.py >> ~/deep_learning_microbiome/analysis/grid_search/LiverCirrhosis_7mers_enc_50_20_dropout.txt &
+
+cat ~/deep_learning_microbiome/analysis/grid_search/LiverCirrhosis_7mers_enc_50_20_dropout.txt | ~/./miniconda3/bin/python process_perf_logs.py  > ~/deep_learning_microbiome/analysis/grid_search/LiverCirrhosis_7mers_enc_50_20_dropout_parsed.txt
+
+# 8  mers for Liver Cirrhosis
+nohup nice ~/./miniconda3/bin/python deep_learning_supervised_Katherine_jf.py >> ~/deep_learning_microbiome/analysis/grid_search/LiverCirrhosis_8mers.txt &
+
+cat ~/deep_learning_microbiome/analysis/grid_search/LiverCirrhosis_8mers.txt | ~/./miniconda3/bin/python process_perf_logs.py  > ~/deep_learning_microbiome/analysis/grid_search/LiverCirrhosis_8mers_parsed.txt
+
+# 8  mers for Karlsson
+nohup nice ~/./miniconda3/bin/python deep_learning_supervised_Katherine_jf.py >> ~/deep_learning_microbiome/analysis/grid_search/Karlsson_8mers.txt &
+
+cat ~/deep_learning_microbiome/analysis/grid_search/Karlsson_8mers.txt | ~/./miniconda3/bin/python process_perf_logs.py  > ~/deep_learning_microbiome/analysis/grid_search/Karlsson_8mers_parsed.txt
+
+
+#Zeller
+nohup nice ~/./miniconda3/bin/python deep_learning_supervised_Katherine_jf.py >> ~/deep_learning_microbiome/analysis/grid_search/Zeller_8mers.txt &
+
+cat ~/deep_learning_microbiome/analysis/grid_search/Zeller_8mers.txt | ~/./miniconda3/bin/python process_perf_logs.py  > ~/deep_learning_microbiome/analysis/grid_search/Zeller_8mers_parsed.txt
+
+# 8  mers for RA
+nohup nice ~/./miniconda3/bin/python deep_learning_supervised_Katherine_jf.py >> ~/deep_learning_microbiome/analysis/grid_search/RA_8mers.txt &
+
+cat ~/deep_learning_microbiome/analysis/grid_search/RA_8mers.txt | ~/./miniconda3/bin/python process_perf_logs.py  > ~/deep_learning_microbiome/analysis/grid_search/RA_8mers_parsed.txt
+
+
+# linear models
+nohup nice ~/./miniconda3/bin/python all_linear_models_katherine.py -m svm -k 10 >> ~/deep_learning_microbiome/analysis/grid_search/LiverCirrhosis_svm_10mers.txt &
+
+nohup nice ~/./miniconda3/bin/python all_linear_models_katherine_Qin.py -m svm -k 10 >> ~/deep_learning_microbiome/analysis/grid_search/Qin_et_al_svm_10mers.txt &
+
+nohup nice ~/./miniconda3/bin/python all_linear_models_katherine_MetaHIT.py -m svm -k 10 >> ~/deep_learning_microbiome/analysis/grid_search/MetaHIT_et_al_svm_10mers.txt &
+
+nohup nice ~/./miniconda3/bin/python all_linear_models_katherine_RA.py -m svm -k 10 >> ~/deep_learning_microbiome/analysis/grid_search/RA_et_al_svm_10mers.txt &
+
+nohup nice ~/./miniconda3/bin/python all_linear_models_katherine_Feng.py -m svm -k 10 >> ~/deep_learning_microbiome/analysis/grid_search/Feng_et_al_svm_10mers.txt &
+
+nohup nice ~/./miniconda3/bin/python all_linear_models_katherine_Zeller.py -m svm -k 10 >> ~/deep_learning_microbiome/analysis/grid_search/Zeller_et_al_svm_10mers.txt &
+
+nohup nice ~/./miniconda3/bin/python all_linear_models_katherine_Karlsson.py -m svm -k 10 >> ~/deep_learning_microbiome/analysis/grid_search/Karlsson_et_al_svm_10mers.txt &
+
+
+
+# rerun the best models:
+nohup nice ~/./miniconda3/bin/python3 linear_stats_plots.py >> ~/deep_learning_microbiome/analysis/grid_search/final_svm_search.txt &
+
+
+
+# Informative kmers 
+
+# what is their distribution in the raw fastq file?
+
+dir='/pollard/home/ngarud/shattuck/metagenomic_fastq_files/Karlsson_2013/fastq_files/'
+rm ~/deep_learning_microbiome/analysis/importances_karlsson_RF_10mer_frequencies.txt
+echo -e "accession\tkmer\tscore\tcount_f_1\tcount_f_2\tcount_r_1\tcount_r_2" > ~/deep_learning_microbiome/analysis/importances_karlsson_RF_10mer_frequencies.txt
+while read line; do
+    kmer=`echo $line | cut -f1 -d' '`
+    score=`echo $line | cut -f2 -d' '`
+    rev_kmer=`echo $kmer | rev | tr ATGC TACG`
+    while read accession; do
+	count_f_1=`zcat ${dir}/${accession}_1.fastq.gz | grep $kmer | wc -l`
+	count_f_2=`zcat ${dir}/${accession}_2.fastq.gz | grep $kmer | wc -l`
+	count_r_1=`zcat ${dir}/${accession}_1.fastq.gz | grep $rev_kmer | wc -l`
+	count_r_2=`zcat ${dir}/${accession}_2.fastq.gz | grep $rev_kmer | wc -l`
+	echo -e "$accession\t$kmer\t$score\t$count_f_1\t$count_f_2\t$count_r_1\t$count_r_2" >> ~/deep_learning_microbiome/analysis/importances_karlsson_RF_10mer_frequencies.txt
+	echo -e "$accession\t$kmer\t$score\t$count_f_1\t$count_f_2\t$count_r_1\t$count_r_2"
+    done < ~/shattuck/metagenomic_fastq_files/Karlsson_2013/PRJEB1786_run_accessions_only.txt
+done < ~/deep_learning_microbiome/analysis/importances_karlsson_linear_best_model.txt
+
+
+
+# DO we see these weird patterns for other data sets?
+
+
+
+dir='/pollard/home/ngarud/shattuck/metagenomic_fastq_files/Zeller_2014/fastq_files/'
+rm ~/deep_learning_microbiome/analysis/importances_Zeller_trial_RF_10mer_frequencies.txt
+echo -e "accession\tkmer\tscore\tcount_f_1\tcount_f_2\tcount_r_1\tcount_r_2" > ~/deep_learning_microbiome/analysis/importances_Zeller_trial_RF_10mer_frequencies.txt
+while read line; do
+    kmer=`echo $line | cut -f1 -d' '`
+    score=`echo $line | cut -f2 -d' '`
+    rev_kmer=`echo $kmer | rev | tr ATGC TACG`
+    while read accession; do
+	count_f_1=`zcat ${dir}/${accession}_1.fastq.gz | grep $kmer | wc -l`
+	count_f_2=`zcat ${dir}/${accession}_2.fastq.gz | grep $kmer | wc -l`
+	count_r_1=`zcat ${dir}/${accession}_1.fastq.gz | grep $rev_kmer | wc -l`
+	count_r_2=`zcat ${dir}/${accession}_2.fastq.gz | grep $rev_kmer | wc -l`
+	echo -e "$accession\t$kmer\t$score\t$count_f_1\t$count_f_2\t$count_r_1\t$count_r_2" >> ~/deep_learning_microbiome/analysis/importances_Zeller_trial_RF_10mer_frequencies.txt
+	echo -e "$accession\t$kmer\t$score\t$count_f_1\t$count_f_2\t$count_r_1\t$count_r_2"
+    done < ~/shattuck/metagenomic_fastq_files/Zeller_2014/PRJEB6070_WGS_run_accessions_only.txt
+done < ~/deep_learning_microbiome/analysis/importances_karlsson_linear_best_model.txt
+
+
+# repeat for metaHIT
+
+dir='/pollard/shattuck0/snayfach/metagenomes/MetaHIT/fastq/'
+echo -e "accession\tkmer\tscore\tcount_f_1\tcount_f_2\tcount_r_1\tcount_r_2" > ~/deep_learning_microbiome/analysis/importances_metahit_RF_10mer_frequencies.txt
+while read line; do
+    kmer=`echo $line | cut -f1 -d' '`
+    score=`echo $line | cut -f2 -d' '`
+    rev_kmer=`echo $kmer | rev | tr ATGC TACG`
+    while read accession; do
+	count_f_1=`zcat ${dir}/${accession}_1.fastq.gz | grep $kmer | wc -l`
+	count_f_2=`zcat ${dir}/${accession}_2.fastq.gz | grep $kmer | wc -l`
+	count_r_1=`zcat ${dir}/${accession}_1.fastq.gz | grep $rev_kmer | wc -l`
+	count_r_2=`zcat ${dir}/${accession}_2.fastq.gz | grep $rev_kmer | wc -l`
+	echo -e "$accession\t$kmer\t$score\t$count_f_1\t$count_f_2\t$count_r_1\t$count_r_2" >> ~/deep_learning_microbiome/analysis/importances_metahit_RF_10mer_frequencies.txt
+	echo -e "$accession\t$kmer\t$score\t$count_f_1\t$count_f_2\t$count_r_1\t$count_r_2"
+    done  < ~/deep_learning_microbiome/MetaHIT_accessions_only.txt
+done < ~/deep_learning_microbiome/analysis/metahit_important_features.txt
+
+
+
+
+# problems with Karlsson data:
+ERR260213_1
+ERR260212_2
+
+
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Backhed
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Nielsen
+
+
+#################################
+# August 18, 2018
+# Adapter trimming
+#################################
+
+# list of adapters here: 
+# Illumina
+~/deep_learning_microbiome/adapters/adaptors_list.fa
+
+#Nextera
+adapter_nexteraR1.fa
+adapter_nexteraR2.fa
+
+#Truseq
+adapter_truseqR1.fa
+adapter_truseqR2.fa
+
+for dataset in MetaHIT RA Karlsson_2013 Qin_et_al Zeller_2014 Feng LiverCirrhosis HMP1-2 Twins IGC Peru Nielsen LeChatelier Fiji Backhed Hadza Mongolian Raymond Yassour Ferretti; do
+    nohup nice  ~/./miniconda3/bin/python grep_adapter.py -dataset_in $dataset &
+done
+
+# remove the adapters from the following data sets: HMP1-2, Karlsson_2013, and RA
+dir='/pollard/home/ngarud/shattuck/metagenomic_fastq_files/Karlsson_2013/fastq_files'
+
+
+skewer -m pe -t 5 -x ~/deep_learning_microbiome/adapters/adapter_truseqR1.fa -y ~/deep_learning_microbiome/adapters/adapter_truseqR2.fa ${dir}/ERR260132_1.fastq.gz ${dir}/ERR260132_2.fastq.gz -o testout.txt
+
+skewer -m any -t 8 -k 20 -x ~/deep_learning_microbiome/adapters/adaptors_list.fa -y ~/deep_learning_microbiome/adapters/adaptors_list.fa ${dir}/ERR260132_1.fastq.gz ${dir}/ERR260132_2.fastq.gz -o testout.txt
+
+
+skewer -m pe -t 8 -x ~/deep_learning_microbiome/adapters/adaptors_list.fa -y ~/deep_learning_microbiome/adapters/adaptors_list.fa ${dir}/ERR260132_1.fastq.gz ${dir}/ERR260132_2.fastq.gz -o testout.txt    
+
+skewer -m any -k 10 -t 8 -x ~/deep_learning_microbiome/adapters/adaptors_list.fa -y ~/deep_learning_microbiome/adapters/adaptors_list.fa testout.txt-trimmed-pair1.fastq testout.txt-trimmed-pair2.fastq -o testout_2.txt    
+
+# set up a skewer of the karlsson data
+
+# first concatenate the adapter list because all adapters show up in Karlsson et al. 
+cat ~/deep_learning_microbiome/adapters/adaptors_list.fa ~/deep_learning_microbiome/adapters/adapter_nexteraR1.fa ~/deep_learning_microbiome/adapters/adapter_truseqR1.fa > ~/deep_learning_microbiome/adapters/all_adapters_R1.fa
+
+cat ~/deep_learning_microbiome/adapters/adaptors_list.fa ~/deep_learning_microbiome/adapters/adapter_nexteraR2.fa ~/deep_learning_microbiome/adapters/adapter_truseqR2.fa > ~/deep_learning_microbiome/adapters/all_adapters_R2.fa
+
+cat ~/deep_learning_microbiome/adapters/adaptors_list.fa  ~/deep_learning_microbiome/adapters/adapter_truseqR1.fa > ~/deep_learning_microbiome/adapters/illumina_truseq_adapters_R1.fa
+
+cat ~/deep_learning_microbiome/adapters/adaptors_list.fa  ~/deep_learning_microbiome/adapters/adapter_truseqR2.fa > ~/deep_learning_microbiome/adapters/illumina_truseq_adapters_R2.fa
+
+
+# (manually removed a new line char from both)
+
+# next write a qsub script to remove the karlsson adapter
+qsub_remove_adapter_karlsson
+
+# the problem with this is I cannot run skewer on QB3. Instead, run this on beuno
+
+
+dir='/pollard/home/ngarud/shattuck/metagenomic_fastq_files/Karlsson_2013/fastq_files'
+
+while read file; do
+    echo $file
+    skewer -m any -t 11 -k 10 -x ~/deep_learning_microbiome/adapters/all_adapters_R1.fa -y ~/deep_learning_microbiome/adapters/all_adapters_R2.fa ${dir}/${file}_1.fastq.gz ${dir}/${file}_2.fastq.gz -o ~/shattuck/metagenomic_fastq_files/Karlsson_2013/fastq_files_no_adapter/${file}
+done < /pollard/home/ngarud/shattuck/metagenomic_fastq_files/Karlsson_2013/PRJEB1786_run_accessions_only.txt
+
+
+# compress the resulting files:
+while read file; do
+    echo $file
+    gzip /pollard/home/ngarud/shattuck/metagenomic_fastq_files/Karlsson_2013/fastq_files_no_adapter/${file}-trimmed-pair1.fastq
+    gzip /pollard/home/ngarud/shattuck/metagenomic_fastq_files/Karlsson_2013/fastq_files_no_adapter/${file}-trimmed-pair2.fastq
+done < /pollard/home/ngarud/shattuck/metagenomic_fastq_files/Karlsson_2013/PRJEB1786_run_accessions_only.txt
+
+qsub ~/deep_learning_microbiome/scripts/qsub_compress_fastq_Karlsson
+
+# Do the same with RA -- some weird stuff happening with that dataset
+
+dir='/pollard/shattuck0/snayfach/metagenomes/RheumatoidArthritis/fastq'
+while read file; do
+    echo $file
+    skewer -m any -t 11 -k 10 -x ~/deep_learning_microbiome/adapters/all_adapters_R1.fa -y ~/deep_learning_microbiome/adapters/all_adapters_R2.fa ${dir}/${file}_1.fastq.gz ${dir}/${file}_2.fastq.gz -o ~/shattuck/metagenomic_fastq_files/RA/fastq_files_no_adapter/${file}
+done < ~/deep_learning_microbiome/RheumatoidArthritis_samples.txt
+
+# do the same with Fiji 
+dir="/pollard/shattuck0/snayfach/metagenomes/FIJI/fastq"
+while read file; do
+    echo $file
+    skewer -m any -t 7 -k 10 -x ~/deep_learning_microbiome/adapters/all_adapters_R1.fa -y ~/deep_learning_microbiome/adapters/all_adapters_R2.fa ${dir}/${file}_1.fastq.gz ${dir}/${file}_2.fastq.gz -o ~/shattuck/metagenomic_fastq_files/FIJI/fastq_files_no_adapter/${file}
+done < ~/shattuck/metagenomic_fastq_files/FIJI/PRJNA217052_stool_accessions_only.txt
+
+# run the remaining on the cluster...taking forever 
+qsub ~/deep_learning_microbiome/scripts/remove_adapters_Fiji
+qsub ~/deep_learning_microbiome/scripts/compress_Fiji
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Fiji
+
+# remove adapters from Peru data
+# here I will remove the illumina adapters
+dir="/pollard/shattuck0/snayfach/metagenomes/Peru/fastq"
+while read file; do
+    echo $file
+    skewer -m any -t 4 -k 10 -x ~/deep_learning_microbiome/adapters/all_adapters_R1.fa -y ~/deep_learning_microbiome/adapters/all_adapters_R2.fa ${dir}/${file}_1.fastq.gz ${dir}/${file}_2.fastq.gz -o ~/shattuck/metagenomic_fastq_files/Peru/fastq_files_no_adapter/${file}
+done < ~/shattuck/metagenomic_fastq_files/Peru/PRJNA268964_run_accession_only.txt
+
+# compress the resulting files.
+qsub ~/deep_learning_microbiome/scripts/qsub_compress_fastq_Peru
+
+# remove adapters from HMP1-2
+
+dir="/pollard/shattuck0/snayfach/metagenomes/Peru/fastq"
+while read file; do
+    echo $file
+    skewer -m any -t 4 -k 10 -x ~/deep_learning_microbiome/adapters/all_adapters_R1.fa -y ~/deep_learning_microbiome/adapters/all_adapters_R2.fa ${dir}/${file}_1.fastq.gz ${dir}/${file}_2.fastq.gz -o ~/shattuck/metagenomic_fastq_files/Peru/fastq_files_no_adapter/${file}
+done < ~/shattuck/metagenomic_fastq_files/Peru/PRJNA268964_run_accession_only.txt
+
+
+# remove adapters for HMP1-2
+qsub ~/deep_learning_microbiome/scripts/remove_adapters_HMP1-2
+# kmerize HMP1-2
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_HMP1-2
+
+
+# kmerize IGC
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_IGC
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_IGC_paired
+
+# kmerize Nielsen
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Nielsen
+
+# kmerize LeChatelier
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_LeChatelier
+
+# remove adapter and kmerize twins
+qsub ~/deep_learning_microbiome/scripts/remove_adapters_Twins
+
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Twins
+
+# compress and kmerize RA
+qsub ~/deep_learning_microbiome/scripts/compress_jellyfish_RA
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_RA
+
+# remove adapter and kmerize Hadza
+qsub ~/deep_learning_microbiome/scripts/remove_adapters_Hadza
+
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Hadza
+
+# remove adapter for Mongolian
+qsub ~/deep_learning_microbiome/scripts/remove_adapters_Mongolian
+qsub ~/deep_learning_microbiome/scripts/remove_adapters_Mongolian_rerun
+# some adapters didn't get removed
+while read accession; do
+    if [ ! -f ~/shattuck/metagenomic_fastq_files/Mongolian/fastq_files_no_adapter/${accession}-trimmed-pair1.fastq.gz ]; then
+	echo $accession >> /pollard/home/ngarud/shattuck/metagenomic_fastq_files/Mongolian/PRJNA328899_run_accessions_rerun.txt
+    fi
+done < /pollard/home/ngarud/shattuck/metagenomic_fastq_files/Mongolian/PRJNA328899_run_accessions_only.txt
+
+
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Mongolian
+
+# remove adapter for Raymond
+qsub ~/deep_learning_microbiome/scripts/remove_adapters_Raymond
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Raymond
+
+# remove adapter for Yassour
+qsub ~/deep_learning_microbiome/scripts/remove_adapters_Yassour
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Yassour
+
+# kmerize Ferretri
+qsub ~/deep_learning_microbiome/scripts/qsub_jellyfish_Ferretti
+
+# final checks (fill in zeros if a kmer is absent)
+qsub ~/deep_learning_microbiome/scripts/final_check_Karlsson_no_adapter_qsub
+qsub ~/deep_learning_microbiome/scripts/final_check_Backhed_no_adapter_qsub
+
+
+##############################################################
+# run jellyfish linearly -- cluster doesn't have enough ram  #
+##############################################################
+
+#RA
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_RA_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_RA_linear_2nd_run.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_RA_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_RA_linear_rerun.log &
+
+#IGC
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_IGC_paired_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_IGC_paired_linear.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_IGC_single_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_IGC_single_linear.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_IGC_paired_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_IGC_paired_linear_rerun.log &
+
+python combine_kmerized_files_IGC.py
+
+#Peru
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Peru_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_Peru_linear.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Peru_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_Peru_linear_rerun.log &
+
+#Hadza -- TO RUN
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Hadza_linear.sh >> ~/deep_learning_microbiome/analysis/jellyfish_Hadza_linear.log &
+
+#HMP -- TO RUN. Also, running this with 6 threads because it's a large dataset. 
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_HMP1-2_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_HMP1-2_linear.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_HMP1-2_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_HMP1-2_linear_rerun.log &
+
+#Backhed
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Backhed_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_Backhed_linear_Sept.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Backhed_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_Backhed_linear.log &
+
+# Nielsen
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Nielsen_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_Nielsen_linear.log &
+
+# LeChatelier
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_LeChatelier_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_LeChatelier_linear.log &
+
+#Twins
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Twins_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_Twins_linear_Sept.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Twins_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_Twins_linear_rerun.log &
+
+# Raymond
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Raymond_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_Raymond_linear.log &
+
+# Mongolian
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Mongolian_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_Mongolian_linear.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Mongolian_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_Mongolian_linear_rerun.log &
+
+#Ferretti
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Ferretti_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_Ferretti_linear.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Ferretti_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_Ferretti_linear_rerun.log &
+
+# Fiji
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Fiji_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_Fiji_linear.log &
+
+python combine_kmerized_files_Fiji.py
+
+# Yassour
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Yassour_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_Yassour_linear.log &
+
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Yassour_linear_rerun.sh > ~/deep_learning_microbiome/analysis/jellyfish_Yassour_linear_rerun.log &
+
+# Zeller
+nohup nice bash ~/deep_learning_microbiome/scripts/jellyfish_Zeller_linear.sh > ~/deep_learning_microbiome/analysis/jellyfish_Zeller_linear.log &
+
+# check if kmer counts are nonzero
+
+dataset=HMP1-2
+for kmer_size in 5 6 7 8 10; do
+    echo $kmer_size >> ~/deep_learning_microbiome/analysis/${dataset}_kmer_count.txt
+    while read file; do
+	file=~/deep_learning_microbiome/data/8mers_jf/HMP1-2/${file}_${kemr_size}mer.gz
+	python ~/deep_learning_microbiome/scripts/count_kmers.py $file >> ~/deep_learning_microbiome/analysis/${dataset}_kmer_count.txt
+    done < ~/deep_learning_microbiome/data/metadata/HMP1-2_samples_only.txt
+done
+
+
+nohup nice bash count_kmers_HMP.sh &
+nohup nice bash count_kmers_RA.sh &
+nohup nice bash count_kmers_IGC.sh &
+nohup nice bash count_kmers_Peru.sh &
+nohup nice bash count_kmers_Fiji.sh &
+nohup nice bash count_kmers_Backhed.sh &
+nohup nice bash count_kmers_Zeller.sh &
+nohup nice bash count_kmers_Raymond.sh &
+nohup nice bash count_kmers_Yassour.sh &
+nohup nice bash count_kmers_Ferretti.sh &
+nohup nice bash count_kmers_Twins.sh & 
+nohup nice bash count_kmers_Mongolian.sh & 
+
+
+
+dataset=HMP1-2
+for kmer_size in 5 6 7 8 10; do
+    while read file; do
+	file_path=~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.gz
+	count_zero=`zcat $file_path | grep '>0' | wc -l `
+	if [ "$count_zero" -gt 0 ]; then
+	    echo $file  >> ~/deep_learning_microbiome/analysis/${dataset}_${kmer_size}_rerun.txt
+	fi
+    done < ~/deep_learning_microbiome/data/metadata/HMP1-2_samples_only.txt
+done
