@@ -1,0 +1,98 @@
+#!/bin/bash                         #-- what is the language of this shell
+#                                  #-- Any line that starts with #$ is an instruction to SGE
+#$ -S /bin/bash                     #-- the shell for the job
+#$ -o output_error_directory       #-- output directory (fill in)
+#$ -e output_error_directory       #-- error directory (fill in)
+#$ -cwd                            #-- tell the job that it should start in your working directory
+#$ -r y                            #-- tell the system that if a job crashes, it should be restarted
+#$ -j y                            #-- tell the system that the STDERR and STDOUT should be joined
+#$ -l mem_free=1G                  #-- submits on nodes with enough free memory (required)
+#$ -l arch=linux-x64               #-- SGE resources (CPU type)
+#$ -l netapp=2G,scratch=2G         #-- SGE resources (home and scratch disks)
+#$ -l h_rt=336:00:00               #-- runtime limit (see above; this requests 24 hours)
+#$ -t 1-287                        #-- remove first '#' to specify the number of
+#$ -tc 50                                   #-- tasks if desired (see Tips section)
+
+readarray files < ~/shattuck/metagenomic_fastq_files/IGC/accessions_paired.txt
+files=(null ${files[@]}) # this pads the file with an extra line in the beginning. 
+file=${files[$SGE_TASK_ID]}
+echo $file
+
+dir=/pollard/shattuck0/snayfach/metagenomes/IGC/fastq
+
+echo $file
+dataset=IGC
+
+
+
+for kmer_size in 8 10; do
+
+    mkdir deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}
+
+
+    # get the num lines expected for the given kmer_size
+    
+    if [ $kmer_size = 10 ]
+    then
+	num_lines_exp=1049600
+    elif [ $kmer_size = 8 ]
+    then
+	num_lines_exp=65792
+    elif [ $kmer_size = 7 ]
+    then
+	num_lines_exp=16384
+    elif [ $kmer_size = 6 ]
+    then 
+	num_lines_exp=4160
+    elif [ $kmer_size = 5 ]
+    then
+	num_lines_exp=1024
+    fi
+
+
+    # run jellyfish
+
+    jellyfish count <(zcat ${dir}/${file}_1.fastq.gz)  <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m ${kmer_size} -s 100M -C -F 2 --disk -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.jf 
+
+    jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.jf  > ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.txt
+
+    
+    # check if jellyfish ran correctly
+
+    num_lines=`cat  ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.txt | wc -l | cut -f1 -d' '`
+
+    if [ $num_lines = $num_lines_exp ]
+    then
+	echo 'file is ok...'
+    else
+	echo 'rerunning jellyfish...'
+
+	# rerun jellyfish
+	jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m $kmer_size -s 100M -t 2 -C -F 2 --disk -o ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.jf
+	
+	jellyfish dump ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.jf  > ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.txt
+
+    fi
+
+    # run a script to reorder the kmers alphabetically since the bioconda version of jellyfish does it differently from Jellyfish 2.2.9. This will also fill in zeros if there are any missing kmers. 
+
+    inFile=~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.txt
+    outFile=~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.gz
+
+    python ~/deep_learning_microbiome/scripts/reorder_kmers_bioconda_jellyfish.py $inFile $outFile $kmer_size
+
+    rm ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.txt
+
+    #clean up the intermediate files:
+    for i in 0 1 2 3 4 5 6 7 8 9; do
+	rm ~/deep_learning_microbiome/data/${kmer_size}mers_jf/${dataset}/${file}_${kmer_size}mer.jf${i}*
+    done
+
+
+done
+
+
+
+
+
+
