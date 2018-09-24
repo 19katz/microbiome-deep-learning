@@ -6,7 +6,7 @@ import subprocess
 def write_command(batch, kmer_size):
     command="while read file; do\n"
     command += "echo $file\n"
-    command += "dir=/pollard/shattuck0/snayfach/metagenomes/MetaHIT/fastq/\n"
+    command += "dir=/pollard/home/ngarud/shattuck/metagenomic_fastq_files/MetaHIT/combined_fastq_files/\n"
     command += "jellyfish count <(zcat ${dir}/${file}_1.fastq.gz) <(zcat ${dir}/${file}_2.fastq.gz) /dev/fd/0 -m %s -s 100M -t 2 -C -F 2 -o ~/deep_learning_microbiome/data/%smers_jf/MetaHIT/${file}_%smer.jf \n" %(kmer_size,kmer_size, kmer_size) 
     command += "jellyfish dump ~/deep_learning_microbiome/data/%smers_jf/MetaHIT/${file}_%smer.jf | grep '>' | gzip > ~/deep_learning_microbiome/data/%smers_jf/MetaHIT/${file}_%smer.gz\n" %(kmer_size,kmer_size, kmer_size, kmer_size)
     command += "done <  ~/deep_learning_microbiome/tmp_intermediate_files/MetaHIT_batch_" + str(batch) + ".txt\n" 
@@ -22,10 +22,11 @@ def write_command(batch, kmer_size):
 # main  #
 #########
 
-kmer_size=7
+kmer_size=8
 number_of_processes=50
 
-list_of_samples=os.path.expanduser('~/deep_learning_microbiome/MetaHIT_accessions_only.txt')
+list_of_samples=os.path.expanduser('~/deep_learning_microbiome/data/metadata/MetaHIT_samples_only.txt')
+
 file=open(list_of_samples,'r')
 
 counter =0
