@@ -103,6 +103,7 @@ def load_metahit_kmers(kmer_size):
 
     labels = []
     for sample in sample_to_kmers:
+        sample_to_labels[sample][4] = sample
         labels.append(sample_to_labels[sample])
         kmer_cnts.append(np.sum(sample_to_kmers[sample], axis=0))
 
@@ -131,6 +132,7 @@ def load_metadata():
     
     exclude = []
     include_pasolli = []
+    include_pasolli_lechatelier = []
     with open(os.path.expanduser("~/deep_learning_microbiome/scripts/exclude.txt")) as text:
         for line in text:
             line = line.rstrip("\n")
@@ -142,6 +144,12 @@ def load_metadata():
             line = line.rstrip("\n")
             line = line.strip("'")
             include_pasolli.append(line)
+
+    with open(os.path.expanduser("~/deep_learning_microbiome/scripts/include_pasolli_lechatelier.txt")) as text:
+        for line in text:
+            line = line.rstrip("\n")
+            line = line.strip("'")
+            include_pasolli_lechatelier.append(line)
                 
 
     # Qin et al. T2D data:
@@ -162,7 +170,7 @@ def load_metadata():
             disease = "Healthy"
         if name in include_pasolli:
             run_accessions.append(run_accession)
-            metadata[run_accession] = [disease_status, 'T2D', 'Qin_et_al', disease]
+            metadata[run_accession] = [disease_status, 'T2D', 'Qin_et_al', disease, run_accession]
 
          
 
@@ -179,7 +187,7 @@ def load_metadata():
         else:
             disease = "Healthy"
         if run_accession not in exclude and run_accession != 'run_accession':
-            metadata[run_accession] = [disease_status, 'RA', 'RA', disease]
+            metadata[run_accession] = [disease_status, 'RA', 'RA', disease, run_accession]
 
     # MetaHIT IBD data:
     
@@ -198,7 +206,7 @@ def load_metadata():
         else:
             disease = "Healthy"
         if name in include_pasolli:
-            metadata[run_accession] = [disease_status, 'IBD', 'MetaHIT', disease]
+            metadata[run_accession] = [disease_status, 'IBD', 'MetaHIT', disease, run_accession]
 
 
     # HMP data (everyone is healthy):
@@ -211,7 +219,7 @@ def load_metadata():
         disease_status = '0'
         disease = 'Healthy'
         if run_accession not in exclude:
-            metadata[run_accession] = [disease_status, 'Healthy', 'HMP', disease]
+            metadata[run_accession] = [disease_status, 'Healthy', 'HMP', disease, run_accession]
     
 
     # Karlsson et al. (T2D European women)
@@ -246,7 +254,7 @@ def load_metadata():
                 disease_status ='1' # note that I'm collapsing T2D and Impaired Glucose Toleraance (IGT) into one group
                 disease = 'T2D'
             if sample_id in include_pasolli:
-                metadata[run_accession] = [disease_status,  'T2D', 'Karlsson_2013', disease]
+                metadata[run_accession] = [disease_status,  'T2D', 'Karlsson_2013', disease, run_accession]
 
 
 
@@ -266,7 +274,7 @@ def load_metadata():
             disease_status ='1'
             disease = 'LC'
         if sample_id in include_pasolli:
-            metadata[sample_id] = [disease_status,  'LC', 'LiverCirrhosis', disease]
+            metadata[sample_id] = [disease_status,  'LC', 'LiverCirrhosis', disease, sample_id]
 
     
 
@@ -284,7 +292,7 @@ def load_metadata():
             disease_status ='1'
             disease = 'CRC'
         if sample_id not in exclude:
-            metadata[sample_id] = [disease_status,  'CRC', 'Feng', disease]
+            metadata[sample_id] = [disease_status,  'CRC', 'Feng', disease, sample_id]
 
     #Zeller_CRC, France
     # 61 healthy, 27 small, 15 large adenocarcinmoas, 15,7,10,21 various stages of CRC
@@ -304,13 +312,32 @@ def load_metadata():
             disease_status ='1'
             disease = 'CRC'
         if sample_id in include_pasolli:
-            metadata[sample_id] = [disease_status,  'CRC', 'Zeller', disease]
+            metadata[sample_id] = [disease_status,  'CRC', 'Zeller', disease, sample_id]
+
+    #LeChatelier
+    LeChatelier_inFN='%s/LeChatelier_metadata.txt' %directory 
+    LeChatelier_file=open(LeChatelier_inFN, 'r')  
+    for line in LeChatelier_file:
+        items=line.strip('\n').split('\t')  
+        sample_id=items[0]
+        BMI=float(items[1])
+        if BMI <= 25:
+            disease_status='0'
+            disease = "Healthy"
+        else:
+            disease_status='1'
+            disease = "Obese"
+
+        if sample_id in include_pasolli_lechatelier:
+            metadata[sample_id] = [disease_status,  'Obese', 'LeChatelier', disease, sample_id]
+
     return metadata
 
 if __name__ == "__main__":
     for kmer_size in [5]:
         #kmers, labels = load_kmers(kmer_size, ['HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al'])
-        for dataset in ['HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al']:
+        for dataset in ['HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al',
+                'LeChatelier']:
             kmers, labels = load_kmers(kmer_size, [ dataset, ])
             total = kmers.shape[0]
             diseased = [labels[i][0] for i in range(len(labels))].count('1')
