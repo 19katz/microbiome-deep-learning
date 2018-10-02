@@ -299,14 +299,15 @@ def create_autoencoder_sequential(encoding_dim, input_dim, encoded_activation, d
 def create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded_activation):
     # note: this is a very basic model. 
     
+    #Seems weird- shouldn't the first argument be the output dimensions?
     model = Sequential()
     model.add(Dense(encoding_dim, activation=encoded_activation, input_dim=input_dim))
     model.add(Dense(1, activation=decoded_activation))
 
     # For a binary classification problem
               
-    #model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
+    #model.compile(optimizer='adadelta', loss='mean_squared_error', metrics=['accuracy'])
     return model
  
 
