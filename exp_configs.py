@@ -75,7 +75,9 @@ exp_configs = {
                                        #'SingleDiseaseFeng',
                                        #'ZellerReduced',
                                        #'KarlssonReduced',
-                                       'SingleDiseaseLiverCirrhosis',
+                                       #'SingleDiseaseLiverCirrhosis',
+                                       #'LeChatelier',
+                                       'KarlssonNoAdap',
                                      ], 'Dataset: {}'],
                 
                 norm_sample_key:   [ [
@@ -88,9 +90,9 @@ exp_configs = {
                 kmer_size_key:     [ [
                                         #5,
                                         #6,
-                                        7,
+                                        #7,
                                         8,
-                                        #10
+                                        10
                                       ]
 
                                      , 'Kmer Size used: {}'],
@@ -101,6 +103,13 @@ exp_configs = {
                                        [1, -1],
                                        #[1, 1/2, -1],
                                        #[1, "random"],
+                                       #[1, 6, -1],
+                                       #[1, 4, -1],
+                                       # [1, 8, -1],
+                                       # [1, 16, -1],
+                                       # [1, 32, -1],
+                                       # [1, 64, -1],
+                                       #[1, 1/8, -1],
                                        #[1, 2, -1],
                                        #[1, 4, -1],
                                        #[1, 8, -1]
@@ -110,40 +119,45 @@ exp_configs = {
                                        #[1, 1/2, 1/4, 1/8, "random"],
                                        #[1, 1/2, 1/4, 1/8, 1/16, "random"],
                                      ], "Layers for autoencoder's first half : {}" ],
-                enc_dim_key:       [ [256, 512, 1024],  'Encoding dimensions: {}' ],
+                enc_dim_key:       [ [
+                    #2,
+                    #4,
+                    #8,
+                    16,
+                ],  'Encoding dimensions: {}' ],
                 enc_act_key:       [ [
-                                         'sigmoid',
+                                         #'sigmoid',
                                          #'relu',
-                                         #'linear',
+                                         'linear',
                                          #'softmax',
                                          #'tanh',
                                      ], 'Encoding activation: {}' ],
                 code_act_key:      [ [
                                          #SAME_AS_ENC,
                                          'linear',
-                                         'softmax',
+                                         #'softmax',
                                          'sigmoid',
-                                         'relu',
-                                         'tanh',
+                                         #'relu',
+                                         #'tanh',
 
                                      ], 'Code (last encoding) layer activation: {}' ],
                 # Decoding activations are fixed as linear as they are popped off anyway
                 # after autoencoder training
                 dec_act_key:       [ [
                                          #SAME_AS_ENC,
-                                         #'linear',
+                                         'linear',
                                          #'sigmoid',
                                          #'relu',
                                          #'softmax',
-                                         'tanh',
+                                         #'tanh',
                                      ], 'Decoding layer activation: {}' ],
                 out_act_key:       [ [
 
                                          #SAME_AS_ENC,
-                                         #'linear',
+                                         'linear',
                                          #'sigmoid',
                                          #'relu',
-                                         'softmax',
+                                         #'softmax',
                                          #'tanh',
                                      ], 'Last decoding layer activation: {}' ],
                 
@@ -164,7 +178,7 @@ exp_configs = {
                                          #'tanh',
                                         ], 'Autoencoder activation: {}', None ],
                                         
-                pca_dim_key:       [ [0],
+                pca_dim_key:       [ [75, 82],
                                       
                                      'Number of principal components for PCA, if 0 no PCA should be used: {}', 0],
 
@@ -208,11 +222,13 @@ exp_configs = {
                                       ], 'Batch size used during training: {}' ],
                 # two booleans
                 batch_norm_key:    [ [0], 'Use batch normalization: {}' ],
-                dropout_pct_key:   [ [0, 0.25, 0.5, 
-                    #0.25, 0.35, 0.5, 0.75
+                dropout_pct_key:   [ [0,
+                                      #0.25, 0.5, 
+                                      #0.25, 0.35, 0.5, 0.75
                                       ], 'Dropout percent: {}', 0],
-                input_dropout_pct_key: [ [0,0.25, 0.5, 
-                    #0.25, 0.35, 0.5, 0.75
+                input_dropout_pct_key: [ [0,
+                                          #0.25, 0.5, 
+                                          #0.25, 0.35, 0.5, 0.75
                                           ], 'Dropout percent on input layer: {}', 0],
                 act_reg_key:       [ [0], 'Activation regularization (for sparsity): {}' ],
                 # boolean
@@ -223,7 +239,7 @@ exp_configs = {
                 # boolean for whether no randomness should be used
                 no_random_key:    [ [0], "Eliminate randomness in training: {}" ],
                 # number of iterations
-                num_iters_key:    [ [1], "Number of iterations: {}" ],
+                num_iters_key:    [ [5], "Number of iterations: {}" ],
                 # the current iteration index
                 iter_key:    [ [0], "Iteration: {}" ],
                 # boolean
@@ -233,8 +249,8 @@ exp_configs = {
 
                 # misc
                 backend_key:   [ [K.backend()], 'Backend: {}' ],
-                version_key:   [ ['AD'], 'Version (catching all other unnamed configs): {}' ],
-                max_norm_key:  [ [0, 1, 2, 3, 4], 'Max norm for kernel constraint: {}', 0]
+                version_key:   [ ['noadap'], 'Version (catching all other unnamed configs): {}' ],
+                max_norm_key:  [ [0,], 'Max norm for kernel constraint: {}', 0]
             }
 
 class ConfigIterator:
@@ -365,9 +381,6 @@ def change_layers(next_config_dict):
 
     next_config_dict[after_ae_layers_key] = after_ae_layers
 
-    if next_config_dict[dropout_pct_key] == 0:
-        next_config_dict[input_dropout_pct_key] = 0
-            
 if __name__ == "__main__":
     for config in ConfigIterator(random=True, count=20):
         print(name_file_from_config(config))

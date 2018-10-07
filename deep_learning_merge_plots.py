@@ -26,9 +26,11 @@ config_aggr_results = {}
 config_ae_results = {}
 
 dataset_label = { 'SingleDiseaseMetaHIT': 'MetaHIT', 'KarlssonReduced': 'Karlsson', 'SingleDiseaseFeng': 'Feng', 'SingleDiseaseQin': 'Qin', 
-                  'SingleDiseaseLiverCirrhosis': 'LiverCirrhosis', 'SingleDiseaseRA': 'RA', 'ZellerReduced': 'Zeller' }
+                  'SingleDiseaseLiverCirrhosis': 'LiverCirrhosis', 'SingleDiseaseRA': 'RA', 'ZellerReduced': 'Zeller', 'KarlssonNoAdap': 'Karlsson No Adapter', 'RANoAdap': 'RA No Adapter',
+                  'LeChatelier': 'LeChatelier'}
 
-dataset_color = { 'MetaHIT': 'r', 'Qin': 'g', 'Karlsson': 'b', 'LiverCirrhosis': 'c', 'Feng': 'm', 'Zeller': 'darkblue', 'RA': 'darkorange', }
+dataset_color = { 'MetaHIT': 'r', 'Qin': 'g', 'Karlsson': 'b', 'LiverCirrhosis': 'c', 'Feng': 'm', 'Zeller': 'darkblue', 'RA': 'darkorange', 'Karlsson No Adapter': 'black', 'RA No Adapter': 'brown',
+                  'LeChatelier': 'purple' }
 
 def process_pickles(filenames):
     roc_aucs = []

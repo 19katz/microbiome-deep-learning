@@ -26,6 +26,9 @@ config_aggr_results = {}
 
 model_type = ''
 
+# Map dataset to color for plotting on the same chart
+dataset_color = { 'MetaHIT': 'r', 'Qin': 'g', 'Karlsson': 'b', 'Karlsson No Adapter': 'black', 'LiverCirrhosis': 'c', 'Feng': 'm', 'Zeller': 'darkblue', 'RA': 'darkorange', 'RA No Adapter': 'brown', 'LeChatelier': 'purple', }
+
 def process_pickles(filenames):
     roc_aucs = []
     for filename in filenames:
@@ -62,6 +65,16 @@ def process_pickles(filenames):
     compute_t_stats()
 
 
+def to_cls_name(name):
+    # table for converting different dataset/model names for the same dataset to the original dataset name
+    # so the plot labels are more readable and the real/shuffled plots for the same dataset use the same color
+    # 'MetaHIT1' was used by mistake as the dataset name for shuffled LeChatelier SVM model
+    t = { 'RA1': 'RA', 'Qin2': 'Qin', 'Qin2-shuffle': 'Qin', 'MetaHIT1': 'LeChatelier', 'LeChatelier1': 'LeChatelier', 'RASVMNoAdapter': 'RA No Adapter',
+          'KarlssonSVMNoAdapter': 'Karlsson No Adapter', 'KarlssonNoAdapter2': 'Karlsson No Adapter', 'RANoAdapter': 'RA No Adapter', }
+    if name in t:
+        return t[name]
+    else:
+        return name
 
 # Plot all the ROCs from all of the input files
 def plot_all_roc_aucs(roc_auc_info_list, config='', name='pickled_all_roc_auc', title='ROC Curves', 
@@ -69,13 +82,16 @@ def plot_all_roc_aucs(roc_auc_info_list, config='', name='pickled_all_roc_auc', 
     fig = pylab.figure()
     lw = 2
 
-    color_list = ['b','g','r','c','m','orange', 'darkblue']
+    #color_list = ['b','g','r','c','m','orange', 'darkblue']
     #roc_colors = cycle(['green', 'red', 'blue', 'purple', 'darkorange', 'darkgreen'])
-    roc_colors = cycle(color_list)
+    #roc_colors = cycle(color_list)
 
     color = None
     config_color = {}
+    dataset_names = []
+    colors = []
     for cls_name, shuffled, config, fpr, tpr, roc_auc, accs, std_down, std_up in roc_auc_info_list:
+        '''
         config_key = re.sub(r'_SL:1', '_SL:0', config)
         if not config_key in config_color:
             color = next(roc_colors)
@@ -84,6 +100,14 @@ def plot_all_roc_aucs(roc_auc_info_list, config='', name='pickled_all_roc_auc', 
         else:
             color = config_color[config_key]
             #print("using color for " + config + ": " + color)
+        '''
+        print("Plotting for " + config)
+        cls_name = to_cls_name(cls_name)
+        color = dataset_color[cls_name]
+
+        if cls_name not in dataset_names:
+            dataset_names.append(cls_name)
+            colors.append(color)
 
         i = None
         if 2 in fpr:
@@ -117,8 +141,8 @@ def plot_all_roc_aucs(roc_auc_info_list, config='', name='pickled_all_roc_auc', 
     real_models = list(filter(lambda r: not r[1], roc_auc_info_list))
     # roc_colors = ['b','g','r','c','m','orange', 'teal']
     #leg_col = [pylab.Rectangle((0, 0), 1, 1, fc=s, linewidth=0) for s in roc_colors[:len(real_models)]] + [pylab.Line2D([0,1], [0,1], c='k', ls='-', lw=2)] + [pylab.Line2D([0,1], [0,1], c='k', ls='--', lw=2)]
-    leg_col = [pylab.Rectangle((0, 0), 0.25, 0.25, fc=s, linewidth=0) for s in color_list[:len(real_models)]] + [pylab.Line2D([0,0.25], [0,0.25], c='k', ls='-', lw=2)] + [pylab.Line2D([0,0.25], [0,0.25], c='k', ls='--', lw=2)]
-    leg_l = [r[0] for r in real_models] + ['Real labels'] + ['Shuffled labels']
+    leg_col = [pylab.Rectangle((0, 0), 0.25, 0.25, fc=s, linewidth=0) for s in colors] + [pylab.Line2D([0,0.25], [0,0.25], c='k', ls='-', lw=2)] + [pylab.Line2D([0,0.25], [0,0.25], c='k', ls='--', lw=2)]
+    leg_l = dataset_names + ['Real labels'] + ['Shuffled labels']
     #leg = pylab.legend(leg_col, leg_l, prop={'size':plot_title_size}, loc='center left', bbox_to_anchor=(1.02,0.5), numpoints=1)
 
     pylab.gca().set_position((0.0, .7, .8, .8))

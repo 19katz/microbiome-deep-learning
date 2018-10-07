@@ -95,7 +95,6 @@ plot_text_size = 10
 plot_title_size = plot_text_size + 2
 
 test_pct = 0.2
-input_drop_pct = 0
 
 dataset_load_name = None
 
@@ -128,6 +127,9 @@ dataset_dict = {
     'SingleDiseaseRA': ('RA', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'RA']), 3, [ 'Healthy', 'RA', ],
                         ['green', 'darkorange', ], datasource_marker, 'RA'),
 
+    'RANoAdap': ('RA', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'RA_no_adapter']), 3, [ 'Healthy', 'RA', ],
+                        ['green', 'darkorange', ], datasource_marker, 'RA_no_adapter'),
+
     'SingleDiseaseFeng': ('CRC', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Feng']), 3, [ 'Healthy', 'CRC', ],
                         ['green', 'blue', ], datasource_marker, 'Feng'),
     
@@ -140,6 +142,12 @@ dataset_dict = {
 
     'KarlssonReduced': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013']), 3, [ 'Healthy', 'T2D', ],
                         ['green', 'brown', ], datasource_marker, 'Karlsson_2013'),
+
+    'KarlssonNoAdap': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Karlsson_2013_no_adapter']), 3, [ 'Healthy', 'T2D', ],
+                       ['green', 'brown', ], datasource_marker, 'Karlsson_2013_no_adapter'),
+
+    'LeChatelier': ('Obese', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'LeChatelier']), 3, [ 'Healthy', 'Obese', ],
+                        ['green', 'darkbrown', ], datasource_marker, 'LeChatelier'),
 
     'T2D-HMP': ('T2D', lambda kmer_size: load_kmers(kmer_size = kmer_size, data_sets = [ 'Qin_et_al', 'Karlsson_2013', 'HMP']), 3, [ 'Healthy', 'T2D', ],
                 ['green', 'purple', ], datasource_marker),
@@ -276,8 +284,10 @@ def get_k_folds(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_lab
         setup_randomness(no_random)
         
         if (get_config_val(shuffle_labels_key, exp_config)):
+            orig_target = np.copy(orig_target)
             np.random.shuffle(orig_target)
         elif (get_config_val(shuffle_abunds_key, exp_config)):
+            data = np.copy(data)
             for r in data:
                 np.random.shuffle(r)
             
@@ -298,13 +308,13 @@ def get_k_folds(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_lab
             skf = StratifiedShuffleSplit(target_labels, n_iter=1, test_size=test_pct, random_state=(i if no_random else None))
 
         x_y_info_train_test_it = []
-        
+
+        x_y_info_train_test_it.append([data, target, orig_target])
+
         # the current active fold
         # This loop is executed K times for K folds and only once for single split
         for train_idx, test_idx in skf:
-            x_train, y_train, info_train = data[train_idx], target[train_idx], orig_target[train_idx]
-            x_test, y_test, info_test = data[test_idx], target[test_idx], orig_target[test_idx]
-            x_y_info_train_test_it.append([x_train, y_train, info_train, x_test, y_test, info_test])
+            x_y_info_train_test_it.append([train_idx, test_idx])
         x_y_info_train_test.append(x_y_info_train_test_it)
     dataset_k_fold[(dataset, num_iters, use_kfold, no_random, kmer_size, shuffle_labels, shuffle_abunds)] = x_y_info_train_test
     return x_y_info_train_test
@@ -379,11 +389,12 @@ def exec_config(k_folds):
         exp_config[iter_key] = i
         exp_config[kfold_key] = 0
         x_y_info_train_test_it  = x_y_info_train_test[i]
-        for x_y_info_fold in x_y_info_train_test_it:
+        data, target, orig_target = x_y_info_train_test_it[0]
+        for (train_idx, test_idx) in x_y_info_train_test_it[1:]:
             global x_train, y_train, info_train, x_test, y_test, info_test
             # set up the training/test sample and target matrices - the info matrix is used for plotting
-            x_train, y_train, info_train = x_y_info_fold[0], x_y_info_fold[1], x_y_info_fold[2]
-            x_test, y_test, info_test = x_y_info_fold[3], x_y_info_fold[4], x_y_info_fold[5]
+            x_train, y_train, info_train = data[train_idx], target[train_idx], orig_target[train_idx]
+            x_test, y_test, info_test = data[test_idx], target[test_idx], orig_target[test_idx]
 
             normalize_train_test()
 
@@ -648,8 +659,8 @@ def cnt_to_coding_layer():
         num_layers += len(exp_config[layers_key]) - 1
     if not exp_config[dropout_pct_key] == 0:
         num_layers += len(exp_config[layers_key]) - 1
-        if not exp_config[input_dropout_pct_key] == 0:
-            num_layers += 1
+    if not exp_config[input_dropout_pct_key] == 0:
+        num_layers += 1
     return num_layers
 
 def cnt_from_decoding():
@@ -673,7 +684,7 @@ def build_train_test(layers):
 
     # the autoencoder
     autoencoder = Sequential()
-    if (not exp_config[input_dropout_pct_key] == 0) and (not exp_config[dropout_pct_key] == 0):
+    if (not exp_config[input_dropout_pct_key] == 0):
         autoencoder.add(Dropout(float(exp_config[input_dropout_pct_key]), input_shape=(layers[0],)))
 
     # layers before the middle code layer - they share the same activation function
@@ -1360,18 +1371,61 @@ if __name__ == '__main__':
         # Overall plotting - aggregate results across both folds and iteration
         plot_overall = True
 
+        '''
+        dataset_configs['LeChatelier'] = [
+            #'LS:32896-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:lechat_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_',
+            'LS:32896-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:lechat_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_',
+        ]
+        '''
+
         #'''
+        dataset_configs['KarlssonNoAdap'] = [
+            #'LS:82-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:82_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:noadap_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_',
+            'LS:80-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:80_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:noadap_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_',
+            #'LS:80-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:80_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:noadap_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_',
+        ]
+        #'''
+
+        '''
+        dataset_configs['KarlssonNoAdap'] = [
+            'LS:50-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:50_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:10_MN:0_AD:_AL:_AA:None_NM:0_CW:0',
+            ]
+        '''
+
+        '''
         dataset_configs['SingleDiseaseMetaHIT'] = [
             'LS:8192-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:18_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
             ]
             
-        #'''
+        '''
+
+
+        '''
+        dataset_configs['SingleDiseaseQin'] = [
+            'DS:SingleDiseaseQin_LS:8192-3_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:18s_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
+            ]
+        '''
 
         '''
         dataset_configs['SingleDiseaseQin'] = [
             'DS:SingleDiseaseQin_LS:8192-3_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:1_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:tensorflow_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
             ]
         '''
+
+        '''
+        dataset_configs['SingleDiseaseLiverCirrhosis'] = [
+            #"LS:32896-4-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:lifinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-4-4_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:lifinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-6-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:lifinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-8-4_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:lifinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-4_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zell_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zell_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-6-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:lifinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-6-4_EA:linear_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:lifinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-4-64_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:64_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:lifinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+        ]
+        '''
+
         '''
         dataset_configs['SingleDiseaseLiverCirrhosis'] = [
             'DS:SingleDiseaseLiverCirrhosis_LS:32896-8-2_EA:sigmoid_CA:softmax_DA:NA_OA:NA_ED:2_PC:0_AEP:1_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
@@ -1380,9 +1434,40 @@ if __name__ == '__main__':
 
         '''
         dataset_configs['ZellerReduced'] = [
+            "LS:32896-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-4_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-2_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-16_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:16_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+        ]
+        '''
+
+        '''
+        #dataset_configs['ZellerReduced'] = [
+            #"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-8_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-2_EA:relu_CA:relu_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+        #]
+        '''
+
+        '''
+        dataset_configs['ZellerReduced'] = [
+            #"LS:32896-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:4_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-32_EA:linear_CA:linear_DA:NA_OA:NA_ED:32_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:4_AD:_AL:_AA:linear_NM:0_CW:0_",
+
+            #"LS:32896-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.25_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            "LS:32896-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0.35_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:zefinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:4_AD:_AL:_AA:linear_NM:0_CW:0_",
+        ]
+        '''
+
+        '''
+        dataset_configs['ZellerReduced'] = [
             'DS:ZellerReduced_LS:512-32_EA:softmax_CA:softmax_DA:NA_OA:NA_ED:32_PC:0_AEP:50_SEP:400_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0.75_IDP:0.75_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:5_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
         ]
         '''
+
 
         '''
         dataset_configs['SingleDiseaseFeng'] = [
@@ -1396,10 +1481,37 @@ if __name__ == '__main__':
         ]
         '''
         
+        '''
+        dataset_configs['SingleDiseaseRA'] = [
+            #"LS:32896-2_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:400_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            # "LS:32896-8_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            # "LS:32896-8_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:8_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            # "LS:32896-64_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:64_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            # "LS:32896-2_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            # "LS:32896-4_EA:linear_CA:linear_DA:NA_OA:NA_ED:4_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            # "LS:32896-4_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:4_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rafinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rafinal_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+
+            #"LS:32896-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+
+            # "LS:32896-32_EA:tanh_CA:tanh_DA:NA_OA:NA_ED:32_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-1_EA:linear_CA:linear_DA:NA_OA:NA_ED:1_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-3_EA:linear_CA:linear_DA:NA_OA:NA_ED:3_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rasearch_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+        ]
+        '''
+
+        '''
+        dataset_configs['RANoAdap'] = [
+            "LS:32896-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rafinal_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+            #"LS:32896-2_EA:linear_CA:linear_DA:NA_OA:NA_ED:2_PC:0_AEP:0_SEP:200_BS:8_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:rafinal_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:8_MN:0_AD:_AL:_AA:linear_NM:0_CW:0_",
+
+        ]
+        '''
         
         '''
         dataset_configs['KarlssonReduced'] = [
-            'DS:KarlssonReduced_LS:50-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:50_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:18_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:10_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
+            'DS:KarlssonReduced_LS:50-32_EA:sigmoid_CA:sigmoid_DA:NA_OA:NA_ED:32_PC:50_AEP:50_SEP:200_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:memtest_AU:0_NR:0_SL:1_SA:0_UK:10_ITS:20_KS:10_MN:0_AD:_AL:_AA:None_NM:0_CW:0'
             ]
         '''
 
@@ -1408,16 +1520,23 @@ if __name__ == '__main__':
 
         '''
         dataset_configs['SingleDiseaseRA'] = [
-            "LS:8192-32_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
-            "LS:2080-64_EA:linear_CA:linear_DA:softmax_OA:softmax_ED:64_PC:0_AEP:50_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:H-R-F-L-Z-M-K_",
-            "LS:2080-64_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:64_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:H-R-F-L-Z-M-K_",
-            "LS:8192-32_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:32_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
-            "LS:8192-64_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:64_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
-            "LS:2080-50_EA:relu_CA:relu_DA:softmax_OA:softmax_ED:50_PC:0_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:H-R-F-L-Z-M-K_",
-            "LS:8192-32_EA:linear_CA:linear_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
-            "LS:2080-32_EA:tanh_CA:tanh_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:H-R-F-L-Z-M-K_",
-            "LS:8192-64_EA:linear_CA:linear_DA:linear_OA:linear_ED:64_PC:0_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
-            "LS:8192-4096-64_EA:linear_CA:sigmoid_DA:linear_OA:softmax_ED:64_PC:0_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:H-R-F-L-Z-M-K_",
+            "LS:2080-64_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:64_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:0_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:_",
+            ]
+        '''
+
+        '''
+        dataset_configs['SingleDiseaseRA'] = [
+
+            "LS:2080-32_EA:tanh_CA:tanh_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:R-F-L-Z-M_",
+            "LS:2080-50_EA:relu_CA:relu_DA:softmax_OA:softmax_ED:50_PC:0_AEP:50_SEP:200_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:R-F-L-Z-M_",
+            "LS:2080-64_EA:sigmoid_CA:sigmoid_DA:linear_OA:linear_ED:64_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:R-F-L-Z-M_",
+            "LS:2080-64_EA:linear_CA:linear_DA:softmax_OA:softmax_ED:64_PC:0_AEP:50_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:6_MN:0_AD:R-F-L-Z-M_",
+            "LS:8192-32_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:200_BS:16_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:R-F-L-Z-M_",
+            "LS:8192-32_EA:tanh_CA:tanh_DA:tanh_OA:tanh_ED:32_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:R-F-L-Z-M_",
+            "LS:8192-32_EA:linear_CA:linear_DA:relu_OA:relu_ED:32_PC:0_AEP:50_SEP:400_BS:16_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:R-F-L-Z-M_",
+            "LS:8192-64_EA:sigmoid_CA:sigmoid_DA:relu_OA:relu_ED:64_PC:0_AEP:50_SEP:400_BS:32_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:R-F-L-Z-M_",
+            "LS:8192-64_EA:linear_CA:linear_DA:linear_OA:linear_ED:64_PC:0_AEP:50_SEP:200_BS:32_LF:kullback_leibler_divergence_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:R-F-L-Z-M_",
+            "LS:8192-4096-64_EA:linear_CA:sigmoid_DA:linear_OA:softmax_ED:64_PC:0_AEP:50_SEP:400_BS:8_LF:mean_squared_error_BN:0_DP:0_IDP:0_AR:0_NI:1_ES:0_PA:2_NO:L1_BE:theano_V:16_AU:1_NR:0_SL:0_SA:0_UK:10_ITS:20_KS:7_MN:0_AD:R-F-L-Z-M_",
 
             ]
         '''

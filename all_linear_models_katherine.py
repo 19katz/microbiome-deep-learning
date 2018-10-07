@@ -43,7 +43,7 @@ random_state = None
 # From the second, diseased samples will be extracted.
 # The two sets will then be combined. 
 data_sets_to_use = [
-    [['MetaHIT'], ['MetaHIT']],
+    #[['MetaHIT'], ['MetaHIT']],
     #[['Qin_et_al'], ['Qin_et_al']],
     #[['Zeller_2014'], ['Zeller_2014']],
     #[['LiverCirrhosis'], ['LiverCirrhosis']],
@@ -51,7 +51,10 @@ data_sets_to_use = [
     #[['RA'], ['RA']],
     #[['Feng'], ['Feng']],
     #[['Karlsson_2013', 'Qin_et_al'], ['Karlsson_2013', 'Qin_et_al']],
-    #[['Feng', 'Zeller_2014'],['Feng', 'Zeller_2014']]
+    #[['Feng', 'Zeller_2014'],['Feng', 'Zeller_2014']],
+    #[['LeChatelier'], ['LeChatelier']],
+    #[['Karlsson_2013_no_adapter'], ['Karlsson_2013_no_adapter']],
+    [['RA_no_adapter'], ['RA_no_adapter']],
     ]
 
 
@@ -196,7 +199,7 @@ if __name__ == '__main__':
 
                 normalized = " with normalization"
                 if learn_type == "rf" and not norm_for_rf:
-                    normalizd = " without normalization"
+                    normalized = " without normalization"
                 print( str(accuracies[i]) + "(acc) produced by params for samples from " + str(data_set) +
                   " with model " + learn_type + normalized + " and kmer size " + str(kmer_size)
                   + ": " + str(all_params[i]))

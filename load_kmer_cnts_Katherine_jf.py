@@ -337,7 +337,7 @@ if __name__ == "__main__":
     for kmer_size in [5]:
         #kmers, labels = load_kmers(kmer_size, ['HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al'])
         for dataset in ['HMP', 'Feng', 'Zeller_2014', 'RA', 'MetaHIT','LiverCirrhosis', 'Karlsson_2013', 'Qin_et_al',
-                'LeChatelier']:
+                        'LeChatelier', 'RA_no_adapter', 'Karlsson_2013_no_adapter']:
             kmers, labels = load_kmers(kmer_size, [ dataset, ])
             total = kmers.shape[0]
             diseased = [labels[i][0] for i in range(len(labels))].count('1')
