@@ -124,26 +124,28 @@ plot_UMAP(X, y, layer = 'none')
 # standalone model without varying dimensions #
 ###############################################
 
-#input_dim=len(data_normalized[0]) # this is the number of input kmers
+input_dim=len(data_normalized[0]) # this is the number of input kmers
 #encoding_dim=8
+encoding_dim=int(len(data_normalized[0])*1/2)
 
-#encoded_activation = 'relu'
 #encoded_activation = 'sigmoid'
-#encoded_activation = 'linear'
 #decoded_activation = 'softmax'
-#decoded_activation = 'sigmoid'
-#decoded_activation = 'softmax'
+encoded_activation = 'relu'
+decoded_activation = 'sigmoid'
 
-#loss='binary_crossentropy'
+loss='binary_crossentropy'
+#loss = 'mean_squared_error'
 
-#model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded_activation)
+model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation, decoded_activation)
 
-#numEpochs = 1000
-#batchSize = 32
+numEpochs = 1000
+#numEpochs = 400
+batchSize = 32
+#batchSize = 16
 
-#history = History()
+history = History()
 
-#model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
+model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
 
 ###############################                      
 # get encoded weights to TsNE #
@@ -172,29 +174,30 @@ plot_UMAP(X, y, layer = 'none')
 # Visualize hidden layer activations w/TsNE #
 #############################################
 
-#intermediate_layer_model = Model(inputs=model.input,
-#                                 outputs=model.layers[0].output)
-#intermediate_output = intermediate_layer_model.predict(data_normalized)
+intermediate_layer_model = Model(inputs=model.input,
+                                 outputs=model.layers[0].output)
+intermediate_output = intermediate_layer_model.predict(data_normalized)
 
-#X = intermediate_output
-#y = np.array(labels)
+X1 = intermediate_output
+y = np.array(labels)
 
-#plot_TSNE(X, y, layer = 'hidden_activations')
+#Plots
+plot_TSNE(X1, y, layer = 'hidden_activations')
+plot_UMAP(X1, y, layer = 'hidden_activations')
 
-
-######################################                                                                                                                          
-# Visualize full model output w/TsNE #                                                                                                                          
+######################################                                                                                                
+# Visualize full model output w/TsNE #                                                                                         
 ######################################
 
-#final_layer_model = Model(inputs=model.input, outputs=model.layers[-1].output)
-#final_output = final_layer_model.predict(data_normalized)
+final_layer_model = Model(inputs=model.input, outputs=model.layers[-1].output)
+final_output = final_layer_model.predict(data_normalized)
 
-#X = final_output
-#y = np.array(labels)
+X2 = final_output
+y = np.array(labels)
 
-#TsNE plot                                                                                                                                                                                                #
-#plot_TSNE(X, y, layer = 'final')
-
+#Plots
+plot_TSNE(X2, y, layer = 'final')
+plot_UMAP(X2, y, layer = 'final')
 
 #######################################################################
 # How does changing t-SNE parameters change the output visualization? #
@@ -225,7 +228,8 @@ def draw_tsne(n_components=2, perplexity=30, learning_rate=200, init='random', n
     plt.title(title, fontsize=18)
     plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/" + str(kmer_size) + "mers/" + title + ".pdf")
 
-# t-SNE tuning                                                                                                                                                   
+
+# t-SNE tuning                                                                                                                        
 encoding_dims = []
 #encoding_dims=[300]                                                                                                                                                                                     
 for encoding_dim in encoding_dims:
@@ -264,8 +268,9 @@ for encoding_dim in encoding_dims:
     #init                                                                                                                                                                                                 
     #draw_tsne(init='pca', title=str(encoding_dim) + 'pca_init') 
 
-############################################################################                                                                                                                              # How does number of encoding dimensions change the output visualization? #                                                                                                                               
-############################################################################                                                                                                                              
+############################################################################                                         
+# How does number of encoding dimensions change the output visualization? #
+############################################################################                                                          
 
 #final output not compatible with PCA for some reason
 

@@ -20,6 +20,7 @@ import argparse
 import load_kmer_cnts_jf
 import warnings
 from sklearn.exceptions import ConvergenceWarning
+from sklearn.decomposition import NMF
 from sklearn.utils import shuffle
 import _search
 import _validation
@@ -45,16 +46,13 @@ random_state = None
 data_sets_to_use = [
     #[['MetaHIT'], ['MetaHIT']],
     #[['Qin_et_al'], ['Qin_et_al']],
-    #[['Zeller_2014'], ['Zeller_2014']],
+#    [['Zeller_2014'], ['Zeller_2014']],
     [['LiverCirrhosis'], ['LiverCirrhosis']],
     #[['Karlsson_2013'], ['Karlsson_2013']],
     #[['RA'], ['RA']],
     #[['Feng'], ['Feng']],
     #[['Karlsson_2013', 'Qin_et_al'], ['Karlsson_2013', 'Qin_et_al']],
-    #[['Feng', 'Zeller_2014'],['Feng', 'Zeller_2014']],
-    #[['LeChatelier'], ['LeChatelier']],
-    #[['Karlsson_2013_no_adapter'], ['Karlsson_2013_no_adapter']],
-    [['RA_no_adapter'], ['RA_no_adapter']],
+    #[['Feng', 'Zeller_2014'],['Feng', 'Zeller_2014']]
     ]
 
 
@@ -66,7 +64,7 @@ param_dict = {
              {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}],
     
     "rf": {
-           "n_estimators": [400, 500],
+           "n_estimators": [400],
             "criterion": ["gini"],
             # "max_features": ["auto", "sqrt", "log2", None],
             "max_features": ["sqrt"],
@@ -114,9 +112,8 @@ if __name__ == '__main__':
     parser.add_argument('-cvt', type = int, default = 10, help = "Number of CV folds for testing")
     parser.add_argument('-ng', type = int, default = 20, help = "Number of iterations of k-fold cross validation for grid search")
     parser.add_argument('-nt', type = int, default = 20, help = "Number of iterations of k-fold cross validation for testing")
-    parser.add_argument('-nrf', type = bool, default = True, help = "Whether to use normalization on the random forest")
-
-
+    parser.add_argument('-nrf', type = bool, default = False, help = "Whether to use normalization on the random forest")
+    #parser.add_argument('-nmf', type = bool, default = False, help = "Whether to conduct NMF after normalizing data")
 
     arg_vals = parser.parse_args()
     learn_type = arg_vals.m
@@ -126,6 +123,7 @@ if __name__ == '__main__':
     n_iter_grid = arg_vals.ng
     n_iter_test = arg_vals.nt
     norm_for_rf = arg_vals.nrf
+    #nmf_option = arg_vals.nmf
     # Loop over all data sets
 
     
@@ -141,112 +139,111 @@ if __name__ == '__main__':
 
         # Normalize and shuffle the data
         data_normalized = normalize(kmer_cnts, axis = 1, norm = 'l1')
-        data_normalized, labels = shuffle(data_normalized, labels, random_state=0)
 
-        # Set up data and labels
-        x = data_normalized
-        y = labels
+        #if nmf_option == False:
+        #    data_normalized, labels = shuffle(data_normalized, labels, random_state=0)
+        #    x = data_normalized
+        #    y = labels
 
-        param_grid = param_dict[learn_type]
+        #elif nmf_option == True:
+        n_comp = [2, 3, 4, 5, 15, 30, 50, 60, 70, 75, 80, 85, 100]
+        for n in n_comp:
+            V = data_normalized.T
+            model = NMF(n_components = n, init='random', random_state=0, solver = 'mu', beta_loss = 'frobenius', max_iter = 1000)
+            W = model.fit_transform(V)
+            H = model.components_
+            data_normalized = H.T            
+            data_normalized, labels = shuffle(data_normalized, labels, random_state=0)
+            x = data_normalized
+            y = labels
+
+            param_grid = param_dict[learn_type]
         
                 
-        # For SVM and Random forest, use GridSearchCV
-        # and cross_val_score to do a nested cross-validation
-        if learn_type == "svm" or learn_type == "rf":
-            # Set the estimator based on the model type
-            if (learn_type == "svm"):
-                estimator = SVC(C = 1, probability = True)
-            else:
-                estimator = RandomForestClassifier(n_estimators=500, max_depth=None, min_samples_split=2, n_jobs=-1)
-            k_fold = RepeatedStratifiedKFold(n_splits=cv_gridsearch, n_repeats=n_iter_grid)
-            if learn_type == "rf" and not norm_for_rf:
-                grid_search = GridSearchCV(estimator, param_grid, cv = k_fold, n_jobs = -1)
-            else:
-                grid_search = _search.GridSearchCV(estimator, param_grid, cv = k_fold, n_jobs = 1)
-                
-            grid_search.fit(x, y)
-
-            grid_search_results = grid_search.cv_results_
-            rank = np.array(grid_search_results['rank_test_score'])
-            accuracies = np.array(grid_search_results['mean_test_score'])
-            all_params = np.array(grid_search_results['params'])
-
-            sort_idx = np.argsort(rank)
-            rank = rank[sort_idx]
-            accuracies = accuracies[sort_idx]
-            all_params = all_params[sort_idx]
-
-            for i in range(len(rank)):
-                param_grid = all_params[i]
-                current_estimator = None
+            if learn_type == "svm" or learn_type == "rf":
                 if (learn_type == "svm"):
-                    C = param_grid["C"]
-                    kernel = param_grid["kernel"]
-                    if not kernel == "linear":
-                        gamma = param_grid["gamma"]
-                        current_estimator = SVC(C = C, gamma = gamma, kernel = kernel, probability = True)
-                    else:
-                        current_estimator = SVC(C = C, kernel = kernel, probability = True)
+                    estimator = SVC(C = 1, probability = True)
                 else:
-                    criterion = param_grid["criterion"]
-                    max_depth = param_grid["max_depth"]
-                    max_features = param_grid["max_features"]
-                    min_samples_split = param_grid["min_samples_split"]
-                    n_estimators = param_grid["n_estimators"]
-                    n_jobs = -1
-                    current_estimator = RandomForestClassifier(criterion=criterion, max_depth=max_depth, max_features=max_features,
-                                                       min_samples_split=min_samples_split, n_estimators=n_estimators, n_jobs=n_jobs)
+                    estimator = RandomForestClassifier(n_estimators=500, max_depth=None, min_samples_split=2, n_jobs=-1)
+                k_fold = RepeatedStratifiedKFold(n_splits=cv_gridsearch, n_repeats=n_iter_grid)
+                if learn_type == "rf" and not norm_for_rf:
+                    grid_search = GridSearchCV(estimator, param_grid, cv = k_fold, n_jobs = -1)
+                else:
+                    grid_search = _search.GridSearchCV(estimator, param_grid, cv = k_fold, n_jobs = 1)
+                
+                grid_search.fit(x, y)
 
-                normalized = " with normalization"
-                if learn_type == "rf" and not norm_for_rf:
-                    normalized = " without normalization"
-                print( str(accuracies[i]) + "(acc) produced by params for samples from " + str(data_set) +
-                  " with model " + learn_type + normalized + " and kmer size " + str(kmer_size)
-                  + ": " + str(all_params[i]))
-                '''
-                if learn_type == "rf" and not norm_for_rf:
+                grid_search_results = grid_search.cv_results_
+                rank = np.array(grid_search_results['rank_test_score'])
+                accuracies = np.array(grid_search_results['mean_test_score'])
+                all_params = np.array(grid_search_results['params'])
+
+                sort_idx = np.argsort(rank)
+                rank = rank[sort_idx]
+                accuracies = accuracies[sort_idx]
+                all_params = all_params[sort_idx]
+
+                for i in range(len(rank)):
+                    param_grid = all_params[i]
+                    current_estimator = None
+                    if (learn_type == "svm"):
+                        C = param_grid["C"]
+                        kernel = param_grid["kernel"]
+                        if not kernel == "linear":
+                            gamma = param_grid["gamma"]
+                            current_estimator = SVC(C = C, gamma = gamma, kernel = kernel, probability = True)
+                        else:
+                            current_estimator = SVC(C = C, kernel = kernel, probability = True)
+                    else:
+                        criterion = param_grid["criterion"]
+                        max_depth = param_grid["max_depth"]
+                        max_features = param_grid["max_features"]
+                        min_samples_split = param_grid["min_samples_split"]
+                        n_estimators = param_grid["n_estimators"]
+                        n_jobs = -1
+                        current_estimator = RandomForestClassifier(criterion=criterion, max_depth=max_depth, max_features=max_features,
+                                                       min_samples_split=min_samples_split, n_estimators=n_estimators, n_jobs=n_jobs)
+                    
+                    print("Params for samples from " + str(data_set) + " with model " + learn_type + " and kmer size " + str(kmer_size) 
+                          + ": " + str(all_params[i]) + "and n_comp: " + str(n) + " produces "
+                          + " score of " + str(accuracies[i]))
+                    '''
+                    if learn_type == "rf" and not norm_for_rf:
                     cross_val = cross_val_score(current_estimator, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
-                else:
+                    else:
                     cross_val = _validation.cross_val_score(current_estimator, x, y, cv = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test))
-                print(str(np.mean(cross_val)) + "\tAggregated cross validation accuracy for healthy samples from " + str(data_sets_healthy) +
+                    print(str(np.mean(cross_val)) + "\tAggregated cross validation accuracy for healthy samples from " + str(data_sets_healthy) +
                           " and diseased samples from " + str(data_sets_diseased) + 
                           " with model " + learn_type + " and kmer size " + str(kmer_size) + " with params " + str(all_params[i]))
-                '''
+                    '''
 
         
-        # For Elastic Net and Lasso, do a stratified k-fold cross validation
-        # For each test fold, fit the estimator to the training data
-        # and evaluate on the test data
-        # This essentially performs the nested cross-validation as well. 
-        elif learn_type == "enet" or learn_type == "lasso":
-            accuracies = []
-            # Set the estimator based on the model type
-            if (learn_type == "enet"):
-                # doing a separate grid search using stratified k fold -- k - 1 folds should be used
-                # for training/grid search, the last fold should be used for test
-                estimator = ElasticNetCV(alphas = param_grid["alpha"][0], l1_ratio = param_grid["l1"], cv = cv_gridsearch,
+            elif learn_type == "enet" or learn_type == "lasso":
+                accuracies = []
+                if (learn_type == "enet"):
+                    estimator = ElasticNetCV(alphas = param_grid["alpha"][0], l1_ratio = param_grid["l1"], cv = cv_gridsearch,
                                          n_jobs = -1)
-            else:
-                estimator = LassoCV(alphas = param_grid["alpha"][0], cv = cv_gridsearch,
+                else:
+                    estimator = LassoCV(alphas = param_grid["alpha"][0], cv = cv_gridsearch,
                                     n_jobs = -1)
-            skf = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test)
-            for train_i, test_i in skf.split(x, y):
-                x_train, x_test = x[train_i], x[test_i]
-                y_train, y_test = y[train_i], y[test_i]
-                y_train = list(map(int, y_train))
-                y_test = list(map(int, y_test))
+                skf = RepeatedStratifiedKFold(n_splits = cv_testfolds, n_repeats = n_iter_test)
+                for train_i, test_i in skf.split(x, y):
+                    x_train, x_test = x[train_i], x[test_i]
+                    y_train, y_test = y[train_i], y[test_i]
+                    y_train = list(map(int, y_train))
+                    y_test = list(map(int, y_test))
 
-                estimator.fit(x_train, y_train)
+                    estimator.fit(x_train, y_train)
                 
-                accuracy = evaluate(estimator, x_test, y_test)
-                accuracies.append(accuracy)
+                    accuracy = evaluate(estimator, x_test, y_test)
+                    accuracies.append(accuracy)
 
-                print("Best params for healthy samples from " + str(data_sets_healthy) +
-                  " and diseased samples from " + str(data_sets_diseased) + 
-                  " with model " + learn_type + " and kmer size " + str(kmer_size)
-                  + ": " + str(estimator.get_params()) + " produces "
-                  + " accuracy of " + str(accuracy))
-            print("Aggregated cross validation accuracies for healthy samples from " + str(data_sets_healthy) +
+                    print("Best params for healthy samples from " + str(data_sets_healthy) +
+                          " and diseased samples from " + str(data_sets_diseased) + 
+                          " with model " + learn_type + " and kmer size " + str(kmer_size)
+                          + ": " + str(estimator.get_params()) + " produces "
+                          + " accuracy of " + str(accuracy))
+                    print("Aggregated cross validation accuracies for healthy samples from " + str(data_sets_healthy) +
                       " and diseased samples from " + str(data_sets_diseased) + 
                       " with model " + learn_type + " and kmer size " + str(kmer_size) + ": " + str(np.mean(accuracies)) + 
                       " with standard deviation " +  str(np.std(accuracies)))

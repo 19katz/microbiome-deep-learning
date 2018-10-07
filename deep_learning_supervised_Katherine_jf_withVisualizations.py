@@ -81,7 +81,7 @@ plot_fold = False
 plot_iter = False
 
 # Overall plotting - aggregate results across both folds and iteration
-# 080917 Everything works when this is False, but it doesn't spit out all data
+#thing I've been changing
 plot_overall = True
 
 # controls transparency of the CI (Confidence Interval) band around the ROCs as in Pasolli
@@ -508,6 +508,14 @@ def exec_config(k_folds):
         precision_graph, recall_graph, _ = precision_recall_curve(all_y_test[:,1], all_y_pred[:, 1])
 
         if plot_overall:
+            # plot TSNE
+            #codes_pred not defined
+            #plot_tSNE(codes_pred, config=config)
+
+            # plot UMAP
+            #codes_pred not defined
+            #plot_UMAP(codes_pred, config=config)
+            
             # plot the confusion matrix
             plot_confusion_matrix(conf_mat, config=config)
 
@@ -844,15 +852,19 @@ def build_train_test(layers):
 
     # plot the 2D codes for the test samples
     codes_pred = code_layer_model.predict(x_test)
-    
-    # tSNE plot of hidden layer
-    plot_tSNE(codes_pred)
 
-    # UMAP plot of hidden layer
-    plot_UMAP(codes_pred)
+    # get all the data for UMAP visualization
+    x_all = np.vstack((x_test, x_train))
+    codes_all = code_layer_model.predict(x_all)
+    #plot_UMAP(codes_all)
+    #plot_tSNE(codes_all)
 
     if plot_fold and exp_config[enc_dim_key] > 1:
-        plot_2d_codes(codes_pred)
+        #plot_2d_codes(codes_pred)
+        plot_UMAP(codes_all)
+        plot_tSNE(codes_all)
+        #plot_tSNE(codes_pred)
+        #plot_UMAP(codes_pred)
 
     y_train_pred = autoencoder.predict(x_train)
 
@@ -1024,7 +1036,8 @@ def plot_2d_codes(codes, name='two_codes', title='2D Codes Before Classfication 
 
 # Plot tSNE
 def plot_tSNE(codes, name = 'tSNE', desc = '', config=None):
-    info = info_test
+    #info = info_test
+    info = np.vstack((info_test, info_train))
     fig = plt.figure()
     X_tsne = TSNE(n_components=2, random_state=0).fit_transform(codes)
     plt.figure()
@@ -1053,7 +1066,8 @@ def plot_tSNE(codes, name = 'tSNE', desc = '', config=None):
 
 # Plot UMAP
 def plot_UMAP(codes, name = 'UMAP', desc = '', config=None):
-    info = info_test
+    info = np.vstack((info_test, info_train))
+    #info = info_test #Use this when only using testing data, not all data. Change for TSNE def too.
     fig = plt.figure()
     fit = umap.UMAP()
     u = fit.fit_transform(codes)
@@ -1306,11 +1320,11 @@ if __name__ == '__main__':
 
     if exp_mode == "SUPER_MODELS":
         plot_ae_fold = False
-        plot_ae_overall = False
+        plot_ae_overall = True
         
-        #plot_fold was TRUE as of 3:49PM 080918 and worked
-        plot_fold = False
-        plot_iter = False
+        #plot_fold TRUE gets fold plots, FALSE gets only overall plots in plot_overall section. Change UMAP definition for this at some point. Not sure about plot_iter; it's always been set to False.
+        plot_fold = True
+        plot_iter = True
         
 
         # Overall plotting - aggregate results across both folds and iteration

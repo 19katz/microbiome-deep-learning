@@ -12,6 +12,12 @@ from scipy import interp
 import shap
 
 import plotting_utils
+import config_file
+
+data_directory = config_file.data_directory
+analysis_directory = config_file.analysis_directory  
+scripts_directory = config_file.scripts_directory 
+
 
 def standardize_data(x_train, x_test):
     sample_mean = x_train.mean(axis=0)
@@ -67,7 +73,7 @@ def compute_summary_statistics(y_test, y_pred, history, aggregated_statistics, n
 
 
 
-def aggregate_statistics_across_folds(aggregated_statistics, rskf, n_splits):
+def aggregate_statistics_across_folds(aggregated_statistics, rskf, n_splits, outFile, summary_string, plotting_string):
     # This definition aggregates all the information for all folds
 
     conf_mat=np.zeros_like(aggregated_statistics[0]['conf_mat'])
@@ -105,58 +111,63 @@ def aggregate_statistics_across_folds(aggregated_statistics, rskf, n_splits):
             all_y_test = np.append(all_y_test,aggregated_statistics[n_repeat]['y_test'], axis=0)
             all_y_pred = np.append(all_y_pred,aggregated_statistics[n_repeat]['y_pred'], axis=0)
 
-        #######################################    
-        # print all statistics to an outfile  #
-        #######################################
-        
-        outFile=open(os.path.expanduser('~/deep_learning_microbiome/analysis/summary_statistics.txt'), 'w')
-        
-        outFile.write('val_acc\tval_acc_se\tacc\tacc_se\tval_loss\tval_loss_se\tloss\tloss_se\tf1\tf1_se\tprecision\tprecision_se\trecall\trecall_se\tauc\tauc_se\n')
+    #######################################    
+    # print all statistics to an outfile  #
+    #######################################
 
-        s=''
-        for value in [val_acc, acc, val_loss, loss, f1, precision, recall, auc]:
-            m, se = mean_confidence_interval(value, n_splits, confidence=0.95)
-            s+= str(m) + '\t' + str(se) + '\t' 
+    print('Saving summary statistics to file %s%s' %(analysis_directory,outFile))
 
-        outFile.write(s +'\n')
+    outFN=open(os.path.expanduser('%s%s' %(analysis_directory,outFile)), 'a')       
+    outFN.write('data_set\tkmer_size\tnorm_input\tencoding_dim\tencoded_activation\tinput_dropout_pct\tdropout_pct\tnum_epochs\tbatch_size\tn_splits\tn_repeats\t')
+    outFN.write('val_acc\tval_acc_se\tacc\tacc_se\tval_loss\tval_loss_se\tloss\tloss_se\tf1\tf1_se\tprecision\tprecision_se\trecall\trecall_se\tauc\tauc_se\n')
 
-        ###########################
-        # precision, recall, curve #
-        ###########################
+    s=''
+    for value in [val_acc, acc, val_loss, loss, f1, precision, recall, auc]:
+        m, se = mean_confidence_interval(value, n_splits, confidence=0.95)
+        s+= str(m) + '\t' + str(se) + '\t' 
 
-        precision_graph, recall_graph, _ = precision_recall_curve(all_y_test, all_y_pred)
-        plotting_utils.plot_precision_recall(precision_graph, recall_graph, f1, graph_dir=os.path.expanduser('~/deep_learning_microbiome/analysis'))
+    outFN.write(summary_string + '\t' + s +'\n')
 
-        # optional: could also add colored lines for the folds so that we can see the variance. 
+    ###########################
+    # precision, recall, curve #
+    ###########################
 
-        #######
-        # ROC #
-        #######
+    precision_graph, recall_graph, _ = precision_recall_curve(all_y_test, all_y_pred)
+    # suppressing plotting for now
+    #plotting_utils.plot_precision_recall(precision_graph, recall_graph, f1, plotting_string)
 
-        mean_tpr = np.mean(tprs, axis=0)
-        mean_tpr[-1] = 1.0
-        
-        pylab.figure()
-        pylab.plot(mean_fpr, mean_tpr, color='b',lw=2, alpha=.8)
+    # optional: could also add colored lines for the folds so that we can see the variance. 
 
-        # get the 95% CI
-        std_tpr = np.std(tprs, axis=0)
-        sem_tpr = scipy.stats.sem(tprs)
-        z=calculate_z_value(0.95, n_splits)
-        tprs_upper=np.minimum(mean_tpr + sem_tpr*z, 1) 
-        tprs_lower=np.maximum(mean_tpr - sem_tpr*z, 0) 
+    #######
+    # ROC #
+    #######
 
-        pylab.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2,)
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+     
+    # suppressing plotting for now
+    '''
+    pylab.figure()
+    pylab.plot(mean_fpr, mean_tpr, color='b',lw=2, alpha=.8)
 
-        pylab.xlim([-0.05, 1.05])
-        pylab.ylim([-0.05, 1.05])
-        pylab.xlabel('False Positive Rate')
-        pylab.ylabel('True Positive Rate')
-        pylab.title('Receiver operating characteristic curve')
-        graph_dir=os.path.expanduser('~/deep_learning_microbiome/analysis')
-        pylab.savefig(os.path.expanduser(graph_dir + '/roc.pdf'))
+    # get the 95% CI
+    std_tpr = np.std(tprs, axis=0)
+    sem_tpr = scipy.stats.sem(tprs)
+    z=calculate_z_value(0.95, n_splits)
+    tprs_upper=np.minimum(mean_tpr + sem_tpr*z, 1) 
+    tprs_lower=np.maximum(mean_tpr - sem_tpr*z, 0) 
 
+    pylab.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2,)
 
+    pylab.xlim([-0.05, 1.05])
+    pylab.ylim([-0.05, 1.05])
+    pylab.xlabel('False Positive Rate')
+    pylab.ylabel('True Positive Rate')
+    pylab.title('Receiver operating characteristic curve')
+    print('Saving figure %sroc_%s.pdf' %(analysis_directory,plotting_string) )
+    pylab.savefig(os.path.expanduser('%sroc_%s.pdf' %(analysis_directory,plotting_string)))
+
+    '''
 
 def mean_confidence_interval(data, n, confidence=0.95):
     # note that n typically = n_splits as this is the correct num of df
@@ -194,3 +205,30 @@ def aggregate_shap(aggregated_statistics, rskf):
     # make a barplot with top informative features
     # plot the shap values for top features, colored by feature importance. 
 
+
+def format_input_parameters_printing(data_set, kmer_size, norm_input, encoding_dim, encoded_activation,input_dropout_pct,dropout_pct,num_epochs,batch_size,n_splits,n_repeats,compute_informative_features,plot_iteration):
+
+    # for saving results later: summarize the input options into a single str:
+    summary_string='\t'.join( (data_set, str(kmer_size), str(norm_input), str(encoding_dim), encoded_activation, str(input_dropout_pct), str(dropout_pct), str(num_epochs), str(batch_size), str(n_splits), str(n_repeats)) ) 
+
+    # for labeling plots:
+    plotting_string=plotting_utils.format_plotting_string(data_set, kmer_size, norm_input, encoding_dim, encoded_activation, input_dropout_pct, dropout_pct, num_epochs, batch_size, n_splits, n_repeats)
+
+    # print the parameters being tested to stdout just for record keeping 
+    print('Parameters being tested:')
+    print(data_set)
+    print(str(kmer_size))
+    print('Normalize input? ' + str(norm_input))
+    print('Encoding dim: ' + str(encoding_dim))
+    print('Encoded activation: ' + encoded_activation)
+    print('Input dropout percent: ' + str(input_dropout_pct))
+    print('Dropout percent: ' + str(dropout_pct))
+    print('Num epochs: ' + str(num_epochs))
+    print('Batch size: ' + str(batch_size))
+    print('n_splits (k-folds): ' + str(n_splits))
+    print('n_repeats (iterations): ' + str(n_repeats))
+    print('Compute infromative features with Shap? ' + str(compute_informative_features))
+    print('Plots for each iteration? ' + str(plot_iteration) + '\n')
+
+
+    return summary_string, plotting_string
