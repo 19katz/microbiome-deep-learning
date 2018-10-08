@@ -31,6 +31,53 @@ def standardize_data(x_train, x_test):
     return x_train, x_test
 
 
+def compute_summary_statistics_autoencoder(history, aggregated_statistics, n_repeat):
+    # accuracy and loss of the last epoch
+    val_acc = history.history['val_acc'][-1]
+    acc = history.history['acc'][-1]
+    val_loss = history.history['val_loss'][-1]
+    loss = history.history['loss'][-1]
+
+    #store all of this in the dictionary:
+    aggregated_statistics[n_repeat]['val_acc']=val_acc
+    aggregated_statistics[n_repeat]['acc']=acc
+    aggregated_statistics[n_repeat]['val_loss']=val_loss
+    aggregated_statistics[n_repeat]['loss']=loss
+
+    return aggregated_statistics    
+
+
+def aggregate_statistics_across_folds_autoencoder(aggregated_statistics, rskf, n_splits, outFile, summary_string, plotting_string):
+    # This definition aggregates all the information for all folds
+
+    val_acc=np.array([])
+    acc=np.array([])
+    val_loss=np.array([])
+    loss=np.array([])
+
+    for n_repeat in range(0,len(rskf[0])): 
+        val_acc = np.append(val_acc, aggregated_statistics[n_repeat]['val_acc'])
+        acc = np.append(acc, aggregated_statistics[n_repeat]['acc'])
+        val_loss = np.append(val_loss, aggregated_statistics[n_repeat]['val_loss'])
+        loss = np.append(loss, aggregated_statistics[n_repeat]['loss'])
+
+    #######################################    
+    # print all statistics to an outfile  #
+    #######################################
+
+    print('Saving summary statistics to file %s%s' %(analysis_directory,outFile))
+
+    outFN=open(os.path.expanduser('%s%s' %(analysis_directory,outFile)), 'a')       
+    outFN.write('data_set\tkmer_size\tnorm_input\tencoding_dim\tencoded_activation\tinput_dropout_pct\tdropout_pct\tnum_epochs\tbatch_size\tn_splits\tn_repeats\t')
+    outFN.write('val_acc\tval_acc_se\tacc\tacc_se\tval_loss\tval_loss_se\tloss\tloss_se\n')
+
+    s=''
+    for value in [val_acc, acc, val_loss, loss]:
+        m, se = mean_confidence_interval(value, n_splits, confidence=0.95)
+        s+= str(m) + '\t' + str(se) + '\t' 
+
+    outFN.write(summary_string + '\t' + s +'\n')
+
 
 def compute_summary_statistics(y_test, y_pred, history, aggregated_statistics, n_repeat):
 

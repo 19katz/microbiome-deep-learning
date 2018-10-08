@@ -83,18 +83,21 @@ numEpochs = 1000
 batchSize = 32
 
 history = History()
+# history is a dictionary. To get the keys, type print(history.history.keys())
 
 model.fit(data_normalized, labels, epochs=numEpochs, validation_split=0.2, batch_size=batchSize, shuffle=True, callbacks=[history])
-#model.fit(data_normalized, labels, epochs=numEpochs, batch_size=batchSize, shuffle=True, callbacks=[history])
+
 
 y_pred=model.predict(data_normalized)
 fpr, tpr, thresholds = roc_curve(labels, y_pred)
 y_pred = (y_pred > 0.5)
 conf_mat=confusion_matrix(labels, y_pred)
-#auc= auc(fpr,tpr)
-acc=accuracy_score(labels, y_pred)
+auc= auc(fpr,tpr)
+accuracy=accuracy_score(labels, y_pred)
+f1 = f1_score(labels, y_pred, pos_label=None, average='weighted')
+precision = precision_score(labels, y_pred, pos_label=None, average='weighted')
+recall = recall_score(labels, y_pred, pos_label=None, average='weighted')
 
-# history is a dictionary. To get the keys, type print(history.history.keys())
 
 #############
 # plot roc: #
@@ -128,6 +131,33 @@ pylab.figtext(0.02, .12, 'Batch size used during training: {}'.format(batchSize)
 pylab.figtext(0.02, .08, 'Activation function used for encoding: ' + encoded_activation)
 pylab.figtext(0.02, .04, 'Activation function used for decoding: ' + decoded_activation)
 pylab.savefig(os.path.expanduser(graph_dir + '/accuracy.pdf') , bbox_inches='tight')
+
+
+##########################
+# Plot loss vs epoch #
+##########################
+graph_dir = '~/deep_learning_microbiome/analysis/'
+
+pylab.figure()
+pylab.plot(history.history['loss'])
+pylab.plot(history.history['val_loss'])
+pylab.legend(['training','test'], loc='upper right')
+
+pylab.title('Model loss by epochs')
+pylab.ylabel('Loss')
+pylab.xlabel('Epoch')
+
+
+pylab.gca().set_position((.1, .6, .8, .6))
+pylab.figtext(0.02, .4, 'This graph shows how loss changes with number of epochs for different splits between training and test data.')
+pylab.figtext(0.02, .32, 'Backend: ' + backend)
+pylab.figtext(0.02, .28, 'Loss function: ' + loss)
+pylab.figtext(0.02, .24, 'Number of encoding dimensions: {}'.format(encoding_dim))
+pylab.figtext(0.02, .16, 'Number of epochs of training: {}'.format(numEpochs))
+pylab.figtext(0.02, .12, 'Batch size used during training: {}'.format(batchSize))
+pylab.figtext(0.02, .08, 'Activation function used for encoding: ' + encoded_activation)
+pylab.figtext(0.02, .04, 'Activation function used for decoding: ' + decoded_activation)
+pylab.savefig(os.path.expanduser(graph_dir + '/Loss.pdf') , bbox_inches='tight')
 
 
 

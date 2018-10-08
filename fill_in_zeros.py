@@ -22,7 +22,7 @@ for line in dictionary_FN:
     dictionary_count[line]='>0\n'
 
 # read in the file: 
-inFN=os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s/tmpOut.txt' % (kmer_size, data_set)) 
+inFN=os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s/%s_tmpOut.txt' % (kmer_size, data_set, sample)) 
 inFile=open(inFN, 'r')
 outFN=os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s/%s_%smer.gz' % (kmer_size, data_set, sample,kmer_size))
 outFile=gzip.open(outFN, 'wb')    

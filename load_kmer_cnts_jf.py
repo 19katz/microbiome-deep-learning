@@ -21,6 +21,12 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import RepeatedStratifiedKFold
 
+import config_file
+
+data_directory = config_file.data_directory
+analysis_directory = config_file.analysis_directory  
+scripts_directory = config_file.scripts_directory 
+
 def load_kmers(kmer_size,data_sets, allowed_labels=['0','1']):
     
     # Feng, Backhed, Ferretti, Hadza, HMP1-2, Karlsson_2013, LeChatelier, MetaHIT, Nielsen, Peru, RA, Raymond, Yassour, Fiji, HMP, IGC, Karlsson_2013_no_adapter, LiverCirrhosis, Mongolian, Qin_et_al, RA_no_adapter, Twins, Zeller_2014
@@ -34,41 +40,159 @@ def load_kmers(kmer_size,data_sets, allowed_labels=['0','1']):
     domain_label=1
     for data_set in data_sets:
         print(data_set)
-        input_dir = os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s') %(kmer_size, data_set)
-        file_pattern='*.gz'
-        files=glob(input_dir + '/' + file_pattern)
 
-        for inFN in files:        
-            run_accession=inFN.split('/')[-1].split('_')[0]
-            if run_accession in metadata.keys():
-                label=metadata[run_accession]
-                if label in allowed_labels:
-                    
-                    file = gzip.open(inFN, 'rb')
+        if data_set == "MetaHIT":
+            kmer_cnts_metahit, samples_metahit, labels_metahit, domain_labels_metahit  = load_metahit_kmers(kmer_size) 
+            kmer_cnts_metahit = np.asarray(kmer_cnts_metahit)
+            for i in range(len(kmer_cnts_metahit)): 
+                kmer_cnts.append(kmer_cnts_metahit[i])
+                labels.append(labels_metahit[i])  
+                accessions.append(samples_metahit[i])
+                domain_labels.append(domain_labels_metahit[i])
                 
-                    new_cnts=[]
-                    for line in file:   
-                        new_cnts.append(float(line.decode('utf8').strip('\n')[1:]))
-                    new_cnts=np.asarray(new_cnts)
+        elif data_set=='LeChatelier':
+            kmer_cnts_lechatelier, samples_lechatelier, labels_lechatelier, domain_labels_lechatelier  = load_lechatelier_kmers(kmer_size, allowed_labels)
+            kmer_cnts_lechatelier = np.asarray(kmer_cnts_lechatelier)
+            for i in range(len(kmer_cnts_lechatelier)):
+                kmer_cnts.append(kmer_cnts_lechatelier[i])
+                labels.append(labels_lechatelier[i])
+                accessions.append(samples_lechatelier[i]) 
+                domain_labels.append(domain_labels_lechatelier[i]) 
+
+        else:
+            input_dir = os.path.expanduser('%s%smers_jf/%s') %(data_directory, kmer_size, data_set)
+            file_pattern='*.gz'
+            files=glob(input_dir + '/' + file_pattern)
+
+            for inFN in files:        
+                run_accession=inFN.split('/')[-1].split('_')[0]
+                if run_accession in metadata.keys():
+                    label=metadata[run_accession]
+                    if label in allowed_labels:
                     
-                    # some entries are zero for various bioinformatic reasons. Exclude these so that they don't mess up training/testing
-                    if new_cnts.sum()>0:
-                        kmer_cnts.append(new_cnts)
-                        labels.append(metadata[run_accession])
-                        accessions.append(run_accession)
-                        domain_labels.append(domain_label)
+                        file = gzip.open(inFN, 'rb')
+                
+                        new_cnts=[]
+                        for line in file:   
+                            new_cnts.append(float(line.decode('utf8').strip('\n')[1:]))
+                        new_cnts=np.asarray(new_cnts)
+                    
+                        # some entries are zero for various bioinformatic reasons. Exclude these so that they don't mess up training/testing
+                        if new_cnts.sum()>0:
+                            kmer_cnts.append(new_cnts)
+                            labels.append(metadata[run_accession])
+                            accessions.append(run_accession)
+                            domain_labels.append(domain_label)
                         
         
         domain_label +=1
 
     kmer_cnts=np.asarray(kmer_cnts)
     
+    # if running the DANN --need to return this. For autoencoder, need the other representation of domain. 
     # one hot encode the domain_labels
-    domain_labels = onehot_encode(domain_labels)
+    #domain_labels = onehot_encode(domain_labels)
 
     return kmer_cnts, accessions, labels, domain_labels
-    
 
+
+def load_metahit_kmers(kmer_size):
+    directory=os.path.expanduser('~/deep_learning_microbiome/data/metadata')
+    run_accession_to_sample = {}
+    sample_to_kmers = {}
+    sample_to_labels = {}
+    kmer_cnts = []
+    metadata=load_metadata()
+    
+    with open(os.path.expanduser('%s/MetaHIT_ids.txt' %directory)) as text:
+        for line in text:
+            line = line.rstrip("\n")
+            line = line.strip("'")
+            fields = line.split('\t')
+            run_accession = fields[2]
+            sample_name = fields[0]
+            if sample_name not in sample_to_kmers and run_accession in metadata:
+                sample_to_kmers[sample_name] = []
+                sample_to_labels[sample_name] = metadata[run_accession]
+            run_accession_to_sample[run_accession] = sample_name
+
+    input_dir = os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s') %(kmer_size, "MetaHIT")
+    file_pattern='*.gz'
+    files=glob(input_dir + '/' + file_pattern)
+    for inFN in files:
+        run_accession=inFN.split('/')[-1].split('_')[0]
+        if run_accession in metadata:
+            sample_name = run_accession_to_sample[run_accession]
+            sample_kmer_cnts = sample_to_kmers[sample_name]
+            file = gzip.open(inFN, 'rb')
+            run_accession_cnts = []
+            for line in file:
+                run_accession_cnts.append(float(line.decode('utf8').strip('\n')[1:]))
+            sample_kmer_cnts.append(run_accession_cnts)
+            
+
+    labels = []
+    samples=[]
+    domain_labels=[]
+    for sample in sample_to_kmers:
+        if sample != 'subject_id':
+            sample_to_labels[sample][4] = sample
+            labels.append(sample_to_labels[sample][0])
+            kmer_cnts.append(np.sum(sample_to_kmers[sample], axis=0))
+            samples.append(sample)
+            domain_labels.append(1)
+    return kmer_cnts, samples, labels, domain_labels
+
+
+###########################################
+def include_lechatelier():
+    include_pasolli_lechatelier = []                
+    with open(os.path.expanduser("~/deep_learning_microbiome/scripts/include_pasolli_lechatelier.txt")) as text:
+        for line in text:
+            line = line.rstrip("\n")
+            line = line.strip("'")
+            include_pasolli_lechatelier.append(line)
+    return include_pasolli_lechatelier
+    
+##########################################
+def load_lechatelier_kmers(kmer_size, allowed_labels=['0','1']):
+    
+    include_pasolli_lechatelier=include_lechatelier()
+
+    kmer_cnts=[]
+    accessions=[]
+    labels=[]
+    metadata=load_metadata()
+    domain_labels=[] # this keeps track of which domain we have
+    domain_label=1
+    
+    input_dir = os.path.expanduser('%s%smers_jf/%s') %(data_directory, kmer_size, 'LeChatelier')
+    file_pattern='*.gz'
+    files=glob(input_dir + '/' + file_pattern)
+
+    for inFN in files:        
+                run_accession=inFN.split('/')[-1].split('_')[0]
+                if run_accession in include_pasolli_lechatelier:
+                    label=metadata[run_accession]
+                    if label in allowed_labels:
+                    
+                        file = gzip.open(inFN, 'rb')
+                
+                        new_cnts=[]
+                        for line in file:   
+                            new_cnts.append(float(line.decode('utf8').strip('\n')[1:]))
+                        new_cnts=np.asarray(new_cnts)
+                    
+                        # some entries are zero for various bioinformatic reasons. Exclude these so that they don't mess up training/testing
+                        if new_cnts.sum()>0:
+                            kmer_cnts.append(new_cnts)
+                            labels.append(metadata[run_accession])
+                            accessions.append(run_accession)
+                            domain_labels.append(domain_label)
+
+    return kmer_cnts, accessions, labels, domain_labels
+
+################################
 def onehot_encode(labels):
     
     values = array(labels)
@@ -87,21 +211,24 @@ def onehot_encode(labels):
 
 def load_metadata():
     metadata={} # run_accession -> disease_status
-    directory=os.path.expanduser('~/deep_learning_microbiome/data/metadata')
+    directory=os.path.expanduser('%smetadata' %data_directory)
     
     exclude = []
-    with open(os.path.expanduser("~/deep_learning_microbiome/scripts/exclude.txt")) as text:
+    with open(os.path.expanduser("%sexclude.txt" %scripts_directory)) as text:
         for line in text:
             line = line.rstrip("\n")
             line = line.strip("'")
             exclude.append(line)
 
     include_pasolli = []
-    with open(os.path.expanduser("~/deep_learning_microbiome/scripts/include_pasolli.txt")) as text:
+    with open(os.path.expanduser("%sinclude_pasolli.txt" %scripts_directory)) as text:
         for line in text:
             line = line.rstrip("\n")
             line = line.strip("'")
             include_pasolli.append(line)
+
+    include_pasolli_lechatelier=include_lechatelier()
+
                 
 
     # Qin et al. T2D data:
@@ -128,7 +255,7 @@ def load_metadata():
             metadata[run_accession] = disease_status
 
     # MetaHIT IBD data:
-    
+    '''
     MetaHIT_inFN='%s/MetaHIT_ids.txt' %directory
     MetaHIT_file=open(MetaHIT_inFN, 'r')
     for line in MetaHIT_file:
@@ -137,7 +264,25 @@ def load_metadata():
         disease_status=items[5]
         if run_accession not in exclude:
             metadata[run_accession] = disease_status
-    
+    '''
+    MetaHIT_inFN='%s/MetaHIT_ids.txt' %directory
+    MetaHIT_file=open(MetaHIT_inFN, 'r')
+    names = []
+    for line in MetaHIT_file:
+        items=line.strip('\n').split('\t')
+        name = str(items[1])
+        name = name.replace(".", "_")
+        name = name.replace("-", "_")
+        run_accession=items[2]
+        disease_status=items[5]
+        if disease_status == '1':
+            disease = "IBD"
+        else:
+            disease = "Healthy"
+        if name in include_pasolli:
+            metadata[run_accession] = [disease_status, 'IBD', 'MetaHIT', disease, run_accession]
+
+
 
     # HMP1-2 data (everyone is healthy):
     
@@ -235,7 +380,7 @@ def load_metadata():
             disease_status ='1' 
         if sample_id not in exclude and disease_status != 'NA' and sample_id in include_pasolli:
             metadata[sample_id] = disease_status
-
+    
     #LeChatelier
     LeChatelier_inFN='%s/LeChatelier_metadata.txt' %directory 
     LeChatelier_file=open(LeChatelier_inFN, 'r')  
@@ -250,7 +395,7 @@ def load_metadata():
         else:
             disease_status='NA'
 
-        if sample_id not in exclude and disease_status != 'NA': 
+        if sample_id in include_pasolli_lechatelier:
             metadata[sample_id] = disease_status
 
     #Backhed
@@ -367,8 +512,31 @@ def load_metadata():
 
     
 
+def load_all_autoencoder(kmer_size, n_splits, n_repeats, precomputed_kfolds):
 
+    data_sets=['Feng', 'Fiji', 'IGC', 'Karlsson_2013_no_adapter', 'LiverCirrhosis', 'Mongolian',  'Qin_et_al', 'RA_no_adapter', 'Twins', 'Zeller_2014', 'Backhed', 'Ferretti', 'Hadza', 'HMP1-2', 'LeChatelier', 'MetaHIT', 'Nielsen', 'Peru', 'Raymond', 'Yassour']
+    allowed_labels=['0','1']
+    kmer_cnts, accessions, labels, domain = load_kmers(kmer_size,data_sets, allowed_labels)
 
+    labels=np.asarray(labels)
+    labels=labels.astype(np.int)
+
+    data=pd.DataFrame(kmer_cnts)
+    data_normalized = normalize(data, axis = 1, norm = 'l1')
+
+    if precomputed_kfolds==False:
+        rskf=repeated_stratified_k_fold(data_normalized, domain, n_splits, n_repeats)
+        # save to a pickle so that the same idxs can be used for multiple runs
+        # to save, I need to convert this to a different data structure
+        train_indexs=[]
+        test_indexs=[]
+        for train_index, test_index in rskf:
+            train_indexs.append(train_index)
+            test_indexs.append(test_index)
+
+    return data_normalized, labels, [train_indexs,test_indexs] 
+
+    
 def load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kfolds):
 
     data_sets=[data_set]
@@ -381,7 +549,6 @@ def load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kf
     data=pd.DataFrame(kmer_cnts)
     data_normalized = normalize(data, axis = 1, norm = 'l1')
     
-
     # compute the indexes for stratified k fold:
     # I may have precomputed this so that we can  use the same idxs for different model. This is what pasolli did and also gives us more power to distinguish model perf. 
 
@@ -395,7 +562,7 @@ def load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kf
             train_indexs.append(train_index)
             test_indexs.append(test_index)
         
-        directory=os.path.expanduser('~/deep_learning_microbiome/data/precomputed_kfolds')
+        directory=os.path.expanduser('%sprecomputed_kfolds' %data_directory)
         pickle.dump([train_indexs,test_indexs], open( "%s/%s_single_disease.p"  %(directory,data_set), "wb" ) )
         
 

@@ -823,7 +823,7 @@ supervised_learning_model_test_Nandita.py
 
 # now run:
 
-~/./miniconda3/bin/python deep_learning_supervised_katherine_jf.py >> grid_search.txt
+~/./miniconda3/bin/python deep_learning_supervised_Katherine_jf.py >> grid_search.txt
 
 # parse the log:
 cat grid_search.txt | ~/./miniconda3/bin/python process_perf_logs.py 

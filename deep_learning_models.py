@@ -25,6 +25,7 @@ from sklearn.metrics import roc_curve, auc, accuracy_score, f1_score, precision_
 import itertools
 from itertools import cycle, product
 import flipGradientTF
+from tied_autoencoder_keras import DenseLayerAutoencoder
 
 backend = K.backend()
 
@@ -295,6 +296,40 @@ def create_autoencoder_sequential(encoding_dim, input_dim, encoded_activation, d
     #autoencoder.save_weights(weightFile)
     
     return autoencoder
+
+def create_autoencoder_tied_weights_dropout(encoding_dim, input_dim, encoded_activation, dropout_pct):
+
+    # note that the same dropout_pct is applied to the input and encoding dims
+
+    inputs = Input(shape=(input_dim,))
+    x = DenseLayerAutoencoder([encoding_dim], activation=encoded_activation, dropout=dropout_pct)(inputs)
+    model = Model(inputs=inputs, outputs=x)
+
+    loss='kullback_leibler_divergence'
+    model.compile(optimizer='adadelta', loss=loss)
+    #weightFile = os.environ['HOME'] + '/deep_learning_microbiome/data/weights.txt'
+    #autoencoder.save_weights(weightFile)
+    
+    return model
+
+def create_autoencoder_dropout(encoding_dim, input_dim, encoded_activation,decoded_activation,input_dropout_pct, dropout_pct):
+
+    # not using tied weights here because it allows me the flexibility to specify a different encoded activation from the decoding layer, which must be softmax. 
+
+    model = Sequential()
+    model.add(Dropout(rate=input_dropout_pct, input_shape=(input_dim,)))
+    model.add(Dense(encoding_dim, activation=encoded_activation, input_dim=input_dim))
+    model.add(Dropout(dropout_pct))
+    model.add(Dense(input_dim, activation=decoded_activation))
+
+              
+    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    return model
+
+
+
+
 
 def create_supervised_model(input_dim, encoding_dim, encoded_activation, input_dropout_pct,dropout_pct):
     # note: this is a very basic model. 

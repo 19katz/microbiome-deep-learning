@@ -11,13 +11,15 @@ config['data_set'] = [#'Feng',
                       #'Qin_et_al'  
                       #'RA'
                       #'RA_no_adapter',
-                      'Zeller_2014'
+                      #'Zeller_2014'
+                      #'LeChatelier'
+                      'All'
                       ]
 
 
 config['kmer_size'] = [5, 6, 7 ,8, 10]
 
-config['norm_input'] = [True] #  standardize the data
+config['norm_input'] = [True, False] #  standardize the data
 
 
 ### params to iterate over ###
@@ -62,7 +64,7 @@ compute_informative_features=config['compute_informative_features'][0]
 plot_iteration=config['plot_iteration'][0] 
 graph_dir=config['graph_dir'][0] 
 
-outFN_list=os.path.expanduser('~/deep_learning_microbiome/tmp_intermediate_files/config_files/list_of_configs_Zeller.txt' ) 
+outFN_list=os.path.expanduser('~/deep_learning_microbiome/tmp_intermediate_files/config_files/list_of_configs_Autoencoder.txt' ) 
 outFile_list=open(outFN_list,'a')
 
 for data_set in data_sets:
