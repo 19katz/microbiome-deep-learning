@@ -12,7 +12,7 @@ from scipy import interp
 import shap
 
 import plotting_utils
-import config_file
+import config_file_local as config_file
 
 data_directory = config_file.data_directory
 analysis_directory = config_file.analysis_directory  
@@ -120,7 +120,7 @@ def compute_summary_statistics(y_test, y_pred, history, aggregated_statistics, n
 
 
 
-def aggregate_statistics_across_folds(aggregated_statistics, rskf, n_splits, outFile, summary_string, plotting_string):
+def aggregate_statistics_across_folds(aggregated_statistics, rskf, n_splits, outFile, summary_string, plotting_string, outFile_header):
     # This definition aggregates all the information for all folds
 
     conf_mat=np.zeros_like(aggregated_statistics[0]['conf_mat'])
@@ -165,7 +165,7 @@ def aggregate_statistics_across_folds(aggregated_statistics, rskf, n_splits, out
     print('Saving summary statistics to file %s%s' %(analysis_directory,outFile))
 
     outFN=open(os.path.expanduser('%s%s' %(analysis_directory,outFile)), 'a')       
-    outFN.write('data_set\tkmer_size\tnorm_input\tencoding_dim\tencoded_activation\tinput_dropout_pct\tdropout_pct\tnum_epochs\tbatch_size\tn_splits\tn_repeats\t')
+    outFN.write(outFile_header)
     outFN.write('val_acc\tval_acc_se\tacc\tacc_se\tval_loss\tval_loss_se\tloss\tloss_se\tf1\tf1_se\tprecision\tprecision_se\trecall\trecall_se\tauc\tauc_se\n')
 
     s=''
@@ -267,6 +267,66 @@ def format_input_parameters_printing(data_set, kmer_size, norm_input, encoding_d
     print(str(kmer_size))
     print('Normalize input? ' + str(norm_input))
     print('Encoding dim: ' + str(encoding_dim))
+    print('Encoded activation: ' + encoded_activation)
+    print('Input dropout percent: ' + str(input_dropout_pct))
+    print('Dropout percent: ' + str(dropout_pct))
+    print('Num epochs: ' + str(num_epochs))
+    print('Batch size: ' + str(batch_size))
+    print('n_splits (k-folds): ' + str(n_splits))
+    print('n_repeats (iterations): ' + str(n_repeats))
+    print('Compute infromative features with Shap? ' + str(compute_informative_features))
+    print('Plots for each iteration? ' + str(plot_iteration) + '\n')
+
+
+    return summary_string, plotting_string
+
+
+def format_input_parameters_printing_2layers(data_set, kmer_size, norm_input, encoding_dim_1, encoding_dim_2, encoded_activation,input_dropout_pct,dropout_pct,num_epochs,batch_size,n_splits,n_repeats,compute_informative_features,plot_iteration):
+
+    # for saving results later: summarize the input options into a single str:
+    summary_string='\t'.join( (data_set, str(kmer_size), str(norm_input), str(encoding_dim_1),str(encoding_dim_2), encoded_activation, str(input_dropout_pct), str(dropout_pct), str(num_epochs), str(batch_size), str(n_splits), str(n_repeats)) ) 
+
+    # for labeling plots:
+    plotting_string=plotting_utils.format_plotting_string_2layers(data_set, kmer_size, norm_input, encoding_dim_1, encoding_dim_2, encoded_activation, input_dropout_pct, dropout_pct, num_epochs, batch_size, n_splits, n_repeats)
+
+    # print the parameters being tested to stdout just for record keeping 
+    print('Parameters being tested:')
+    print(data_set)
+    print(str(kmer_size))
+    print('Normalize input? ' + str(norm_input))
+    print('Encoding dim_1: ' + str(encoding_dim_1))
+    print('Encoding dim_2: ' + str(encoding_dim_2))
+    print('Encoded activation: ' + encoded_activation)
+    print('Input dropout percent: ' + str(input_dropout_pct))
+    print('Dropout percent: ' + str(dropout_pct))
+    print('Num epochs: ' + str(num_epochs))
+    print('Batch size: ' + str(batch_size))
+    print('n_splits (k-folds): ' + str(n_splits))
+    print('n_repeats (iterations): ' + str(n_repeats))
+    print('Compute infromative features with Shap? ' + str(compute_informative_features))
+    print('Plots for each iteration? ' + str(plot_iteration) + '\n')
+
+
+    return summary_string, plotting_string
+
+
+
+def format_input_parameters_printing_3layers(data_set, kmer_size, norm_input, encoding_dim_1, encoding_dim_2, encoding_dim_3, encoded_activation,input_dropout_pct,dropout_pct,num_epochs,batch_size,n_splits,n_repeats,compute_informative_features,plot_iteration):
+
+    # for saving results later: summarize the input options into a single str:
+    summary_string='\t'.join( (data_set, str(kmer_size), str(norm_input), str(encoding_dim_1),str(encoding_dim_2), str(encoding_dim_3), encoded_activation, str(input_dropout_pct), str(dropout_pct), str(num_epochs), str(batch_size), str(n_splits), str(n_repeats)) ) 
+
+    # for labeling plots:
+    plotting_string=plotting_utils.format_plotting_string_3layers(data_set, kmer_size, norm_input, encoding_dim_1, encoding_dim_2, encoding_dim_3, encoded_activation, input_dropout_pct, dropout_pct, num_epochs, batch_size, n_splits, n_repeats)
+
+    # print the parameters being tested to stdout just for record keeping 
+    print('Parameters being tested:')
+    print(data_set)
+    print(str(kmer_size))
+    print('Normalize input? ' + str(norm_input))
+    print('Encoding dim_1: ' + str(encoding_dim_1))
+    print('Encoding dim_2: ' + str(encoding_dim_2))
+    print('Encoding dim_3: ' + str(encoding_dim_3))
     print('Encoded activation: ' + encoded_activation)
     print('Input dropout percent: ' + str(input_dropout_pct))
     print('Dropout percent: ' + str(dropout_pct))

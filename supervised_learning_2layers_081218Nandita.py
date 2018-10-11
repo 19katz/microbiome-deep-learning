@@ -31,7 +31,7 @@ import load_kmer_cnts_jf
 import deep_learning_models
 import plotting_utils
 import stats_utils
-import config_file_local as config_file
+import config_file
 import importlib
 import imp
 import os
@@ -42,12 +42,12 @@ analysis_directory = config_file.analysis_directory
 scripts_directory = config_file.scripts_directory
 
 
-def run_model(data_set, kmer_size, norm_input, encoding_dim, encoded_activation, input_dropout_pct, dropout_pct, num_epochs, batch_size, n_splits, n_repeats, compute_informative_features, plot_iteration, graph_dir, outFile):
+def run_model(data_set, kmer_size, norm_input, encoding_dim_1, encoding_dim_2, encoded_activation, input_dropout_pct, dropout_pct, num_epochs, batch_size, n_splits, n_repeats, compute_informative_features, plot_iteration, graph_dir, outFile):
     
     # format strings for outputting the paramters associated with this run:
-    summary_string, plotting_string= stats_utils.format_input_parameters_printing(data_set, kmer_size, norm_input, encoding_dim, encoded_activation,input_dropout_pct,dropout_pct,num_epochs,batch_size,n_splits,n_repeats,compute_informative_features,plot_iteration)
+    summary_string, plotting_string= stats_utils.format_input_parameters_printing_2layers(data_set, kmer_size, norm_input, encoding_dim_1, encoding_dim_2, encoded_activation,input_dropout_pct,dropout_pct,num_epochs,batch_size,n_splits,n_repeats,compute_informative_features,plot_iteration)
 
-    outFile_header='data_set\tkmer_size\tnorm_input\tencoding_dim\tencoded_activation\tinput_dropout_pct\tdropout_pct\tnum_epochs\tbatch_size\tn_splits\tn_repeats\t'
+    outFile_header='data_set\tkmer_size\tnorm_input\tencoding_dim_1\tencoding_dim_2\tencoded_activation\tinput_dropout_pct\tdropout_pct\tnum_epochs\tbatch_size\tn_splits\tn_repeats\t'
 
     #################
     # Load the data # 
@@ -88,7 +88,7 @@ def run_model(data_set, kmer_size, norm_input, encoding_dim, encoded_activation,
     
         input_dim=len(data_normalized[0]) # this is the number of input kmers
 
-        model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation,input_dropout_pct, dropout_pct)
+        model=deep_learning_models.create_supervised_model_2layers(input_dim, encoding_dim_1, encoding_dim_2, encoded_activation,input_dropout_pct, dropout_pct)
     
         #weightFile = os.environ['HOME'] + '/deep_learning_microbiome/data/weights.txt'
        
@@ -161,7 +161,8 @@ def parse_config_and_run(config_dict, outFile):
     data_sets=config_dict['data_set']
     kmer_sizes=config_dict['kmer_size']
     norm_inputs=config_dict['norm_input']
-    encoding_dims=config_dict['encoding_dim']
+    encoding_dims_1=config_dict['encoding_dim_1']
+    encoding_dims_2=config_dict['encoding_dim_2']
     encoded_activations=config_dict['encoded_activation']
     input_dropout_pcts=config_dict['input_dropout_pct']
     dropout_pcts=config_dict['dropout_pct'] 
@@ -176,22 +177,24 @@ def parse_config_and_run(config_dict, outFile):
     for data_set in data_sets:
         for kmer_size in kmer_sizes:
             for norm_input in norm_inputs:
-                for encoding_dim in encoding_dims:
-                    for encoded_activation in encoded_activations:
-                        for input_dropout_pct in input_dropout_pcts:
-                            for dropout_pct in dropout_pcts:
-                                for num_epochs in num_epochss:
-                                    for batch_size in batch_sizes:
-                                        for n_splits in n_splitss:
-                                            for n_repeats in n_repeatss:
-                                                for compute_informative_features in compute_informative_featuress:
-                                                    for plot_iteration in plot_iterations:
-                                                        for graph_dir in graph_dirs:
-                                                        
-                                                            run_model(data_set, 
+                for encoding_dim_1 in encoding_dims_1:
+                    for encoding_dim_2 in encoding_dims_2:
+                        for encoded_activation in encoded_activations:
+                            for input_dropout_pct in input_dropout_pcts:
+                                for dropout_pct in dropout_pcts:
+                                    for num_epochs in num_epochss:
+                                        for batch_size in batch_sizes:
+                                            for n_splits in n_splitss:
+                                                for n_repeats in n_repeatss:
+                                                    for compute_informative_features in compute_informative_featuress:
+                                                        for plot_iteration in plot_iterations:
+                                                            for graph_dir in graph_dirs:
+                                                                
+                                                                run_model(data_set, 
                                                                       kmer_size,
                                                                       norm_input,
-                                                                      encoding_dim,
+                                                                      encoding_dim_1,
+                                                                      encoding_dim_2,
                                                                       encoded_activation,
                                                                       input_dropout_pct,
                                                                       dropout_pct,

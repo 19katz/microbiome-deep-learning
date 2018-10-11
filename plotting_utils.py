@@ -20,7 +20,7 @@ import itertools
 from itertools import cycle, product
 from sklearn.model_selection import StratifiedKFold
 
-import config_file
+import config_file_local as config_file
 
 data_directory = config_file.data_directory
 analysis_directory = config_file.analysis_directory  
@@ -42,6 +42,46 @@ def format_plotting_string(data_set, kmer_size, norm_input, encoding_dim, encode
     plotting_string+='DP:' + str(dropout_pct)
 
     return plotting_string
+
+
+def format_plotting_string_2layers(data_set, kmer_size, norm_input, encoding_dim_1, encoding_dim_2, encoded_activation, input_dropout_pct, dropout_pct, num_epochs, batch_size, n_splits, n_repeats):
+
+
+    TF_dictionary={True:'T',False:'F'}
+
+    plotting_string=''
+    plotting_string+=data_set + '_'
+    plotting_string+=str(kmer_size) +'_'
+    plotting_string+='N:'+TF_dictionary[norm_input] +'_'
+    plotting_string+='ED1:'+ str(encoding_dim_1) +'_'
+    plotting_string+='ED2:'+ str(encoding_dim_2) +'_'
+    plotting_string+='EA:'+ encoded_activation +'_'
+    plotting_string+='IDP:' +str(input_dropout_pct) +'_'
+    plotting_string+='DP:' + str(dropout_pct)
+
+    return plotting_string
+
+
+
+def format_plotting_string_3layers(data_set, kmer_size, norm_input, encoding_dim_1, encoding_dim_2, encoding_dim_3, encoded_activation, input_dropout_pct, dropout_pct, num_epochs, batch_size, n_splits, n_repeats):
+
+
+    TF_dictionary={True:'T',False:'F'}
+
+    plotting_string=''
+    plotting_string+=data_set + '_'
+    plotting_string+=str(kmer_size) +'_'
+    plotting_string+='N:'+TF_dictionary[norm_input] +'_'
+    plotting_string+='ED1:'+ str(encoding_dim_1) +'_'
+    plotting_string+='ED2:'+ str(encoding_dim_2) +'_'
+    plotting_string+='ED3:'+ str(encoding_dim_3) +'_'
+    plotting_string+='EA:'+ encoded_activation +'_'
+    plotting_string+='IDP:' +str(input_dropout_pct) +'_'
+    plotting_string+='DP:' + str(dropout_pct)
+
+    return plotting_string
+
+
 
 def plot_confusion_matrix(cm, classes, file_name):
     

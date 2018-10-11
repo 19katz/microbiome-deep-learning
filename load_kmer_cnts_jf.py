@@ -21,7 +21,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import RepeatedStratifiedKFold
 
-import config_file
+import config_file_local as config_file
 
 data_directory = config_file.data_directory
 analysis_directory = config_file.analysis_directory  
@@ -147,7 +147,7 @@ def load_metahit_kmers(kmer_size):
 ###########################################
 def include_lechatelier():
     include_pasolli_lechatelier = []                
-    with open(os.path.expanduser("~/deep_learning_microbiome/scripts/include_pasolli_lechatelier.txt")) as text:
+    with open(os.path.expanduser("%sinclude_pasolli_lechatelier.txt" %scripts_directory)) as text:
         for line in text:
             line = line.rstrip("\n")
             line = line.strip("'")

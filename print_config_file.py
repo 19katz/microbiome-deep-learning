@@ -8,18 +8,18 @@ config['data_set'] = [#'Feng',
                       #'Karlsson_2013_no_adapter',
                       #'LiverCirrhosis' 
                       #'MetaHIT'  
-                      #'Qin_et_al'  
+                      'Qin_et_al'  
                       #'RA'
                       #'RA_no_adapter',
                       #'Zeller_2014'
                       #'LeChatelier'
-                      'All'
+                      #'All'
                       ]
 
 
 config['kmer_size'] = [5, 6, 7 ,8, 10]
 
-config['norm_input'] = [True, False] #  standardize the data
+config['norm_input'] = [False] #  standardize the data
 
 
 ### params to iterate over ###

@@ -348,3 +348,45 @@ def create_supervised_model(input_dim, encoding_dim, encoded_activation, input_d
     return model
  
 
+
+def create_supervised_model_2layers(input_dim, encoding_dim_1, encoding_dim_2, encoded_activation, input_dropout_pct,dropout_pct):
+    # note: this is a very basic model. 
+    
+    #Seems weird- shouldn't the first argument be the output dimensions?
+    model = Sequential()
+    model.add(Dropout(rate=input_dropout_pct, input_shape=(input_dim,)))
+    model.add(Dense(encoding_dim_1, activation=encoded_activation, input_dim=input_dim))
+    model.add(Dropout(dropout_pct))
+    model.add(Dense(encoding_dim_2, activation=encoded_activation, input_dim=encoding_dim_1))
+    model.add(Dropout(dropout_pct))
+    model.add(Dense(1, activation='sigmoid'))
+
+    # For a binary classification problem
+              
+    model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
+    #model.compile(optimizer='adadelta', loss='mean_squared_error', metrics=['accuracy'])
+    return model
+ 
+
+
+def create_supervised_model_3layers(input_dim, encoding_dim_1, encoding_dim_2, encoding_dim_3, encoded_activation, input_dropout_pct,dropout_pct):
+    # note: this is a very basic model. 
+    
+    #Seems weird- shouldn't the first argument be the output dimensions?
+    model = Sequential()
+    model.add(Dropout(rate=input_dropout_pct, input_shape=(input_dim,)))
+    model.add(Dense(encoding_dim_1, activation=encoded_activation, input_dim=input_dim))
+    model.add(Dropout(dropout_pct))
+    model.add(Dense(encoding_dim_2, activation=encoded_activation, input_dim=encoding_dim_1))
+    model.add(Dropout(dropout_pct))
+    model.add(Dense(encoding_dim_3, activation=encoded_activation, input_dim=encoding_dim_2))
+    model.add(Dropout(dropout_pct))
+    model.add(Dense(1, activation='sigmoid'))
+
+    # For a binary classification problem
+              
+    model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
+    #model.compile(optimizer='adadelta', loss='mean_squared_error', metrics=['accuracy'])
+    return model
+ 
+
