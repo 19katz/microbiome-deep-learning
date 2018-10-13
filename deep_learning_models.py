@@ -329,8 +329,6 @@ def create_autoencoder_dropout(encoding_dim, input_dim, encoded_activation,decod
 
 
 
-
-
 def create_supervised_model(input_dim, encoding_dim, encoded_activation, input_dropout_pct,dropout_pct):
     # note: this is a very basic model. 
     
@@ -390,3 +388,45 @@ def create_supervised_model_3layers(input_dim, encoding_dim_1, encoding_dim_2, e
     return model
  
 
+
+
+
+
+
+def create_supervised_model_with_autoencoder(input_dim, encoding_dim, encoded_activation, input_dropout_pct,dropout_pct):
+    # note: this is a very basic model. 
+
+    #input_dim is the number of kmers (or columns) in our input data
+    input_img = Input(shape=(input_dim,))
+
+
+    ### Step 1: create the encoding:
+    
+    input_dropout = Dropout(input_dropout_pct)(input_img)
+    
+    # "encoded" is the encoded representation of the input
+    encoded = Dense(encoding_dim, activation=encoded_activation)(input_dropout)
+    
+    dropout = Dropout(dropout_pct)(encoded)
+
+    ### Step 2: create the autoencoder based on the encoding
+
+    # "decoded" is the lossy reconstruction of the input
+    decoded = Dense(input_dim, activation='softmax')(dropout)
+
+    # this model maps an input to its reconstruction
+    autoencoder = Model(inputs=input_img, outputs=decoded)
+
+
+    ### Step 3: create the classifier based on the same encoding. 
+    classifier = Dense(1, activation='sigmoid')(dropout)
+    
+    classifier_model = Model(inputs=input_img, outputs=classifier)
+
+    ### Step 4: compile
+
+    autoencoder.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+          
+    classifier_model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
+    
+    return autoencoder, classifier_model
