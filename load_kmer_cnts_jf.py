@@ -116,7 +116,7 @@ def load_metahit_kmers(kmer_size):
                 sample_to_labels[sample_name] = metadata[run_accession]
             run_accession_to_sample[run_accession] = sample_name
 
-    input_dir = os.path.expanduser('~/deep_learning_microbiome/data/%smers_jf/%s') %(kmer_size, "MetaHIT")
+    input_dir = os.path.expanduser('%s%smers_jf/%s') %(data_directory, kmer_size, "MetaHIT")
     file_pattern='*.gz'
     files=glob(input_dir + '/' + file_pattern)
     for inFN in files:
