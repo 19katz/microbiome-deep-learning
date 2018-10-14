@@ -1,0 +1,25 @@
+#!/bin/bash                         #-- what is the language of this shell
+#                                  #-- Any line that starts with #$ is an instruction to SGE
+#$ -S /bin/bash                     #-- the shell for the job
+#$ -o output_error_directory       #-- output directory (fill in)
+#$ -e output_error_directory       #-- error directory (fill in)
+#$ -cwd                            #-- tell the job that it should start in your working directory
+#$ -r y                            #-- tell the system that if a job crashes, it should be restarted
+#$ -j y                            #-- tell the system that the STDERR and STDOUT should be joined
+#$ -l mem_free=5G                  #-- submits on nodes with enough free memory (required)
+#$ -l arch=linux-x64               #-- SGE resources (CPU type)
+#$ -l netapp=3G,scratch=3G         #-- SGE resources (home and scratch disks)
+#$ -l h_rt=336:00:00               #-- runtime limit (see above; this requests 24 hours)
+#$ -t 1-3125                        #-- remove first '#' to specify the number of
+#$ -tc 75                                   #-- tasks if desired (see Tips section)
+
+readarray files < ~/deep_learning_microbiome/tmp_intermediate_files/config_files/list_of_configs_RA_no_adapter.txt
+
+files=(null ${files[@]}) # this pads the file with an extra line in the beginning. 
+file=${files[$SGE_TASK_ID]}
+echo $file
+
+# parse which dataset this is:
+dataset=`echo $file | cut -f8 -d'/' | cut -f1 -d'_'`
+
+./miniconda3/bin/python ~/deep_learning_microbiome/scripts/supervised_learning_081218Nandita.py -outFile ${dataset}_gridsearch.txt -configFile $file
