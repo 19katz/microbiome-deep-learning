@@ -429,4 +429,8 @@ def create_supervised_model_with_autoencoder(input_dim, encoding_dim, encoded_ac
           
     classifier_model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
     
+    # multitask learning:
+    #model = Model(inputs=input_img, outputs=[decoded, classifier])
+    #model.compile(optimizer='rmsprop', loss=['categorical_crossentropy', 'binary_crossentropy'],  metrics=['accuracy'])
+    
     return autoencoder, classifier_model

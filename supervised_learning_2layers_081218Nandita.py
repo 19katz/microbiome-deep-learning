@@ -100,7 +100,7 @@ def run_model(data_set, kmer_size, norm_input, encoding_dim_1, encoding_dim_2, e
         
         model.fit(x_train, y_train, 
                   epochs=num_epochs, 
-                  batch_size=batch_size, 
+                  batch_size=len(x_train), 
                   shuffle=True,
                   validation_data=(x_test, y_test),
                   verbose=0,

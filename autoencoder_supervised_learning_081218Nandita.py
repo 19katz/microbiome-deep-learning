@@ -54,7 +54,10 @@ def run_model(data_set, kmer_size, norm_input, encoding_dim, encoded_activation,
     #################
     print('Loading data...')
 
-    data_normalized, labels, rskf = load_kmer_cnts_jf.load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kfolds=False)
+    data_normalized_auto, labels_auto, rskf_auto = load_kmer_cnts_jf.load_all_autoencoder(kmer_size, n_splits, n_repeats,precomputed_kfolds=False)
+
+    data_normalized_supervised, labels_supervised, rskf_supervised = load_kmer_cnts_jf.load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kfolds=False)
+
 
     # rskf = repeated stratified k fold. This contains all the kfold-by-iteration combos. 
 
@@ -66,29 +69,38 @@ def run_model(data_set, kmer_size, norm_input, encoding_dim, encoded_activation,
     # Create a dictionary to store the metrics of each fold 
     aggregated_statistics={} # key=n_repeat, values= dictionary with stats
 
-    for n_repeat in range(0,len(rskf[0])):
+    for n_repeat in range(0,len(rskf_auto[0])):
         
         print('Iteration %s...' %n_repeat)
         
         aggregated_statistics[n_repeat] = {}
-        
-        train_idx = rskf[0][n_repeat]
-        test_idx = rskf[1][n_repeat]
-        x_train, y_train = data_normalized[train_idx], labels[train_idx]
-        x_test, y_test = data_normalized[test_idx], labels[test_idx]
+
+        # data for autoencoder
+        train_idx = rskf_auto[0][n_repeat]
+        test_idx = rskf_auto[1][n_repeat]
+        x_train_auto, y_train_auto = data_normalized_auto[train_idx], labels_auto[train_idx]
+        x_test_auto, y_test_auto = data_normalized_auto[test_idx], labels_auto[test_idx]
+
+
+        # data for supervised learning
+        train_idx = rskf_supervised[0][n_repeat]
+        test_idx = rskf_supervised[1][n_repeat]
+        x_train_supervised, y_train_supervised = data_normalized_supervised[train_idx], labels_supervised[train_idx]
+        x_test_supervised, y_test_supervised = data_normalized_supervised[test_idx], labels_supervised[test_idx]
     
         #standardize the data, mean=0, std=1
         if norm_input:
-            x_train, x_test= stats_utils.standardize_data(x_train, x_test)
+            x_train_auto, x_test_auto= stats_utils.standardize_data(x_train_auto, x_test_auto)
+            x_train_supervised, x_test_supervised= stats_utils.standardize_data(x_train_supervised, x_test_supervised)
     
         ###########################################
         # set up a model (supervised learning)    #
         ###########################################
         # note that the model has to be instantiated each time a new fold is started otherwise the weights will not start from scratch. 
     
-        input_dim=len(data_normalized[0]) # this is the number of input kmers
+        input_dim=len(data_normalized_auto[0]) # this is the number of input kmers
 
-        model=deep_learning_models.create_supervised_model(input_dim, encoding_dim, encoded_activation,input_dropout_pct, dropout_pct)
+        autoencoder, classifier_model=deep_learning_models.create_supervised_model_with_autoencoder(input_dim, encoding_dim, encoded_activation,input_dropout_pct, dropout_pct)
     
         #weightFile = os.environ['HOME'] + '/deep_learning_microbiome/data/weights.txt'
        
@@ -98,16 +110,28 @@ def run_model(data_set, kmer_size, norm_input, encoding_dim, encoded_activation,
         history = History()
         # history is a dictionary. To get the keys, type print(history.history.keys())
         
-        model.fit(x_train, y_train, 
+        autoencoder.fit(x_train_auto, x_train_auto, 
                   epochs=num_epochs, 
-                  batch_size=batch_size, 
+                  batch_size=len(x_train_auto), 
                   shuffle=True,
-                  validation_data=(x_test, y_test),
+                  validation_data=(x_test_auto, x_test_auto),
+                  verbose=0,
+                  callbacks=[history])
+            
+        # store the val_loss of the lass entry because otherwise history gets overwritten:
+        val_loss_auto = history.history['val_loss'][-1] 
+        aggregated_statistics[n_repeat]['val_loss_auto']=val_loss_auto
+
+        classifier_model.fit(x_train_supervised, y_train_supervised, 
+                  epochs=num_epochs, 
+                  batch_size=len(x_train_supervised), 
+                  shuffle=True,
+                  validation_data=(x_test_supervised, y_test_supervised),
                   verbose=0,
                   callbacks=[history])
     
         # predict using the held out data
-        y_pred=model.predict(x_test)
+        y_pred=classifier_model.predict(x_test_supervised)
         
         # save the weights of this model. TODO 
     
@@ -115,11 +139,12 @@ def run_model(data_set, kmer_size, norm_input, encoding_dim, encoded_activation,
         # Compute summary statistics                                   #
         ################################################################
         # Store the results of this fold in aggregated_statistics
-        aggregated_statistics = stats_utils.compute_summary_statistics(y_test, y_pred, history, aggregated_statistics, n_repeat)
+        aggregated_statistics = stats_utils.compute_summary_statistics(y_test_supervised, y_pred, history, aggregated_statistics, n_repeat)
+
 
         # could  plot everything (roc, accuracy vs epoch, loss vs epoch, confusion matrix, precision recall) for each fold, but this will produce a lot of graphs. 
         if compute_informative_features:
-            shap_values, shap_values_summed = stats_utils.compute_shap_values_deeplearning(input_dim, model, x_test)
+            shap_values, shap_values_summed = stats_utils.compute_shap_values_deeplearning(input_dim, classifier_model, x_test_supervised)
             aggregated_statistics[n_repeat]['shap_values_summed']=shap_values_summed
             aggregated_statistics[n_repeat]['shap_values']=shap_values
 
@@ -133,7 +158,7 @@ def run_model(data_set, kmer_size, norm_input, encoding_dim, encoded_activation,
     ##############################################
     print('Aggregating statistics across iterations and printing/plotting...')
 
-    stats_utils.aggregate_statistics_across_folds(aggregated_statistics, rskf, n_splits, outFile, summary_string, plotting_string, outFile_header)
+    stats_utils.aggregate_statistics_across_folds_supervised_and_auto(aggregated_statistics, rskf_supervised, n_splits, outFile, summary_string, plotting_string, outFile_header)
 
 
     ###################

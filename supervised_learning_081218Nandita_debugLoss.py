@@ -63,7 +63,6 @@ for kmer_size in [7]:
 
     bootstrapped_data=stats_utils.bootstrap_data(data_normalized, kmer_cnts)
 
-    for i in train_idx:
 
     #
     ###################################################

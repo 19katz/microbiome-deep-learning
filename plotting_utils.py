@@ -135,33 +135,35 @@ def plot_roc_aucs(fpr, tpr, auc, acc, graph_dir):
 
 
 
-def plot_loss_vs_epoch(history, graph_dir):
+def plot_loss_vs_epoch(history, graph_dir, plotting_str=''):
 
     pylab.figure()
     pylab.plot(history.history['loss'])
     pylab.plot(history.history['val_loss'])
     pylab.legend(['training','test'], loc='upper right')
+    pylab.ylim((0, 1))
     
     pylab.title('Model loss by epochs')
     pylab.ylabel('Loss')
     pylab.xlabel('Epoch')
 
-    pylab.savefig(os.path.expanduser(graph_dir + '/Loss.pdf') , bbox_inches='tight')
+    pylab.savefig(os.path.expanduser(graph_dir + '/%sLoss.pdf' %plotting_str) , bbox_inches='tight')
+    pylab.close()
 
 
-
-def plot_accuracy_vs_epoch(history, graph_dir):
+def plot_accuracy_vs_epoch(history, graph_dir, plotting_str=''):
     pylab.figure()
     pylab.plot(history.history['acc'])
     pylab.plot(history.history['val_acc'])
     pylab.legend(['training','test'], loc='upper right')
-    
+    pylab.ylim((0, 1))
+
     pylab.title('Model accuracy by epochs')
     pylab.ylabel('Accuracy')
     pylab.xlabel('Epoch')
     
-    pylab.savefig(os.path.expanduser(graph_dir + '/accuracy.pdf') , bbox_inches='tight')
-
+    pylab.savefig(os.path.expanduser(graph_dir + '/%saccuracy.pdf' %plotting_str) , bbox_inches='tight')
+    pylab.close()
 
 
 def plot_precision_recall(precision, recall, f1_score, plotting_string):
