@@ -97,13 +97,12 @@ def load_kmers(kmer_size,data_sets, allowed_labels=['0','1']):
 
 
 def load_metahit_kmers(kmer_size):
-    directory=os.path.expanduser('~/deep_learning_microbiome/data/metadata')
+    directory=os.path.expanduser('%smetadata' %data_directory)
     run_accession_to_sample = {}
     sample_to_kmers = {}
     sample_to_labels = {}
     kmer_cnts = []
     metadata=load_metadata()
-    
     with open(os.path.expanduser('%s/MetaHIT_ids.txt' %directory)) as text:
         for line in text:
             line = line.rstrip("\n")
@@ -115,10 +114,11 @@ def load_metahit_kmers(kmer_size):
                 sample_to_kmers[sample_name] = []
                 sample_to_labels[sample_name] = metadata[run_accession]
             run_accession_to_sample[run_accession] = sample_name
-
+    
     input_dir = os.path.expanduser('%s%smers_jf/%s') %(data_directory, kmer_size, "MetaHIT")
     file_pattern='*.gz'
     files=glob(input_dir + '/' + file_pattern)
+    
     for inFN in files:
         run_accession=inFN.split('/')[-1].split('_')[0]
         if run_accession in metadata:
@@ -537,7 +537,7 @@ def load_all_autoencoder(kmer_size, n_splits, n_repeats, precomputed_kfolds):
     return data_normalized, labels, [train_indexs,test_indexs] 
 
     
-def load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kfolds):
+def load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kfolds, bootstrap=False):
 
     data_sets=[data_set]
     allowed_labels=['0','1']
@@ -548,7 +548,7 @@ def load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kf
 
     data=pd.DataFrame(kmer_cnts)
     data_normalized = normalize(data, axis = 1, norm = 'l1')
-    
+
     # compute the indexes for stratified k fold:
     # I may have precomputed this so that we can  use the same idxs for different model. This is what pasolli did and also gives us more power to distinguish model perf. 
 
@@ -569,8 +569,10 @@ def load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kf
     else:
         [train_indexs,test_indexs] = pickle.load(open( "%s/%s_single_disease.p" %(directory,data_set), "rb" ))
 
-    return data_normalized, labels, [train_indexs,test_indexs]
-
+    if bootstrap ==  False:
+        return data_normalized, labels, [train_indexs,test_indexs]
+    else:
+        return data_normalized, kmer_cnts, labels, [train_indexs,test_indexs]
 
 
 def repeated_stratified_k_fold(data, labels, n_splits, n_repeats):
