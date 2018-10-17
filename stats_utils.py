@@ -30,6 +30,17 @@ def standardize_data(x_train, x_test):
 
     return x_train, x_test
 
+def standardize_data_bootstrap(x_train, x_test, x_train_bootstrap):
+    sample_mean = x_train.mean(axis=0)
+    sample_std = x_train.std(axis=0)
+    
+    # Standardize both training and test samples with the training mean and std
+    x_train_bootstrap = (x_train_bootstrap - sample_mean) / sample_std
+    # test samples are standardized using only the mean and std of the training samples
+    x_test = (x_test - sample_mean) / sample_std
+
+    return x_train_bootstrap, x_test
+
 
 def compute_summary_statistics_autoencoder(history, aggregated_statistics, n_repeat):
     # accuracy and loss of the last epoch
@@ -215,6 +226,63 @@ def aggregate_statistics_across_folds(aggregated_statistics, rskf, n_splits, out
     pylab.savefig(os.path.expanduser('%sroc_%s.pdf' %(analysis_directory,plotting_string)))
 
     '''
+def aggregate_statistics_across_folds_supervised_and_auto(aggregated_statistics, rskf, n_splits, outFile, summary_string, plotting_string, outFile_header):
+    # This definition aggregates all the information for all folds
+
+    conf_mat=np.zeros_like(aggregated_statistics[0]['conf_mat'])
+    val_acc=np.array([])
+    acc=np.array([])
+    val_loss=np.array([])
+    loss=np.array([])
+    val_loss_auto=np.array([])
+    f1=np.array([])
+    precision=np.array([])
+    recall=np.array([])
+    auc=np.array([])
+    all_y_test=aggregated_statistics[0]['y_test']
+    all_y_pred=aggregated_statistics[0]['y_pred']
+    mean_fpr = np.linspace(0, 1, 100)
+    tprs = []
+
+    for n_repeat in range(0,len(rskf[0])): 
+        conf_mat+=aggregated_statistics[n_repeat]['conf_mat']
+        val_acc = np.append(val_acc, aggregated_statistics[n_repeat]['val_acc'])
+        acc = np.append(acc, aggregated_statistics[n_repeat]['acc'])
+        val_loss = np.append(val_loss, aggregated_statistics[n_repeat]['val_loss'])
+        loss = np.append(loss, aggregated_statistics[n_repeat]['loss'])
+        val_loss_auto=np.append(val_loss, aggregated_statistics[n_repeat]['val_loss_auto'])
+        f1 = np.append(f1, aggregated_statistics[n_repeat]['f1'])
+        precision = np.append(precision,aggregated_statistics[n_repeat]['precision'])
+        recall = np.append(recall, aggregated_statistics[n_repeat]['recall'])
+        auc = np.append(auc, aggregated_statistics[n_repeat]['auc'])
+        fpr=aggregated_statistics[n_repeat]['fpr']
+        tpr=aggregated_statistics[n_repeat]['tpr']
+        tprs.append(interp(mean_fpr, fpr, tpr))    
+        #
+        if n_repeat==0:
+            all_y_test = aggregated_statistics[n_repeat]['y_test']
+            all_y_pred = aggregated_statistics[n_repeat]['y_pred']
+        else:
+            all_y_test = np.append(all_y_test,aggregated_statistics[n_repeat]['y_test'], axis=0)
+            all_y_pred = np.append(all_y_pred,aggregated_statistics[n_repeat]['y_pred'], axis=0)
+
+    #######################################    
+    # print all statistics to an outfile  #
+    #######################################
+
+    print('Saving summary statistics to file %s%s' %(analysis_directory,outFile))
+
+    outFN=open(os.path.expanduser('%s%s' %(analysis_directory,outFile)), 'a')       
+    outFN.write(outFile_header)
+    outFN.write('val_acc\tval_acc_se\tacc\tacc_se\tval_loss\tval_loss_se\tloss\tloss_se\tf1\tf1_se\tprecision\tprecision_se\trecall\trecall_se\tauc\tauc_se\tval_loss_auto\tval_loss_auto_se\n')
+
+    s=''
+    for value in [val_acc, acc, val_loss, loss,f1, precision, recall, auc,val_loss_auto]:
+        m, se = mean_confidence_interval(value, n_splits, confidence=0.95)
+        s+= str(m) + '\t' + str(se) + '\t' 
+
+    outFN.write(summary_string + '\t' + s +'\n')
+
 
 def mean_confidence_interval(data, n, confidence=0.95):
     # note that n typically = n_splits as this is the correct num of df
@@ -339,3 +407,21 @@ def format_input_parameters_printing_3layers(data_set, kmer_size, norm_input, en
 
 
     return summary_string, plotting_string
+
+
+def bootstrap_data(data_normalized, kmer_cnts, num_replicates, num_kmers):
+    
+    #store bootstrapped data in a dictionary:
+    bootstrapped_data={}
+
+    for i in range(0,len(kmer_cnts)):
+        print(i)
+        bootstrapped_data[i]=[]
+        for replicate in range(0,num_replicates):
+            sample = np.random.choice(len(data_normalized[0]), num_kmers, p=data_normalized[i])
+            unique, counts =np.unique(sample, return_counts=True)
+            bootstrapped_array=np.zeros(len(data_normalized[0]))
+            bootstrapped_array[unique] = counts
+            bootstrapped_data[i].append(bootstrapped_array)
+
+    return bootstrapped_data

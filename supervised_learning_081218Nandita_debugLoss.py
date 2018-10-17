@@ -42,7 +42,7 @@ analysis_directory = config_file.analysis_directory
 scripts_directory = config_file.scripts_directory
 
 
-for kmer_size in [7]:
+for kmer_size in [5]:
     #
     #################
     # Load the data # 
@@ -50,20 +50,18 @@ for kmer_size in [7]:
     print('Loading data...')
     #
     data_set='Qin_et_al'
-    kmer_size=7
+    kmer_size=5
     n_splits=5
     n_repeats=1
     encoding_dim=10
-    dropout_pct=0
+    dropout_pct=0.5
     input_dropout_pct=0
-    encoded_activation='sigmoid'
+    encoded_activation='relu'
     num_epochs=400
     #
     data_normalized, kmer_cnts, labels, rskf = load_kmer_cnts_jf.load_single_disease(data_set, kmer_size, n_splits, n_repeats, precomputed_kfolds=False, bootstrap = True)
-
-    bootstrapped_data=stats_utils.bootstrap_data(data_normalized, kmer_cnts)
-
-
+    #
+    bootstrapped_data=stats_utils.bootstrap_data(data_normalized, kmer_cnts, 100, 100000)
     #
     ###################################################
     # iterate through the data kfolds and iterations #
@@ -81,18 +79,24 @@ for kmer_size in [7]:
     
         bootstrapped_data_normalized = normalize(bootstrapped_data_stacked, axis = 1, norm = 'l1')
 
+        #add on the real training data too
+        bootstrapped_data_normalized=np.vstack((bootstrapped_data_normalized, data_normalized[train_idx]))
+        
         training_labels=[]
         for idx in train_idx:
             for i in range(0, num_replicates):
                 training_labels.append(labels[idx])
+                
+        for idx in train_idx:
+            training_labels.append(labels[idx])
 
-        x_train, y_train = data_normalized[train_idx], labels[train_idx]
+        x_train, y_train = bootstrapped_data_normalized, np.asarray(training_labels)
         x_test, y_test = data_normalized[test_idx], labels[test_idx]
         #
         #standardize the data, mean=0, std=1
         norm_input=True
         if norm_input:
-            x_train, x_test= stats_utils.standardize_data(x_train, x_test)
+            x_train, x_test= stats_utils.standardize_data_bootstrap(data_normalized[train_idx], x_test, x_train)
         #
         ###########################################
         # set up a model (supervised learning)    #
@@ -117,15 +121,10 @@ for kmer_size in [7]:
                   verbose=1,
                   callbacks=[history])
         #
-        plotting_str='sample_size_%s_' %sample_size
+        plotting_str='bootstrapped_qin_10x_relu_dropout75'
         # plot loss vs epoch
         plotting_utils.plot_loss_vs_epoch(history, analysis_directory, plotting_str=plotting_str)
         plotting_utils.plot_accuracy_vs_epoch(history, analysis_directory, plotting_str=plotting_str)
-        #
-        losses.append(history.history['loss'][-1])
-        val_losses.append(history.history['val_loss'][-1]) 
-        accs.append(history.history['acc'][-1]) 
-        val_accs.append(history.history['val_acc'][-1]) 
         
-
+        
 
