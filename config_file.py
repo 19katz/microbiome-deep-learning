@@ -4,6 +4,7 @@ import os
 data_directory = os.path.expanduser("~/deep_learning_microbiome/data/")
 analysis_directory = os.path.expanduser("~/deep_learning_microbiome/analysis/")
 scripts_directory = os.path.expanduser("~/deep_learning_microbiome/scripts/")
+species_directory = os.path.expanduser("~/deep_learning_microbiome/data/pasolli_speciesAb/")
 
 config={}
 
