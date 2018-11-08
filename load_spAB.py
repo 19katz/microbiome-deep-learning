@@ -21,12 +21,12 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import RepeatedStratifiedKFold
 
-import config_file
+import config_file_AEB
 
-species_directory = config_file.species_directory
-data_directory = config_file.data_directory
-analysis_directory = config_file.analysis_directory  
-scripts_directory = config_file.scripts_directory  
+species_directory = config_file_AEB.species_directory
+data_directory = config_file_AEB.data_directory
+analysis_directory = config_file_AEB.analysis_directory  
+scripts_directory = config_file_AEB.scripts_directory  
 
 def load_species(data_sets):
     
@@ -628,6 +628,9 @@ def load_single_disease(data_set, n_splits, n_repeats, precomputed_kfolds, boots
 
     if precomputed_kfolds==False:
         rskf=repeated_stratified_k_fold(data_normalized, labels, n_splits, n_repeats)
+    
+    return data_normalized, labels, rskf
+'''
         # save to a pickle so that the same idxs can be used for multiple runs
         # to save, I need to convert this to a different data structure
         train_indexs=[]
@@ -648,7 +651,7 @@ def load_single_disease(data_set, n_splits, n_repeats, precomputed_kfolds, boots
     else:
         return data_normalized, kmer_cnts, labels, [train_indexs,test_indexs]
 
-
+'''
 def repeated_stratified_k_fold(data, labels, n_splits, n_repeats):
     # this will cut up the data so that healthy and disease labels are represented proportionately in test/training across all folds. 
     # when training on just 1 data set, we will use the healthy vs disease label for the skf.
