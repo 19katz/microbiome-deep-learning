@@ -622,6 +622,7 @@ def load_single_disease(data_set, n_splits, n_repeats, precomputed_kfolds, boots
 
     data=pd.DataFrame(species_cnts)
     data_normalized = normalize(data, axis = 1, norm = 'l1')
+    #data_normalized = data_normalized.astype('float32') # not sure if this is necessary long-term
 
     # compute the indexes for stratified k fold:
     # I may have precomputed this so that we can  use the same idxs for different model. This is what pasolli did and also gives us more power to distinguish model perf. 

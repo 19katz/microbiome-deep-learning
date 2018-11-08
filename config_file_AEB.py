@@ -21,7 +21,7 @@ config['data_set'] = ['MetaHIT']
 
 #config['kmer_size'] = [7]
 
-config['norm_input'] = [True] #  standardize the data
+config['norm_input'] = [False] #  standardize the data, throwing errors for species so set to False for now
 
 
 ### params to iterate over ###
