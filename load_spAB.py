@@ -616,12 +616,17 @@ def load_single_disease(data_set, n_splits, n_repeats, precomputed_kfolds, boots
     data_sets=[data_set]
     allowed_labels=['0','1']
     species_cnts, labels, features = load_species(data_sets)
+    
+    # get rid of features that are zero for each sample
+    species_cnts = species_cnts[:, ~np.all(species_cnts == 0, axis=0)]
 
     labels=np.asarray(labels)
     labels=labels.astype(np.int)
 
-    data=pd.DataFrame(species_cnts)
-    data_normalized = normalize(data, axis = 1, norm = 'l1')
+    #data=pd.DataFrame(species_cnts)
+    #data_normalized = normalize(data, axis = 1, norm = 'l1')
+
+    data_normalized = species_cnts
     #data_normalized = data_normalized.astype('float32') # not sure if this is necessary long-term
 
     # compute the indexes for stratified k fold:

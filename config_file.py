@@ -9,6 +9,7 @@ species_directory = os.path.expanduser("~/deep_learning_microbiome/data/pasolli_
 config={}
 
 config['data_set'] = ['MetaHIT']
+                      #'MetaHIT'
                       #'Feng'  
                       #'HMP'  
                       #'Karlsson_2013' 
@@ -41,7 +42,7 @@ config['batch_size'] = [16]
 
 config['n_splits'] = [10]
 
-config['n_repeats'] = [5]
+config['n_repeats'] = [1]
 
 config['compute_informative_features'] = [False]
 

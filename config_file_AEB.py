@@ -21,7 +21,7 @@ config['data_set'] = ['MetaHIT']
 
 #config['kmer_size'] = [7]
 
-config['norm_input'] = [False] #  standardize the data, throwing errors for species so set to False for now
+config['norm_input'] = [True] #  standardize the data, throwing errors for species so set to False for now
 
 
 ### params to iterate over ###
@@ -39,9 +39,9 @@ config['num_epochs'] = [400]
 config['batch_size'] = [16]
 ###                        ###
 
-config['n_splits'] = [10]
+config['n_splits'] = [5] #folds
 
-config['n_repeats'] = [5]
+config['n_repeats'] = [10] #iterations
 
 config['compute_informative_features'] = [False]
 

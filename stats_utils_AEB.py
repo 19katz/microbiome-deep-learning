@@ -197,7 +197,7 @@ def aggregate_shap(aggregated_statistics, rskf):
     # make a barplot with top informative features
     # plot the shap values for top features, colored by feature importance. 
     
-def NMF_factor(data, kmer_size, n_components=5, init = 'random', solver='mu', beta_loss='frobenius', max_iter=1000, random_state=0, title="dataset"):
+def NMF_factor(data, kmer_size, n_components=5, init = 'random', solver='mu', beta_loss='frobenius', max_iter=1000000, random_state=None, title="dataset"):
     model = NMF(
         n_components = n_components,
         init = init,

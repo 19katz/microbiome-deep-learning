@@ -28,7 +28,7 @@ import stats_utils_AEB
 
 
 # directories (make sure date exists)
-date = '101618_grid_RF/'
+date = '113018_grid_RF/'
 output_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/kmers/linear/' + str(date)
 
 
@@ -48,14 +48,14 @@ random_state = None
 # From the second, diseased samples will be extracted.
 # The two sets will then be combined. 
 data_sets_to_use = [
-#    [['MetaHIT'], ['MetaHIT']],
-#    [['Qin_et_al'], ['Qin_et_al']],
-#    [['Zeller_2014'], ['Zeller_2014']],
+   # [['MetaHIT'], ['MetaHIT']],
+    [['Qin_et_al'], ['Qin_et_al']],
+    [['Zeller_2014'], ['Zeller_2014']],
     [['LiverCirrhosis'], ['LiverCirrhosis']],
-#    [['Karlsson_2013_no_adapter'], ['Karlsson_2013_no_adapter']],
-#    [['RA_no_adapter'], ['RA_no_adapter']],
-#    [['LeChatelier'], ['LeChatelier']],
-#    [['Feng'], ['Feng']]
+    [['Karlsson_2013_no_adapter'], ['Karlsson_2013_no_adapter']],
+    [['RA_no_adapter'], ['RA_no_adapter']],
+    [['LeChatelier'], ['LeChatelier']],
+    [['Feng'], ['Feng']]
    ]
 
 
@@ -117,7 +117,7 @@ if __name__ == '__main__':
             for n in [0, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]:
                 if n == 0:
                     data_normalized = normalize(kmer_cnts, axis = 1, norm = 'l1')
-                    data_normalized, labels = shuffle(data_normalized, labelz, random_state=0) 
+                    data_normalized, labels = shuffle(data_normalized, labelz, random_state=10) 
                     x = data_normalized
                     y = labels
                     
@@ -126,7 +126,7 @@ if __name__ == '__main__':
                     data_normalized = stats_utils_AEB.NMF_factor(data_normalized, kmer_size, n_components = int(n), 
                                                      title=(str(data_set) + str(kmer_size) + "mers" 
                                                             + str(n) + "factors"))
-                    data_normalized, labels = shuffle(data_normalized, labelz, random_state=0)
+                    data_normalized, labels = shuffle(data_normalized, labelz, random_state=10)
                     x = data_normalized
                     y = labels
                 

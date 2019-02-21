@@ -21,7 +21,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import RepeatedStratifiedKFold
 
-import config_file_local as config_file
+import config_file as config_file
 
 data_directory = config_file.data_directory
 analysis_directory = config_file.analysis_directory  
