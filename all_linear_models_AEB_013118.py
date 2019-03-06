@@ -1,4 +1,4 @@
-# to use example: python3 all_linear_models_AEB.py -m 'lassoLR' -k 5 -cvg 10 -ng 1
+# to use example: python3 all_linear_models_AEB.py -m 'lassoLR_saga' -k 5 -cvg 10 -ng 1
 
 import os
 import pandas as pd
@@ -28,8 +28,8 @@ import stats_utils_AEB
 
 
 # directories (make sure date exists)
-date = '012818_rf/'
-output_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/kmers/linear/' + str(date)
+date = '030519_lasso/'
+output_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/grid_search/' + str(date)
 
 
 # filter out warnings about convergence 
