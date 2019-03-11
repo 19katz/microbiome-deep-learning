@@ -32,9 +32,13 @@ for n in range(2, factors + 1):
     data_NMF = stats_utils_AEB.NMF_factor(data, kmer_size, n_components = int(n), 
                                                      title=("ALL_DATA_no_norm_" + str(kmer_size) + "mers" 
                                                             + str(n) + "factors"))
+    data_NMF.to_pickle("/pollard/home/abustion/deep_learning_microbiome/data_AEB/NMF_on_all_data/after_NMF_no_norm_" +
+                       str(n) + "factors.pickle")
 
 factors=30
 for n in range(2, factors + 1):
     data_NMF = stats_utils_AEB.NMF_factor(data_normalized, kmer_size, n_components = int(n), 
                                                      title=("ALL_DATA_no_norm_" + str(kmer_size) + "mers" 
-                                                            + str(n) + "factors"))  
+                                                            + str(n) + "factors"))
+    data_NMF.to_pickle("/pollard/home/abustion/deep_learning_microbiome/data_AEB/NMF_on_all_data/after_NMF_with_norm_" +
+                       str(n) + "factors.pickle")
