@@ -29,7 +29,7 @@ import stats_utils_AEB
 
 # directories (make sure date exists)
 date = '030519_lasso/'
-output_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/grid_search/' + str(date)
+output_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/kmers/linear/' + str(date)
 
 
 # filter out warnings about convergence 
@@ -205,12 +205,12 @@ if __name__ == '__main__':
                                                      scoring= 'accuracy', 
                                                      penalty = 'l1', 
                                                      solver = 'saga', 
-                                                     n_jobs = 1).fit(x,y)
+                                                     n_jobs = 7).fit(x,y)
                 estimator_auc = LogisticRegressionCV(cv = k_fold, 
                                                      scoring= 'roc_auc', 
                                                      penalty = 'l1', 
                                                      solver = 'saga', 
-                                                     n_jobs = 1).fit(x,y)
+                                                     n_jobs = 7).fit(x,y)
                     
                 #scores
                 acc = estimator_acc.scores_[1].mean(axis=0).max()
