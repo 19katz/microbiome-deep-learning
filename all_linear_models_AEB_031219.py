@@ -12,6 +12,7 @@ import warnings
 from sklearn.preprocessing import normalize
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegressionCV
+from sklearn.linear_model import LassoCV
 from sklearn.model_selection import GridSearchCV, cross_val_score, StratifiedKFold, RepeatedStratifiedKFold, train_test_split
 from sklearn import cross_validation, metrics
 from sklearn.utils import shuffle
@@ -30,6 +31,9 @@ import stats_utils_AEB
 # directories (make sure date exists)
 date = '031219_NMF_on_all/'
 output_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/kmers/linear/' + str(date)
+
+# current directory
+os.chdir("/pollard/home/abustion/deep_learning_microbiome/scripts/")
 
 
 # filter out warnings about convergence 
@@ -51,6 +55,7 @@ param_dict = {
            "max_depth": [None],
            "min_samples_split": [2, 5, 10],
            "n_jobs": [1]},
+    "lasso": {"alpha": [np.logspace(-4, -0.5, 50)]}
     "lassoLR_saga": {"penalty": ["l1"], 
                 "solver": ["saga"]},
     "lassoLR_liblin": {"penalty": ["l1"], 
@@ -228,3 +233,23 @@ if __name__ == '__main__':
                             'NMF_factors': n,
                             'params': 'liblinear'
                             })
+                
+            elif learn_type == "lasso":
+                k_fold = RepeatedStratifiedKFold(n_splits=cv_gridsearch, n_repeats=n_iter_grid)
+                estimator = LassoCV(alphas = param_grid["alpha"][0], cv = k_fold, n_jobs = -1)
+                accuracies = []
+                for train_i, test_i in skf.split(x, y):
+                    x_train, x_test = x[train_i], x[test_i]
+                    y_train, y_test = y[train_i], y[test_i]
+                    y_train = list(map(int, y_train))
+                    y_test = list(map(int, y_test))
+
+                    estimator.fit(x_train, y_train)
+                
+                    accuracy = evaluate(estimator, x_test, y_test)
+                    accuracies.append(estimator.get_params())
+                    accuracies.append(accuracy)
+
+                with open('/pollard/home/abustion/deep_learning_microbiome/lasso.txt', 'w') as f:
+                    for item in accuracies:
+                        f.write("%s\n" % item)
