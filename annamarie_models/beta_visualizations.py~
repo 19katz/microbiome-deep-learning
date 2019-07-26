@@ -1,0 +1,89 @@
+import os
+import pandas as pd
+import numpy as np
+import csv
+
+from itertools import cycle, product
+import argparse
+import warnings
+
+from sklearn.preprocessing import normalize
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.model_selection import GridSearchCV, cross_val_score, StratifiedKFold, RepeatedStratifiedKFold, train_test_split
+from sklearn import metrics
+from sklearn.utils import shuffle
+from sklearn.decomposition import NMF
+from sklearn.exceptions import ConvergenceWarning
+
+# import private scripts
+import load_kmer_cnts_jf
+import stats_utils_AEB
+
+#plotting
+import matplotlib.pyplot as plt
+plt.switch_backend('Agg') # this suppresses the console for plotting
+import seaborn as sns
+
+def beta_dist(data_sets, kmer_size, n_factor):
+
+    # Loop over all data sets
+    for data_set in data_sets:
+        
+        data_set = data_set[0]        
+    
+        # Retrieve diseased data and labels
+        allowed_labels = ['0', '1']
+        kmer_cnts, accessions, labelz, domain_labels = load_kmer_cnts_jf.load_kmers(kmer_size, data_set, allowed_labels)
+        print("LOADED DATASET " + str(data_set[0]) + ": " + str(len(kmer_cnts)) + " SAMPLES")
+        labelz=np.asarray(labelz)
+        labelz=labelz.astype(np.int)
+        
+        # Conduct NMF and resave to data_normalized
+        if n_factor == 0:
+            data_normalized = normalize(kmer_cnts, axis = 1, norm = 'l1')
+            data_normalized, labels = shuffle(data_normalized, labelz, random_state=0) 
+            x = data_normalized
+            y = labels
+                    
+        else:
+            data_normalized = normalize(kmer_cnts, axis = 1, norm = 'l1')
+            data_normalized = stats_utils_AEB.NMF_factor(data_normalized, kmer_size, n_components = int(n_factor), 
+                                                     title=(str(data_set) + str(kmer_size) + "mers" 
+                                                            + str(n_factor) + "factors"))
+            data_normalized, labels = shuffle(data_normalized, labelz, random_state=0)
+            x = data_normalized
+            y = labels
+            
+        return x, y
+    
+data_sets = [
+    #[['MetaHIT'], ['MetaHIT']],
+    #[['Qin_et_al'], ['Qin_et_al']],
+    #[['Zeller_2014'], ['Zeller_2014']],
+    #[['LiverCirrhosis'], ['LiverCirrhosis']],
+    #[['Karlsson_2013_no_adapter'], ['Karlsson_2013_no_adapter']],
+    #[['RA_no_adapter'], ['RA_no_adapter']], 
+    [['LeChatelier'], ['LeChatelier']],
+    #[['Feng'], ['Feng']]
+]
+
+for kmer_size in [10]:
+    x, y = beta_dist(data_sets, kmer_size=kmer_size, n_factor=100) 
+    
+    k_fold = RepeatedStratifiedKFold(n_splits=10, n_repeats=20)
+    estimator = LogisticRegressionCV(cv = k_fold, 
+                                 scoring= 'accuracy',
+                                 max_iter=10000000,
+                                 penalty = 'l1', 
+                                 solver = 'saga', 
+                                 n_jobs = 1).fit(x,y)
+    
+    df = pd.DataFrame(abs(estimator.coef_)).T.sort_values(by = [0],axis=0, ascending=False).reset_index()
+    plt.figure()
+    plt.scatter(y = df[0], x= df.index)
+    plt.ylabel("abs value beta coef")
+    plt.xlabel("factors")
+    plt.title(str(kmer_size) + str(data_sets[0]))
+    plt.savefig("/pollard/home/abustion/deep_learning_microbiome/analysis/NMF/beta_figures/" + str(kmer_size) + str(data_sets[0]) + ".png")
+    plt.show()

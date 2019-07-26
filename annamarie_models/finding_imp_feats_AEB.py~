@@ -1,0 +1,200 @@
+import os
+import pandas as pd
+import numpy as np
+import csv
+
+from itertools import cycle, product
+import argparse
+import warnings
+
+from sklearn.preprocessing import normalize
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, cross_val_score, StratifiedKFold, RepeatedStratifiedKFold, train_test_split
+from sklearn.utils import shuffle
+from sklearn.decomposition import NMF
+from sklearn.exceptions import ConvergenceWarning
+
+# import private scripts
+import load_kmer_cnts_jf
+import stats_utils_AEB
+
+
+graph_dir = os.environ['HOME'] + '/deep_learning_microbiome/analysis/impt_features/kmer_lists'
+
+
+# User passes the model to be used as a command-line argument, which is parsed here.
+if __name__ == '__main__':    
+    parser = argparse.ArgumentParser(description= "Program to run machine learning models and find impt feats")
+    parser.add_argument('-m', type = str, default = 'rf', help = "Model type, can be rf lasso or lasso_nmf")
+    parser.add_argument('-k', type = int, default = 5, help = "Kmer Size")
+    parser.add_argument('-f', type = int, default = 10, help = "Number CV folds")
+    parser.add_argument('-r', type = int, default = 20, help = "Number iterations of k-fold cross validation")
+    parser.add_argument('-ds', type = str, default = 'LiverCirrhosis', help = 'Data set')
+
+    arg_vals = parser.parse_args()
+    model_type = arg_vals.m
+    kmer_size = arg_vals.k
+    splits = arg_vals.f
+    repeats = arg_vals.r
+    data_set = arg_vals.ds
+
+#Functions
+def class_to_target(cls):
+    target = np.zeros((n_classes,))
+    target[class_to_ind[cls]] = 1.0
+    return target
+
+    
+def config_info(dataset_name, model_name, config,  kmer_size, skip_keys=['DS', 'CL']):
+    config_info = "DS:" + dataset_name
+    for k in config:              
+        # skip the specified keys, used for skipping the fold and iteration indices (for aggregating results across them)
+        if not k in skip_keys:
+            config_info += '_' + k + ':' +str(get_config_val(k, config))
+    return config_info
+
+def get_config_val(config_key, config):
+    val = config[config_key]
+    if type(val) is list:
+        val = '-'.join([ str(c) for c in val])
+    return val
+
+def get_reverse_complement(kmer):
+    kmer_rev = ''
+    for c in kmer:
+        if c == 'A':
+            kmer_rev += 'T'
+        elif c == 'T':
+            kmer_rev += 'A'
+        elif c == 'C':
+            kmer_rev += 'G'
+        else:
+            kmer_rev += 'C'
+
+    return kmer_rev[::-1]
+    
+
+def get_feature_importances(clf, kmer_imps):
+    print("GETTING FEATURE IMPORTANCES")
+    importances = clf.feature_importances_
+    #std = np.std([tree.feature_importances_ for tree in clf.estimators_],
+    #             axis=0)
+    for i in range(len(importances)):
+        kmer_imps[i] += importances[i]
+    print("FINISHED ADDING IMPORTANCES")
+    
+def get_lasso_importances(estimator, kmer_imps):
+    print("GETTING FEATURE IMPORTANCES")
+    importances = estimator.coef_
+    for i in range(len(importances)):
+        kmer_imps[i] += importances[0][i]
+    print("FINISHED ADDING IMPORTANCES")
+    
+def get_lasso_NMF_importances(estimator, factors):
+    print("GETTING FEATURE IMPORTANCES")
+    importances = estimator.coef_
+    for i in range(len(importances)):
+        factors[i] += importances[0][i]
+    print("FINISHED ADDING IMPORTANCES")
+    
+
+## data loading ##
+data_set = [data_set]
+allowed_labels = ['0', '1']
+kmer_cnts, accessions, labelz, domain_labels = load_kmer_cnts_jf.load_kmers(kmer_size,
+                                                                            data_set,
+                                                                            allowed_labels)
+labelz=np.asarray(labelz)
+labelz=labelz.astype(np.int)
+
+if model_type == 'lasso_nmf':
+    n=20
+    data_normalized = normalize(kmer_cnts, axis = 1, norm = 'l1')
+    data_normalized = stats_utils_AEB.NMF_factor(data_normalized, kmer_size, n_components = int(n), 
+                                                     title=(str(data_set) + str(kmer_size) + "mers" 
+                                                            + str(n) + "factors"))
+    data_normalized, labels = shuffle(data_normalized, labelz, random_state=0)
+    x = data_normalized
+    y = labels
+else:
+    data_normalized = normalize(kmer_cnts, axis = 1, norm = 'l1')
+    data_normalized, labels = shuffle(data_normalized, labelz, random_state=0) 
+    x = data_normalized
+    y = labels
+
+
+## kmer or factor setup ##
+if model_type == 'lasso_nmf':
+    kmers_no_comp=[]
+    for i in range(n):
+        kmers_no_comp.append("Factor" + str(i) +": ")
+    factor_imps = np.zeros(len(kmers_no_comp))
+else:
+    kmers_no_comp = []
+    all_kmers_caps = [''.join(_) for _ in product(['A', 'C', 'G', 'T'], repeat = kmer_size)]
+    for kmer in all_kmers_caps:
+        if get_reverse_complement(kmer) not in kmers_no_comp:
+            kmers_no_comp.append(kmer)
+    kmer_imps = np.zeros(len(kmers_no_comp))
+
+
+## set up model ##
+if model_type == 'rf':
+    estimator = RandomForestClassifier(n_estimators=500, max_depth=None, min_samples_split=5, n_jobs=4, max_features='log2')
+else:
+    estimator = LogisticRegression(penalty='l1', solver='saga', max_iter=10, n_jobs=4)
+
+
+## run the model ##
+k_fold = RepeatedStratifiedKFold(n_splits=splits, n_repeats=repeats)
+for train_i, test_i in k_fold.split(x, y):
+    x_train, y_train = x[train_i], y[train_i]
+    x_test, y_test = x[test_i], y[test_i]
+    use_norm = True
+    
+    if use_norm:
+        sample_mean = x_train.mean(axis=0)
+        sample_std = x_train.std(axis=0)
+        x_train = (x_train - sample_mean) / sample_std
+        x_test = (x_test - sample_mean) / sample_std
+                
+    y_train = np.array(y_train)
+    y_test = np.array(y_test)
+                
+    estimator.fit(x_train, y_train)
+    y_test_pred= np.array(estimator.predict_proba(x_test))
+    
+    if model_type == 'rf':
+        get_feature_importances(estimator, kmer_imps)
+        
+    elif model_type == 'lasso':
+        importances = estimator.coef_
+        for i in range(len(importances.T)):
+            kmer_imps[i] += abs(importances[0][i])
+    
+    elif model_type == 'lasso_nmf':
+        importances = estimator.coef_
+        for i in range(len(importances.T)):
+            factor_imps[i] += abs(importances[0][i])
+    
+
+        
+## get the important features ##
+if model_type == 'lasso_nmf':
+    imps = factor_imps
+else:
+    imps = kmer_imps
+num_features = -1
+num_feature_imps = num_features
+if (num_feature_imps == -1):
+    num_feature_imps = len(imps)
+if imps is not None and num_feature_imps > 0:
+    indices = np.argsort(imps)[::-1][0:num_feature_imps]
+    imps = imps[indices]
+    kmers_no_comp = [kmers_no_comp[i] for i in indices]
+    file = open(graph_dir + "/feat_imps_" + str(model_type) + str(data_set) + str(kmer_size) + "mers.txt", "w")
+    for i in range(num_feature_imps):
+        if imps[i] > 0:
+            file.write(kmers_no_comp[i] + "\t" + str(imps[i] / (splits * repeats)) + "\n")
+    file.close()
